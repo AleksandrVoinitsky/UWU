@@ -290,6 +290,7 @@
         var elItem = document.createElement("div");
         elItem.className = "rmk-item";
         elItem.innerHTML =
+          (it.image ? '<img class="thumb" src="/uploads/' + it.image + '" alt="">' : "") +
           '<div class="name"></div>' +
           (it.price ? '<div class="price">' + money(it.price) + " ₽</div>" : "");
         elItem.querySelector(".name").textContent = it.name;

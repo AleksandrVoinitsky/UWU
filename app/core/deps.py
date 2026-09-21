@@ -8,6 +8,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_session
 from app.core.security import decode_access_token
@@ -22,6 +23,14 @@ _CREDENTIALS_ERROR = HTTPException(
 )
 
 
+async def _load_user(session: AsyncSession, user_id: int) -> User | None:
+    """Загружает пользователя с ролью (для проверки прав без lazy-load)."""
+    result = await session.execute(
+        select(User).options(selectinload(User.role)).where(User.id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_current_user(
     token: str | None = Depends(oauth2_scheme),
     session: AsyncSession = Depends(get_session),
@@ -32,7 +41,7 @@ async def get_current_user(
     subject = decode_access_token(token)
     if subject is None:
         raise _CREDENTIALS_ERROR
-    user = await session.get(User, int(subject))
+    user = await _load_user(session, int(subject))
     if user is None or not user.is_active:
         raise _CREDENTIALS_ERROR
     return user
@@ -59,7 +68,7 @@ async def get_current_user_optional(
     subject = decode_access_token(token)
     if subject is None:
         return None
-    user = await session.get(User, int(subject))
+    user = await _load_user(session, int(subject))
     if user is None or not user.is_active:
         return None
     return user

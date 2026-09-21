@@ -10,16 +10,19 @@ from __future__ import annotations
 import csv
 import io
 import json
+import uuid
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_session
+from app.core.config import settings
 from app.core.deps import get_current_user_from_cookie
 from app.core.i18n import translate
 from app.models import catalog as cat
@@ -387,6 +390,53 @@ async def update_nomenklatura(
     return RedirectResponse("/catalog/nomenklatura", status_code=303)
 
 
+@router.post("/catalog/nomenklatura/{item_id}/image")
+async def upload_nomenklatura_image(
+    item_id: int,
+    file: UploadFile = File(...),
+    session=Depends(get_session),
+    user=Depends(get_current_user_from_cookie),
+):
+    """Загружает изображение товара (PNG/WebP/JPEG/GIF, прозрачность сохраняется)."""
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
+    obj = await catalog_service.get_one(session, cat.Nomenklatura, item_id)
+    if obj is None:
+        return JSONResponse({"detail": "Товар не найден"}, status_code=404)
+
+    content_type = (file.content_type or "").lower()
+    ext = {
+        "png": ".png", "jpeg": ".jpg", "jpg": ".jpg",
+        "webp": ".webp", "gif": ".gif",
+    }
+    matched = None
+    for key, val in ext.items():
+        if key in content_type:
+            matched = val
+            break
+    if matched is None:
+        return JSONResponse({"detail": "Неподдерживаемый формат изображения"}, status_code=400)
+
+    uploads = Path(settings.uploads_dir)
+    uploads.mkdir(parents=True, exist_ok=True)
+    filename = f"nomen_{item_id}_{uuid.uuid4().hex[:8]}{matched}"
+    dest = uploads / filename
+    dest.write_bytes(await file.read())
+
+    # Удаляем старое изображение.
+    if obj.image_path:
+        old = uploads / obj.image_path
+        if old.exists() and old.is_file():
+            try:
+                old.unlink()
+            except OSError:
+                pass
+    obj.image_path = filename
+    await session.commit()
+    return RedirectResponse("/catalog/nomenklatura", status_code=303)
+
+
 @router.post("/catalog/kontragenty/{item_id}/update")
 async def update_kontragent(
     item_id: int, name: str = Form(...), full_name: str = Form(""), inn: str = Form(""),
@@ -648,6 +698,7 @@ async def rmk_page(
             "id": n.id,
             "name": n.name,
             "price": float(price_service.effective_price(n, tipy_map) or Decimal("0")),
+            "image": n.image_path,
         }
         for n in nomen
     ]

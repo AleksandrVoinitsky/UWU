@@ -27,9 +27,13 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@uwu.local}
       DEFAULT_CURRENCY: ${DEFAULT_CURRENCY:-RUB}
       DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-ru}
+      UPLOADS_DIR: /app/uploads
     ports:
       - "8000:8000"
+    volumes:
+      - uploads:/app/uploads
     restart: unless-stopped
 
 volumes:
   pgdata:
+  uploads:

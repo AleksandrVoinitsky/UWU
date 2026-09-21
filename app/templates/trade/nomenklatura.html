@@ -23,13 +23,19 @@
           <th>Вид</th>
           <th class="num">Закуп.</th>
           <th class="num">Цена</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
         {% for item in items %}
         <tr data-row data-edit="modal-nomen-edit" data-id="{{ item.id }}" data-name="{{ item.name }}" data-full_name="{{ item.full_name or '' }}" data-vid="{{ item.vid }}" data-artikul="{{ item.artikul or '' }}" data-purchase_price="{{ item.purchase_price or '' }}" data-retail_price="{{ item.retail_price or '' }}" data-price_mode="{{ item.price_mode }}" data-tip_tsen_id="{{ item.tip_tsen_id or '' }}" style="cursor:pointer" title="Нажмите для редактирования">
           <td class="muted">{{ item.code }}</td>
-          <td>{{ item.name }}</td>
+          <td>
+            <div class="flex" style="gap:10px;align-items:center">
+              {% if item.image_path %}<img class="thumb" src="/uploads/{{ item.image_path }}" alt="">{% else %}<span class="thumb thumb-empty">—</span>{% endif %}
+              {{ item.name }}
+            </div>
+          </td>
           <td class="muted">{{ item.artikul or '—' }}</td>
           <td>{{ item.vid }}</td>
           <td class="num muted">{{ "%.2f"|format(item.purchase_price) if item.purchase_price else '—' }}</td>
@@ -38,9 +44,10 @@
             {% if ep is not none %}{{ "%.2f"|format(ep) }}{% else %}—{% endif %}
             {% if item.price_mode == 'by_type' %}<span class="muted small"> · {{ item.tip_tsen.name if item.tip_tsen else 'вид цен' }}</span>{% endif %}
           </td>
+          <td><button class="btn text small" data-photo-open data-photo-id="{{ item.id }}">Фото</button></td>
         </tr>
         {% else %}
-        <tr data-empty><td colspan="6" class="muted">Нет записей</td></tr>
+        <tr data-empty><td colspan="7" class="muted">Нет записей</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -137,4 +144,69 @@
     </form>
   </div>
 </div>
+
+<!-- Загрузка фото товара (drag-and-drop) -->
+<div class="modal-backdrop" id="modal-photo">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header"><h3>Фото товара</h3><button class="modal-close" data-modal-close>✕</button></div>
+    <div class="modal-body">
+      <div class="dropzone" id="dropzone">
+        <div class="dz-hint">Перетащите изображение сюда или</div>
+        <button type="button" class="btn secondary" onclick="document.getElementById('photo-file').click()">Выбрать файл</button>
+        <div class="muted small mt">PNG с прозрачностью, WebP, JPEG, GIF</div>
+        <img id="photo-preview" style="display:none;max-width:180px;max-height:180px;margin:12px auto">
+      </div>
+      <form id="photo-form" method="post" enctype="multipart/form-data" action="">
+        <input type="file" id="photo-file" name="file" accept="image/*" style="display:none">
+      </form>
+    </div>
+    <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
+      <button type="button" class="btn secondary" data-modal-close>Закрыть</button>
+      <button type="button" class="btn primary" id="photo-upload" disabled>Загрузить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var photoForm = document.getElementById('photo-form');
+var photoFile = document.getElementById('photo-file');
+var photoPreview = document.getElementById('photo-preview');
+var photoUpload = document.getElementById('photo-upload');
+var dropzone = document.getElementById('dropzone');
+
+document.querySelectorAll('[data-photo-open]').forEach(function (btn) {
+  btn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    photoForm.action = '/catalog/nomenklatura/' + btn.getAttribute('data-photo-id') + '/image';
+    openModal('modal-photo');
+  });
+});
+
+photoFile.addEventListener('change', function () {
+  if (photoFile.files && photoFile.files[0]) {
+    photoPreview.src = URL.createObjectURL(photoFile.files[0]);
+    photoPreview.style.display = '';
+    photoUpload.disabled = false;
+  }
+});
+
+['dragover', 'dragenter'].forEach(function (ev) {
+  dropzone.addEventListener(ev, function (e) { e.preventDefault(); dropzone.classList.add('dragover'); });
+});
+['dragleave', 'drop'].forEach(function (ev) {
+  dropzone.addEventListener(ev, function (e) { e.preventDefault(); dropzone.classList.remove('dragover'); });
+});
+dropzone.addEventListener('drop', function (e) {
+  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+    photoFile.files = e.dataTransfer.files;
+    photoPreview.src = URL.createObjectURL(e.dataTransfer.files[0]);
+    photoPreview.style.display = '';
+    photoUpload.disabled = false;
+  }
+});
+
+photoUpload.addEventListener('click', function () {
+  photoForm.submit();
+});
+</script>
 {% endblock %}

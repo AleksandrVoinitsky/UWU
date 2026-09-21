@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     # --- Сервис ---
     app_name: str = "UWU"
     debug: bool = False
+    uploads_dir: str = "./uploads"  # каталог для загружаемых изображений
 
 
 @lru_cache

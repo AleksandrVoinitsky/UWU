@@ -39,6 +39,8 @@ class Nomenklatura(Base, IdMixin, TimestampMixin):
     barcode: Mapped[str | None] = mapped_column(String(13), nullable=True)
     nds_rate_id: Mapped[int | None] = mapped_column(ForeignKey("stavki_nds.id"), nullable=True)
     properties: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    # Путь к изображению товара (относительно /uploads).
+    image_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Цены: закупочная (база для наценки) и свободная розничная (без видов цен).
     purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)

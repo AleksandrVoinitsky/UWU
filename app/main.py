@@ -44,6 +44,15 @@ def create_app() -> FastAPI:
         "/static", StaticFiles(directory="app/static"), name="static"
     )
 
+    # Каталог загружаемых изображений (volume в Docker).
+    from pathlib import Path
+
+    uploads = Path(settings.uploads_dir)
+    uploads.mkdir(parents=True, exist_ok=True)
+    application.mount(
+        "/uploads", StaticFiles(directory=str(uploads)), name="uploads"
+    )
+
     @application.get("/healthz", tags=["health"])
     async def healthz() -> dict:
         return {"status": "ok"}
