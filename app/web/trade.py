@@ -38,7 +38,7 @@ router = APIRouter(tags=["web-trade"])
 # Названия документов для отображения.
 DOC_LABELS = {
     "prihod": "Приходная накладная",
-    "rashod": "Расходная накладная",
+    "rashod": "Накладная",
     "peremeshenie": "Перемещение",
     "spisanie": "Списание",
     "oprihodovanie": "Оприходование",
@@ -811,7 +811,8 @@ async def document_print(
     if document is None:
         return _page(request, user, "trade/error.html", error="Документ не найден", back="/documents")
     names = await _resolve_names(session, document)
-    return _page(request, user, "trade/invoice.html", document=document, names=names)
+    constants = await catalog_service.get_constants(session)
+    return _page(request, user, "trade/invoice.html", document=document, names=names, constants=constants)
 
 
 # --- Заявки покупателя ---

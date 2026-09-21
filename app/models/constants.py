@@ -28,6 +28,11 @@ DEFAULT_CONSTANTS: dict[str, Any] = {
     "cost_method": "fifo",          # Метод списания себестоимости
     "prefix_ib": "",                # Префикс информационной базы
     "enforce_min_price": False,     # Контроль минимальной цены (не ниже закупочной)
+    # Шапка печатной формы накладной.
+    "invoice_company_name": "",     # Название организации
+    "invoice_company_inn": "",      # ИНН
+    "invoice_company_address": "",  # Адрес
+    "invoice_footer": "",           # Доп. текст в подвале
 }
 
 

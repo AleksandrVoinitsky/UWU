@@ -11,6 +11,9 @@
 <div class="invoice">
   <div class="inv-header">
     <div>
+      {% if constants.invoice_company_name %}<div class="inv-company">{{ constants.invoice_company_name }}</div>{% endif %}
+      {% if constants.invoice_company_inn %}<div class="muted small">ИНН {{ constants.invoice_company_inn }}</div>{% endif %}
+      {% if constants.invoice_company_address %}<div class="muted small">{{ constants.invoice_company_address }}</div>{% endif %}
       <div class="inv-title">{{ DOC_LABELS.get(document.doc_type, document.doc_type) }}</div>
       <div class="muted">№ {{ document.number }}</div>
     </div>
@@ -55,6 +58,10 @@
     <div>Получено: {{ "%.2f"|format(document.extra.received) }}</div>
     <div style="font-weight:600">Сдача: {{ "%.2f"|format(document.extra.received - document.total) }}</div>
   </div>
+  {% endif %}
+
+  {% if constants.invoice_footer %}
+  <div class="muted small" style="margin-top:24px">{{ constants.invoice_footer }}</div>
   {% endif %}
 
   <div style="margin-top:40px;display:flex;justify-content:space-between;font-size:13px;color:var(--text-secondary)">

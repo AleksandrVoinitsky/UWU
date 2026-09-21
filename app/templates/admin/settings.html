@@ -39,6 +39,14 @@
         <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="const_enforce_min_price" {% if constants.enforce_min_price %}checked{% endif %} style="width:auto"> Контроль минимальной цены (не ниже закупочной)</label>
       </div>
     </div>
+    <hr class="divider">
+    <h2>Печатная форма накладной</h2>
+    <div class="form-row">
+      <div class="field"><label>Название организации</label><input type="text" name="const_invoice_company_name" value="{{ constants.invoice_company_name or '' }}"></div>
+      <div class="field"><label>ИНН</label><input type="text" name="const_invoice_company_inn" value="{{ constants.invoice_company_inn or '' }}"></div>
+      <div class="field"><label>Адрес</label><input type="text" name="const_invoice_company_address" value="{{ constants.invoice_company_address or '' }}"></div>
+      <div class="field"><label>Текст в подвале</label><input type="text" name="const_invoice_footer" value="{{ constants.invoice_footer or '' }}"></div>
+    </div>
     <div class="form-actions"><button type="submit" class="btn primary">{{ t('common.save', lang) }}</button></div>
   </form>
 </div>
