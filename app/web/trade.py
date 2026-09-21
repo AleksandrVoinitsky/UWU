@@ -720,6 +720,55 @@ async def zakaz_reserve(
     return RedirectResponse("/zakazy", status_code=303)
 
 
+@router.post("/zakazy/{zakaz_id}/ship")
+async def zakaz_ship(
+    zakaz_id: int,
+    sklad_id: str = Form(""),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    """Отгружает заявку: создаёт расходную накладную, снимает резерв, закрывает заявку."""
+    zakaz = await document_service.get_document(session, zakaz_id)
+    if not (zakaz and zakaz.items):
+        return RedirectResponse("/zakazy", status_code=303)
+
+    sklady = await catalog_service.list_all(session, cat.Sklad)
+    target = (
+        int(sklad_id)
+        if sklad_id
+        else next((s.id for s in sklady if s.is_default), sklady[0].id if sklady else None)
+    )
+    if target is None:
+        return RedirectResponse("/zakazy", status_code=303)
+
+    items = [
+        {"nomenklatura_id": i.nomenklatura_id, "quantity": i.quantity, "price": i.price}
+        for i in zakaz.items
+    ]
+    try:
+        document = await document_service.create_document(
+            session,
+            doc_type=DocType.RASHOD,
+            subtype=DocSubtype.CASH,
+            doc_date=date.today(),
+            sklad_id=target,
+            kontragent_id=zakaz.kontragent_id,
+            extra={"zakaz_id": zakaz_id},
+            items=items,
+            created_by_id=user.id,
+        )
+        await document_service.post_document(session, document)
+        # Снимаем резерв и закрываем заявку.
+        await stock_service.release_for_zakaz(session, zakaz_id)
+        extra = dict(zakaz.extra or {})
+        extra["state"] = "done"
+        zakaz.extra = extra
+        await session.commit()
+    except (InsufficientStockError, document_service.DocumentError):
+        await session.rollback()
+    return RedirectResponse("/zakazy", status_code=303)
+
+
 # --- Договоры контрагентов ---
 
 

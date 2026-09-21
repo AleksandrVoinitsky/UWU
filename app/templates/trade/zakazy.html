@@ -29,6 +29,7 @@
               {% set st = z.extra.get('state', 'new') if z.extra else 'new' %}
               {% if st in ['new', 'in_work'] %}
               <form method="post" action="/zakazy/{{ z.id }}/reserve"><button class="btn text small">Резерв</button></form>
+              <form method="post" action="/zakazy/{{ z.id }}/ship" onsubmit="return confirm('Отгрузить заявку и создать расходную накладную?')"><button class="btn text small">Отгрузить</button></form>
               {% endif %}
               {% if st == 'new' %}
               <form method="post" action="/zakazy/{{ z.id }}/state"><input type="hidden" name="state" value="in_work"><button class="btn text small">В работу</button></form>
