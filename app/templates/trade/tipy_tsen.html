@@ -14,7 +14,7 @@
       <thead><tr><th>{{ t('common.name', lang) }}</th><th>Включает НДС</th><th class="num">Наценка</th></tr></thead>
       <tbody>
         {% for item in items %}
-        <tr data-row data-edit="modal-tip-edit" data-id="{{ item.id }}" data-name="{{ item.name }}" style="cursor:pointer" title="Нажмите для редактирования"><td>{{ item.name }}</td><td>{{ 'Да' if item.includes_nds else 'Нет' }}</td><td class="num">{{ item.markup_percent or '—' }}</td></tr>
+        <tr data-row data-edit="modal-tip-edit" data-id="{{ item.id }}" data-name="{{ item.name }}" data-markup_percent="{{ item.markup_percent or '' }}" style="cursor:pointer" title="Нажмите для редактирования"><td>{{ item.name }}</td><td>{{ 'Да' if item.includes_nds else 'Нет' }}</td><td class="num">{{ item.markup_percent or '—' }}</td></tr>
         {% else %}<tr data-empty><td colspan="3" class="muted">Нет записей</td></tr>{% endfor %}
       </tbody>
     </table>
@@ -26,7 +26,10 @@
     <div class="modal-header"><h3>{{ t('common.create', lang) }} · Тип цен</h3><button class="modal-close" data-modal-close>✕</button></div>
     <form method="post" action="/catalog/tipy_tsen">
       <div class="modal-body">
-        <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+        <div class="form-row">
+          <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+          <div class="field"><label>Наценка %</label><input type="number" step="0.01" name="markup_percent" placeholder="например 20"></div>
+        </div>
       </div>
       <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
         <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
@@ -41,7 +44,10 @@
     <div class="modal-header"><h3>{{ t('common.edit', lang) }} · Тип цен</h3><button class="modal-close" data-modal-close>✕</button></div>
     <form method="post" action="" data-action-pattern="/catalog/tipy_tsen/{id}/update">
       <div class="modal-body">
-        <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+        <div class="form-row">
+          <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+          <div class="field"><label>Наценка %</label><input type="number" step="0.01" name="markup_percent" placeholder="например 20"></div>
+        </div>
       </div>
       <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
         <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>

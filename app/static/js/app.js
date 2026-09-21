@@ -161,6 +161,65 @@
     });
   });
 
+  /* ---------- Цены номенклатуры по видам ---------- */
+  var tipyEl = document.getElementById("tipy-data");
+  var explicitEl = document.getElementById("explicit-data");
+  var TIPY = tipyEl ? JSON.parse(tipyEl.textContent) : [];
+  var EXPLICIT = explicitEl ? JSON.parse(explicitEl.textContent) : {};
+
+  function renderPriceRows(nomenId, purchasePrice) {
+    var container = document.getElementById("prices-rows");
+    if (!container) return;
+    container.innerHTML = "";
+    TIPY.forEach(function (tip) {
+      var auto = purchasePrice ? purchasePrice * (1 + (tip.markup_percent || 0) / 100) : 0;
+      var explicit = (EXPLICIT[nomenId] || {})[tip.id];
+
+      var row = document.createElement("div");
+      row.className = "flex flex-between";
+      row.style.cssText = "padding:8px 0;border-bottom:1px solid var(--border);align-items:center";
+
+      var label = document.createElement("div");
+      label.style.cssText = "flex:1;min-width:0";
+      var name = document.createElement("div");
+      name.style.cssText = "font-size:13px";
+      name.textContent = tip.name;
+      var hint = document.createElement("div");
+      hint.className = "muted small";
+      hint.textContent = "наценка " + (tip.markup_percent != null ? tip.markup_percent + "%" : "—") + " · авто " + auto.toFixed(2);
+      label.appendChild(name);
+      label.appendChild(hint);
+
+      var input = document.createElement("input");
+      input.type = "number";
+      input.step = "0.01";
+      input.name = "override_" + tip.id;
+      input.style.cssText = "width:130px;text-align:right";
+      input.placeholder = auto.toFixed(2);
+      input.value = explicit != null ? explicit : "";
+
+      row.appendChild(label);
+      row.appendChild(input);
+      container.appendChild(row);
+    });
+  }
+
+  document.querySelectorAll("[data-prices-open]").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var row = btn.closest("tr[data-id]");
+      var modal = document.getElementById("modal-prices");
+      if (!row || !modal) return;
+      var id = row.dataset.id;
+      var form = modal.querySelector("form");
+      form.action = "/catalog/nomenklatura/" + id + "/prices";
+      form.querySelector('[name="purchase_price"]').value = row.dataset.purchase_price || "";
+      form.querySelector('[name="retail_price"]').value = row.dataset.retail_price || "";
+      renderPriceRows(id, parseFloat(row.dataset.purchase_price) || 0);
+      openModal("modal-prices");
+    });
+  });
+
   /* ---------- РМК (рабочее место кассира) ---------- */
   var rmkData = document.getElementById("rmk-data");
   if (rmkData) {

@@ -40,6 +40,10 @@ class Nomenklatura(Base, IdMixin, TimestampMixin):
     nds_rate_id: Mapped[int | None] = mapped_column(ForeignKey("stavki_nds.id"), nullable=True)
     properties: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
 
+    # Цены: закупочная (база для наценки) и свободная розничная (без видов цен).
+    purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    retail_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+
     parent: Mapped["Nomenklatura | None"] = relationship(remote_side="Nomenklatura.id")
     base_unit: Mapped["Edinitsa | None"] = relationship(foreign_keys=[base_unit_id])  # noqa: F821
     main_unit: Mapped["Edinitsa | None"] = relationship(foreign_keys=[main_unit_id])  # noqa: F821

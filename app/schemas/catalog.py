@@ -143,6 +143,8 @@ class NomenklaturaBase(BaseModel):
     is_weighted: bool = False
     barcode: str | None = None
     nds_rate_id: int | None = None
+    purchase_price: Decimal | None = None
+    retail_price: Decimal | None = None
     properties: dict[str, Any] = Field(default_factory=dict)
 
 

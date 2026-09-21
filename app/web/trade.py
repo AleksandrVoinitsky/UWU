@@ -24,7 +24,7 @@ from app.models import catalog as cat
 from app.models.document.base_document import Document
 from app.models.enums import DocSubtype, DocType, DocumentStatus
 from app.models.users import User
-from app.services import catalog_service, document_service, report_service
+from app.services import catalog_service, document_service, price_service, report_service
 from app.services.stock_service import InsufficientStockError
 from app.templates import render
 
@@ -123,13 +123,30 @@ async def catalog_nomenklatura(request: Request, session=Depends(get_session), u
     items = list(result.scalars())
     units = await catalog_service.list_all(session, cat.Edinitsa)
     nds = await catalog_service.list_all(session, cat.StavkaNDS)
-    return _page(request, user, "trade/nomenklatura.html", items=items, units=units, nds=nds)
+    tipy = await catalog_service.list_all(session, cat.TipTsen)
+
+    # Явные цены {nomen_id: {tip_id: price}}.
+    prices_result = await session.execute(select(cat.TsenaNomenklatury))
+    explicit: dict[int, dict[int, float]] = {}
+    for p in prices_result.scalars():
+        explicit.setdefault(p.nomenklatura_id, {})[p.tip_tsen_id] = float(p.price)
+
+    return _page(
+        request, user, "trade/nomenklatura.html",
+        items=items, units=units, nds=nds,
+        tipy_json=json.dumps(
+            [{"id": t.id, "name": t.name, "markup_percent": float(t.markup_percent) if t.markup_percent is not None else None} for t in tipy],
+            ensure_ascii=False,
+        ),
+        explicit_json=json.dumps(explicit, ensure_ascii=False),
+    )
 
 
 @router.post("/catalog/nomenklatura")
 async def create_nomenklatura(
     name: str = Form(...), full_name: str = Form(""), vid: str = Form("tovar"),
     artikul: str = Form(""), base_unit_id: str = Form(""), nds_rate_id: str = Form(""),
+    purchase_price: str = Form(""), retail_price: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
     code = await catalog_service.next_nomenklatura_code(session)
@@ -138,6 +155,8 @@ async def create_nomenklatura(
         vid=vid, artikul=artikul or None,
         base_unit_id=int(base_unit_id) if base_unit_id else None,
         nds_rate_id=int(nds_rate_id) if nds_rate_id else None,
+        purchase_price=_or_decimal(purchase_price),
+        retail_price=_or_decimal(retail_price),
     )
     return RedirectResponse("/catalog/nomenklatura", status_code=303)
 
@@ -255,9 +274,12 @@ async def catalog_tipy_tsen(request: Request, session=Depends(get_session), user
 
 @router.post("/catalog/tipy_tsen")
 async def create_tip_tsen(
-    name: str = Form(...), session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+    name: str = Form(...), markup_percent: str = Form(""),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
-    await catalog_service.create_one(session, cat.TipTsen, name=name)
+    await catalog_service.create_one(
+        session, cat.TipTsen, name=name, markup_percent=_or_decimal(markup_percent)
+    )
     return RedirectResponse("/catalog/tipy_tsen", status_code=303)
 
 
@@ -268,16 +290,27 @@ def _or_none(value: str) -> str | None:
     return value.strip() if value else None
 
 
+def _or_decimal(value: str) -> Decimal | None:
+    value = value.strip()
+    return Decimal(value) if value else None
+
+
 @router.post("/catalog/nomenklatura/{item_id}/update")
 async def update_nomenklatura(
     item_id: int, name: str = Form(...), full_name: str = Form(""), vid: str = Form("tovar"),
-    artikul: str = Form(""), session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+    artikul: str = Form(""), purchase_price: str = Form(""), retail_price: str = Form(""),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
     obj = await catalog_service.get_one(session, cat.Nomenklatura, item_id)
     if obj:
-        await catalog_service.update_one(
-            session, obj, name=name, full_name=_or_none(full_name), vid=vid, artikul=_or_none(artikul)
-        )
+        obj.name = name
+        obj.full_name = _or_none(full_name)
+        obj.vid = vid
+        obj.artikul = _or_none(artikul)
+        # Цены задаём явно (пустое значение очищает цену).
+        obj.purchase_price = _or_decimal(purchase_price)
+        obj.retail_price = _or_decimal(retail_price)
+        await session.commit()
     return RedirectResponse("/catalog/nomenklatura", status_code=303)
 
 
@@ -364,13 +397,47 @@ async def update_stavka_nds(
 
 @router.post("/catalog/tipy_tsen/{item_id}/update")
 async def update_tip_tsen(
-    item_id: int, name: str = Form(...),
+    item_id: int, name: str = Form(...), markup_percent: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
     obj = await catalog_service.get_one(session, cat.TipTsen, item_id)
     if obj:
-        await catalog_service.update_one(session, obj, name=name)
+        obj.name = name
+        obj.markup_percent = _or_decimal(markup_percent)
+        await session.commit()
     return RedirectResponse("/catalog/tipy_tsen", status_code=303)
+
+
+# --- Цены номенклатуры (виды цен + автонаценка) ---
+
+
+@router.post("/catalog/nomenklatura/{item_id}/prices")
+async def update_nomenklatura_prices(
+    item_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    """Сохраняет закупочную/свободную цену и явные цены по видам цен."""
+    obj = await catalog_service.get_one(session, cat.Nomenklatura, item_id)
+    if obj is None:
+        return RedirectResponse("/catalog/nomenklatura", status_code=303)
+
+    form = await request.form()
+    obj.purchase_price = _or_decimal(str(form.get("purchase_price", "") or ""))
+    obj.retail_price = _or_decimal(str(form.get("retail_price", "") or ""))
+
+    tipy = await catalog_service.list_all(session, cat.TipTsen)
+    for tip in tipy:
+        key = f"override_{tip.id}"
+        raw = str(form.get(key, "") or "").strip()
+        if raw:
+            await price_service.set_explicit_price(session, item_id, tip.id, Decimal(raw))
+        else:
+            await price_service.clear_explicit_price(session, item_id, tip.id)
+
+    await session.commit()
+    return RedirectResponse("/catalog/nomenklatura", status_code=303)
 
 
 # --- РМК (рабочее место кассира) ---
@@ -395,7 +462,15 @@ async def rmk_page(
             price_map[p.nomenklatura_id] = p.price
 
     items = [
-        {"id": n.id, "name": n.name, "price": float(price_map[n.id]) if n.id in price_map else 0.0}
+        {
+            "id": n.id,
+            "name": n.name,
+            "price": (
+                float(n.retail_price)
+                if n.retail_price is not None
+                else (float(price_map[n.id]) if n.id in price_map else 0.0)
+            ),
+        }
         for n in nomen
     ]
     sklady = await catalog_service.list_all(session, cat.Sklad)
