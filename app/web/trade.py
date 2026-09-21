@@ -422,6 +422,77 @@ async def update_tip_tsen(
     return RedirectResponse("/catalog/tipy_tsen", status_code=303)
 
 
+# --- Сотрудники ---
+
+
+@router.get("/catalog/sotrudniki", response_class=HTMLResponse)
+async def catalog_sotrudniki(request: Request, session=Depends(get_session), user=Depends(get_current_user_from_cookie)):
+    items = await catalog_service.list_all(session, cat.Sotrudnik)
+    return _page(request, user, "trade/sotrudniki.html", items=items)
+
+
+@router.post("/catalog/sotrudniki")
+async def create_sotrudnik(
+    name: str = Form(...), position: str = Form(""),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    await catalog_service.create_one(session, cat.Sotrudnik, name=name, position=position or None)
+    return RedirectResponse("/catalog/sotrudniki", status_code=303)
+
+
+@router.post("/catalog/sotrudniki/{item_id}/update")
+async def update_sotrudnik(
+    item_id: int, name: str = Form(...), position: str = Form(""),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    obj = await catalog_service.get_one(session, cat.Sotrudnik, item_id)
+    if obj:
+        obj.name = name
+        obj.position = position or None
+        await session.commit()
+    return RedirectResponse("/catalog/sotrudniki", status_code=303)
+
+
+# --- Расчётные счета ---
+
+
+@router.get("/catalog/scheta", response_class=HTMLResponse)
+async def catalog_scheta(request: Request, session=Depends(get_session), user=Depends(get_current_user_from_cookie)):
+    items = await catalog_service.list_all(session, cat.RaschetnySchet)
+    kontragenty = await catalog_service.list_all(session, cat.Kontragent)
+    kg_map = {k.id: k.name for k in kontragenty}
+    return _page(request, user, "trade/scheta.html", items=items, kontragenty=kontragenty, kg_map=kg_map)
+
+
+@router.post("/catalog/scheta")
+async def create_schet(
+    kontragent_id: str = Form(...), bank_name: str = Form(""), account: str = Form(...),
+    bik: str = Form(""),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    await catalog_service.create_one(
+        session, cat.RaschetnySchet,
+        kontragent_id=int(kontragent_id), bank_name=bank_name or None, account=account, bik=bik or None,
+    )
+    return RedirectResponse("/catalog/scheta", status_code=303)
+
+
+@router.post("/catalog/scheta/{item_id}/update")
+async def update_schet(
+    item_id: int, kontragent_id: str = Form(...), bank_name: str = Form(""),
+    account: str = Form(...), bik: str = Form(""),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    obj = await catalog_service.get_one(session, cat.RaschetnySchet, item_id)
+    if obj:
+        obj.kontragent_id = int(kontragent_id)
+        obj.bank_name = bank_name or None
+        obj.account = account
+        obj.bik = bik or None
+        await session.commit()
+    return RedirectResponse("/catalog/scheta", status_code=303)
+
+
 # --- Цены номенклатуры (виды цен + автонаценка) ---
 
 
