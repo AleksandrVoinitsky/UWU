@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.catalog import Kontragent, Nomenklatura, Sklad
-from app.models.document.base_document import Document
+from app.models.document.base_document import Document, DocumentItem
 from app.models.enums import DocType, DocumentStatus
 from app.models.registry import (
     MoneyMovement,
@@ -161,6 +161,82 @@ async def money_movements(session: AsyncSession, start: date, end: date) -> list
                 "document": doc.number if doc else f"#{m.document_id}",
                 "kontragent": kontragent.name if kontragent else None,
                 "amount": m.amount,
+            }
+        )
+    return rows
+
+
+async def settlement_movements(
+    session: AsyncSession, start: date, end: date, kontragent_id: int | None = None
+) -> list[dict]:
+    """Движения по взаиморасчётам за период (детально)."""
+    stmt = (
+        select(SettlementMovement)
+        .where(SettlementMovement.date >= start, SettlementMovement.date <= end)
+        .order_by(SettlementMovement.date, SettlementMovement.id)
+    )
+    if kontragent_id:
+        stmt = stmt.where(SettlementMovement.kontragent_id == kontragent_id)
+    result = await session.execute(stmt)
+    rows = []
+    for m in result.scalars():
+        doc = await session.get(Document, m.document_id)
+        kontragent = await session.get(Kontragent, m.kontragent_id)
+        rows.append(
+            {
+                "date": m.date,
+                "document": doc.number if doc else f"#{m.document_id}",
+                "kontragent": kontragent.name if kontragent else f"#{m.kontragent_id}",
+                "amount": m.amount,
+            }
+        )
+    return rows
+
+
+async def abc_analysis(session: AsyncSession, start: date, end: date) -> list[dict]:
+    """ABC-анализ: группировка ТМЦ по объёму продаж (A/B/C).
+
+    Классы: A — до 80% накопленного объёма, B — следующие 15%, C — остальные.
+    """
+    stmt = (
+        select(
+            DocumentItem.nomenklatura_id,
+            func.sum(DocumentItem.amount),
+        )
+        .join(Document, Document.id == DocumentItem.document_id)
+        .where(
+            Document.doc_type == DocType.RASHOD.value,
+            Document.status == DocumentStatus.POSTED.value,
+            Document.date >= start,
+            Document.date <= end,
+        )
+        .group_by(DocumentItem.nomenklatura_id)
+        .order_by(func.sum(DocumentItem.amount).desc())
+    )
+    result = await session.execute(stmt)
+    data = [(nomen_id, amount) for nomen_id, amount in result.all()]
+
+    total = sum((a for _, a in data), Decimal("0"))
+    rows: list[dict] = []
+    cumulative = Decimal("0")
+    for nomen_id, amount in data:
+        nomen = await session.get(Nomenklatura, nomen_id)
+        cumulative += amount
+        pct = (amount / total * Decimal("100")).quantize(Decimal("0.01")) if total else Decimal("0")
+        cum_pct = (cumulative / total * Decimal("100")).quantize(Decimal("0.01")) if total else Decimal("0")
+        if cum_pct <= Decimal("80"):
+            cls = "A"
+        elif cum_pct <= Decimal("95"):
+            cls = "B"
+        else:
+            cls = "C"
+        rows.append(
+            {
+                "nomenklatura": nomen.name if nomen else f"#{nomen_id}",
+                "amount": amount,
+                "pct": pct,
+                "cum_pct": cum_pct,
+                "class": cls,
             }
         )
     return rows

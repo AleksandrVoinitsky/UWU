@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block page_title %}ABC-анализ{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h2>ABC-анализ ТМЦ</h2>
+    <form method="get" action="/reports/abc" class="flex flex-wrap" style="align-items:flex-end">
+      <div class="field" style="margin:0"><label>С</label><input type="date" name="start" value="{{ start }}"></div>
+      <div class="field" style="margin:0"><label>По</label><input type="date" name="end" value="{{ end }}"></div>
+      <button type="submit" class="btn secondary">Применить</button>
+    </form>
+  </div>
+  <div class="table-wrap">
+    <table class="table" id="abc-table">
+      <thead><tr><th>Номенклатура</th><th class="num">Объём продаж</th><th class="num">Доля %</th><th class="num">Накопл. %</th><th>Класс</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-row>
+          <td>{{ r.nomenklatura }}</td>
+          <td class="num">{{ "%.2f"|format(r.amount) }}</td>
+          <td class="num">{{ r.pct }}%</td>
+          <td class="num">{{ r.cum_pct }}%</td>
+          <td><span class="badge {% if r.class == 'A' %}posted{% elif r.class == 'B' %}draft{% else %}neutral{% endif %}">{{ r.class }}</span></td>
+        </tr>
+        {% else %}<tr data-empty><td colspan="5" class="muted">Нет данных за период</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="muted small mt">A — до 80% накопленного объёма · B — следующие 15% · C — остальные</div>
+</div>
+{% endblock %}
