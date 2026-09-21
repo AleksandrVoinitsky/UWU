@@ -90,6 +90,16 @@
         <span class="label">{{ t('rmk.total', lang) }}</span>
         <span class="value" id="rmk-total">0.00 ₽</span>
       </div>
+      <div class="form-row" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="field" style="margin:0">
+          <label>Получено</label>
+          <input type="number" step="0.01" id="rmk-received" placeholder="0.00" oninput="recalcChange()">
+        </div>
+        <div class="field" style="margin:0">
+          <label>Сдача</label>
+          <div class="stat" id="rmk-change" style="font-size:20px">0.00 ₽</div>
+        </div>
+      </div>
       <button class="btn primary rmk-sell" id="rmk-sell">{{ t('rmk.sell', lang) }}</button>
       <button class="btn secondary" id="rmk-return" style="width:100%;justify-content:center;margin-top:8px">Возврат</button>
     </div>

@@ -50,6 +50,13 @@
 
   <div class="inv-total">Итого: {{ "%.2f"|format(document.total) }}</div>
 
+  {% if document.extra and document.extra.get('received') is not none %}
+  <div style="text-align:right;margin-top:8px;font-size:14px">
+    <div>Получено: {{ "%.2f"|format(document.extra.received) }}</div>
+    <div style="font-weight:600">Сдача: {{ "%.2f"|format(document.extra.received - document.total) }}</div>
+  </div>
+  {% endif %}
+
   <div style="margin-top:40px;display:flex;justify-content:space-between;font-size:13px;color:var(--text-secondary)">
     <div>Отпустил: ______________</div>
     <div>Получил: ______________</div>

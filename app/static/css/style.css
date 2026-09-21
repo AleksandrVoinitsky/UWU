@@ -562,20 +562,22 @@ input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
 .nav-sub {
   max-height: 0;
   overflow: hidden;
-  transition: max-height 2.5s var(--ease), opacity 2.0s var(--ease);
+  transition: max-height 0.4s var(--ease), opacity 0.3s var(--ease);
   opacity: 0;
 }
 
-.nav-group-parent:hover .nav-sub,
+/* Раскрытие по клику (класс .open), без ограничения высоты. */
 .nav-group-parent.open .nav-sub {
-  max-height: 420px;
+  max-height: 4000px;
   opacity: 1;
 }
 
-.nav-group-parent:hover .chevron,
+.nav-group-parent .chevron {
+  transition: transform 0.4s var(--ease);
+}
+
 .nav-group-parent.open .chevron {
   transform: rotate(90deg);
-  transition: transform 2.0s var(--ease);
 }
 
 .nav-sub .nav-link {

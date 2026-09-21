@@ -88,5 +88,24 @@
       </tbody>
     </table>
   </div>
+
+  {% if total_pages > 1 %}
+  <div class="flex flex-between mt">
+    <span class="muted small">Всего: {{ total }} · стр. {{ page }} из {{ total_pages }}</span>
+    <div class="flex" style="gap:6px">
+      {% if page > 1 %}
+      <a class="btn secondary small" href="?doc_type={{ doc_type or '' }}&status={{ status or '' }}&start={{ start or '' }}&end={{ end or '' }}&page={{ page - 1 }}">←</a>
+      {% endif %}
+      {% for p in range(1, total_pages + 1) %}
+        {% if p >= page - 2 and p <= page + 2 %}
+        <a class="btn small {% if p == page %}primary{% else %}secondary{% endif %}" href="?doc_type={{ doc_type or '' }}&status={{ status or '' }}&start={{ start or '' }}&end={{ end or '' }}&page={{ p }}">{{ p }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if page < total_pages %}
+      <a class="btn secondary small" href="?doc_type={{ doc_type or '' }}&status={{ status or '' }}&start={{ start or '' }}&end={{ end or '' }}&page={{ page + 1 }}">→</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

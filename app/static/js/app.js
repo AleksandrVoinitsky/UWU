@@ -261,13 +261,26 @@
     var sellBtn = document.getElementById("rmk-sell");
     var returnBtn = document.getElementById("rmk-return");
     var skladSelect = document.getElementById("rmk-sklad");
+    var receivedInput = document.getElementById("rmk-received");
+    var changeEl = document.getElementById("rmk-change");
 
     // Корзина: id -> {name, qty, price}
     var cart = {};
+    var currentTotal = 0;
 
     function money(n) {
       return (Math.round((Number(n) + Number.EPSILON) * 100) / 100).toFixed(2);
     }
+
+    window.recalcChange = function () {
+      var received = parseFloat(receivedInput ? receivedInput.value : 0) || 0;
+      var change = received - currentTotal;
+      if (changeEl) {
+        changeEl.textContent = (change < 0 ? "−" : "") + money(Math.abs(change)) + " ₽";
+        changeEl.style.color = change < 0 ? "var(--bad)" : "";
+      }
+      return change;
+    };
 
     function renderGrid(filter) {
       var q = (filter || "").toLowerCase().trim();
@@ -304,7 +317,9 @@
       Object.keys(cart).forEach(function (id) {
         total += cart[id].qty * cart[id].price;
       });
+      currentTotal = total;
       totalEl.textContent = money(total) + " ₽";
+      recalcChange();
       return total;
     }
 
@@ -363,12 +378,17 @@
         };
       });
       var skladId = skladSelect ? skladSelect.value : "";
+      var received = parseFloat(receivedInput ? receivedInput.value : 0) || 0;
+      if (!isReturn && received < currentTotal) {
+        alert("Сумма оплаты меньше итога на " + money(currentTotal - received) + " ₽");
+        return;
+      }
       if (sellBtn) sellBtn.disabled = true;
       if (returnBtn) returnBtn.disabled = true;
       fetch("/rmk/sell", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sklad_id: skladId ? parseInt(skladId, 10) : null, items: lines, return: !!isReturn }),
+        body: JSON.stringify({ sklad_id: skladId ? parseInt(skladId, 10) : null, items: lines, return: !!isReturn, received: received }),
       })
         .then(function (r) {
           if (!r.ok) return r.json().then(function (e) { throw new Error(e.detail || "Ошибка"); });

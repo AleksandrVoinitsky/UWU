@@ -15,7 +15,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -710,6 +710,7 @@ async def rmk_sell(
 
     sklad_id = data.get("sklad_id")
     doc_type = DocType.VOZVRAT if data.get("return") else DocType.RASHOD
+    received = data.get("received")
 
     # Контроль минимальной цены (продажа не ниже закупочной).
     if doc_type == DocType.RASHOD:
@@ -729,6 +730,7 @@ async def rmk_sell(
             subtype=DocSubtype.CASH if doc_type == DocType.RASHOD else None,
             doc_date=date.today(),
             sklad_id=sklad_id,
+            extra={"received": received} if received is not None else None,
             items=[
                 {"nomenklatura_id": int(i["nomenklatura_id"]), "quantity": Decimal(str(i["quantity"])), "price": Decimal(str(i["price"]))}
                 for i in items
@@ -1012,18 +1014,34 @@ async def documents_journal(
     start: str | None = None,
     end: str | None = None,
     status: str | None = None,
+    page: int = 1,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
-    stmt = select(Document).order_by(Document.date.desc(), Document.id.desc())
+    page_size = 50
+    filters = []
     if doc_type:
-        stmt = stmt.where(Document.doc_type == doc_type)
+        filters.append(Document.doc_type == doc_type)
     if start:
-        stmt = stmt.where(Document.date >= date.fromisoformat(start))
+        filters.append(Document.date >= date.fromisoformat(start))
     if end:
-        stmt = stmt.where(Document.date <= date.fromisoformat(end))
+        filters.append(Document.date <= date.fromisoformat(end))
     if status:
-        stmt = stmt.where(Document.status == status)
+        filters.append(Document.status == status)
+
+    total = (
+        await session.execute(select(func.count(Document.id)).where(*filters))
+    ).scalar() or 0
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = max(1, min(page, total_pages))
+
+    stmt = (
+        select(Document)
+        .where(*filters)
+        .order_by(Document.date.desc(), Document.id.desc())
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+    )
     result = await session.execute(stmt)
     documents = list(result.scalars())
     # Карта наименований контрагентов и складов для отображения.
@@ -1035,6 +1053,7 @@ async def documents_journal(
         request, user, "trade/documents.html",
         documents=documents, doc_type=doc_type, start=start, end=end, status=status,
         kg_map=kg_map, sk_map=sk_map,
+        page=page, total_pages=total_pages, total=total,
     )
 
 
