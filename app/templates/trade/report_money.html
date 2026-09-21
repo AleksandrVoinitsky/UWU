@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header"><h1>{{ t('report.money', lang) }}</h1></div>
+<div class="card">
+  <div class="stat">{{ balance }}</div>
+  <div class="muted">{{ t('report.money', lang) }}</div>
+</div>
+{% endblock %}

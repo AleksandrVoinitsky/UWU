@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header"><h1>{{ t('report.stock', lang) }}</h1></div>
+<div class="card">
+  <table class="table">
+    <thead><tr><th>{{ t('common.name', lang) }}</th><th>Склад</th><th>Количество</th><th>Стоимость</th></tr></thead>
+    <tbody>
+      {% for b in balances %}
+      <tr><td>{{ b.nomenklatura }}</td><td>{{ b.sklad }}</td><td>{{ b.quantity }}</td><td>{{ b.cost }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

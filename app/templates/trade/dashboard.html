@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ t('menu.dashboard', lang) }}</h1>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div class="stat">{{ money }}</div>
+    <div class="muted">{{ t('report.money', lang) }}</div>
+  </div>
+  <div class="card">
+    <a class="btn" href="/documents/new?doc_type=rashod">{{ t('doc.rashod', lang) }}</a>
+  </div>
+  <div class="card">
+    <a class="btn secondary" href="/documents/new?doc_type=prihod">{{ t('doc.prihod', lang) }}</a>
+  </div>
+</div>
+{% endblock %}

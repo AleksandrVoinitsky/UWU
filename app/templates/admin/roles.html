@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ t('menu.roles', lang) }}</h1>
+</div>
+
+{% for role in roles %}
+<div class="card">
+  <h2>{{ role.name }} <span class="muted" style="font-weight:400">({{ role.key }})</span></h2>
+  <form method="post" action="/admin/roles/{{ role.id }}/permissions">
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+      {% for key, desc in permissions.items() %}
+      <label style="font-weight:400">
+        <input type="checkbox" name="perm_{{ key }}" {% if key in role.permissions %}checked{% endif %}> {{ key }}
+      </label>
+      {% endfor %}
+    </div>
+    <button type="submit" class="btn mt">{{ t('common.save', lang) }}</button>
+  </form>
+</div>
+{% endfor %}
+{% endblock %}

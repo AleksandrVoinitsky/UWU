@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ t('catalog.nomenklatura', lang) }}</h1>
+</div>
+
+<div class="card">
+  <h2>{{ t('common.add', lang) }}</h2>
+  <form method="post" action="/catalog/nomenklatura" class="flex" style="flex-wrap:wrap;align-items:flex-end">
+    <div class="field" style="flex:2;min-width:160px"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+    <div class="field" style="flex:2;min-width:160px"><label>Полное наименование</label><input type="text" name="full_name"></div>
+    <div class="field"><label>Вид</label><select name="vid"><option value="tovar">Товар</option><option value="material">Материал</option><option value="produkciya">Продукция</option><option value="usluga">Услуга</option></select></div>
+    <div class="field"><label>Артикул</label><input type="text" name="artikul"></div>
+    <div class="field"><label>Ед.</label><select name="base_unit_id"><option value="">—</option>{% for u in units %}<option value="{{ u.id }}">{{ u.short_name }}</option>{% endfor %}</select></div>
+    <div class="field"><label>НДС</label><select name="nds_rate_id"><option value="">—</option>{% for n in nds %}<option value="{{ n.id }}">{{ n.name }}</option>{% endfor %}</select></div>
+    <button type="submit" class="btn">{{ t('common.add', lang) }}</button>
+  </form>
+</div>
+
+<div class="card">
+  <table class="table">
+    <thead><tr><th>{{ t('common.code', lang) }}</th><th>{{ t('common.name', lang) }}</th><th>Артикул</th><th>Вид</th></tr></thead>
+    <tbody>
+      {% for item in items %}
+      <tr><td>{{ item.code }}</td><td>{{ item.name }}</td><td>{{ item.artikul or '—' }}</td><td>{{ item.vid }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

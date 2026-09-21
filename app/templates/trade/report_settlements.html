@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header"><h1>{{ t('report.settlements', lang) }}</h1></div>
+<div class="card">
+  <table class="table">
+    <thead><tr><th>{{ t('catalog.kontragenty', lang) }}</th><th>Задолженность</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr><td>{{ r.kontragent }}</td><td>{{ r.debt }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

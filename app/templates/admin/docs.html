@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ t('menu.docs', lang) }}</h1>
+</div>
+
+<div class="app" style="min-height:0">
+  <aside class="sidebar" style="position:static;height:auto;width:220px;border-right:1px solid var(--border)">
+    <div class="nav-group">Docs</div>
+    {% for f in files %}
+    <a class="nav-link {% if f == current %}active{% endif %}" href="/admin/docs/{{ f }}">{{ f }}</a>
+    {% endfor %}
+  </aside>
+  <div class="content docs-body" style="padding:0 0 0 24px">
+    {{ content | safe }}
+  </div>
+</div>
+{% endblock %}

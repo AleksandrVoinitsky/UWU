@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ t('menu.documents', lang) }}</h1>
+  <div class="flex mt">
+    <a class="btn small" href="/documents/new?doc_type=rashod">{{ t('doc.rashod', lang) }}</a>
+    <a class="btn small" href="/documents/new?doc_type=prihod">{{ t('doc.prihod', lang) }}</a>
+    <a class="btn small" href="/documents/new?doc_type=peremeshenie">{{ t('doc.peremeshenie', lang) }}</a>
+    <a class="btn small" href="/documents/new?doc_type=spisanie">{{ t('doc.spisanie', lang) }}</a>
+    <a class="btn small" href="/documents/new?doc_type=oprihodovanie">{{ t('doc.oprihodovanie', lang) }}</a>
+    <a class="btn small" href="/documents/new?doc_type=pko">{{ t('doc.pko', lang) }}</a>
+    <a class="btn small" href="/documents/new?doc_type=rko">{{ t('doc.rko', lang) }}</a>
+    <a class="btn small" href="/documents/new?doc_type=vvod_ostatkov">{{ t('doc.vvod_ostatkov', lang) }}</a>
+  </div>
+</div>
+
+<div class="card">
+  <table class="table">
+    <thead><tr><th>№</th><th>Дата</th><th>Тип</th><th>Сумма</th><th>Статус</th><th>{{ t('common.actions', lang) }}</th></tr></thead>
+    <tbody>
+      {% for d in documents %}
+      <tr>
+        <td>{{ d.number }}</td>
+        <td>{{ d.date }}</td>
+        <td>{{ d.doc_type }}{% if d.subtype %} ({{ d.subtype }}){% endif %}</td>
+        <td>{{ d.total }}</td>
+        <td>{% if d.status == 'posted' %}<span class="badge posted">{{ t('doc.status.posted', lang) }}</span>{% elif d.status == 'deleted' %}<span class="badge deleted">{{ t('doc.status.deleted', lang) }}</span>{% else %}<span class="badge draft">{{ t('doc.status.draft', lang) }}</span>{% endif %}</td>
+        <td class="flex">
+          {% if d.status == 'draft' %}
+          <form method="post" action="/documents/{{ d.id }}/post"><button class="btn small">Провести</button></form>
+          {% elif d.status == 'posted' %}
+          <form method="post" action="/documents/{{ d.id }}/unpost"><button class="btn small secondary">Отменить</button></form>
+          {% endif %}
+          {% if d.status != 'deleted' %}
+          <form method="post" action="/documents/{{ d.id }}/delete" onsubmit="return confirm('Delete?')"><button class="btn small danger">{{ t('common.delete', lang) }}</button></form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

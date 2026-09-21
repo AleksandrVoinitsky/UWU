@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+  <h1>Новый документ</h1>
+</div>
+
+<div class="card">
+  <form method="post" action="/documents/new">
+    <input type="hidden" name="doc_type" value="{{ doc_type }}">
+
+    <div class="flex" style="flex-wrap:wrap;align-items:flex-end">
+      <div class="field"><label>Дата</label><input type="date" name="doc_date" value="{{ today }}" required></div>
+      <div class="field"><label>Склад</label><select name="sklad_id"><option value="">—</option>{% for s in sklady %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></div>
+      {% if doc_type == 'peremeshenie' %}
+      <div class="field"><label>Склад-получатель</label><select name="sklad_to_id"><option value="">—</option>{% for s in sklady %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></div>
+      {% endif %}
+      {% if doc_type in ['rashod', 'prihod', 'pko', 'rko'] %}
+      <div class="field"><label>Контрагент</label><select name="kontragent_id"><option value="">—</option>{% for k in kontragenty %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Тип расчёта</label><select name="subtype"><option value="">—</option><option value="cash">Наличный</option><option value="credit">Кредит</option><option value="realization">Реализация</option></select></div>
+      {% endif %}
+      {% if doc_type in ['pko', 'rko'] %}
+      <div class="field"><label>Касса</label><select name="kassa_id"><option value="">—</option>{% for k in kassy %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}</select></div>
+      {% endif %}
+    </div>
+
+    <div class="field">
+      <label>Комментарий</label>
+      <input type="text" name="comment">
+    </div>
+
+    {% if doc_type in ['rashod', 'prihod', 'peremeshenie', 'spisanie', 'oprihodovanie', 'vvod_ostatkov'] %}
+    <h2>Табличная часть</h2>
+    <div id="items">
+      <div class="flex item-row" style="align-items:flex-end">
+        <div class="field" style="flex:2"><label>Номенклатура</label><select name="item_nomenklatura_id">{% for n in nomenklatura %}<option value="{{ n.id }}">{{ n.name }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Количество</label><input type="number" step="0.001" name="item_quantity" required></div>
+        <div class="field"><label>Цена</label><input type="number" step="0.01" name="item_price" required></div>
+      </div>
+    </div>
+    <button type="button" class="btn secondary small" onclick="addRow()">+ {{ t('common.add', lang) }}</button>
+    {% else %}
+    <div class="field"><label>Сумма</label><input type="number" step="0.01" name="amount" required></div>
+    {% endif %}
+
+    <div class="mt">
+      <button type="submit" class="btn">{{ t('common.save', lang) }}</button>
+    </div>
+  </form>
+</div>
+
+<script>
+function addRow() {
+  var tpl = document.querySelector('.item-row');
+  var clone = tpl.cloneNode(true);
+  clone.querySelectorAll('input').forEach(i => i.value = '');
+  document.getElementById('items').appendChild(clone);
+}
+</script>
+{% endblock %}

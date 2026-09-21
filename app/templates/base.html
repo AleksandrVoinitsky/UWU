@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}UWU{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="app">
+    {% if user %}
+    <aside class="sidebar">
+      <div class="brand">UWU</div>
+
+      {% if section == 'admin' %}
+        <div class="nav-group">{{ t('menu.settings', lang) }}</div>
+        <a class="nav-link" href="/admin">{{ t('menu.dashboard', lang) }}</a>
+        <a class="nav-link" href="/admin/users">{{ t('menu.users', lang) }}</a>
+        <a class="nav-link" href="/admin/roles">{{ t('menu.roles', lang) }}</a>
+        <a class="nav-link" href="/admin/settings">{{ t('menu.settings', lang) }}</a>
+        <a class="nav-link" href="/admin/docs">{{ t('menu.docs', lang) }}</a>
+      {% else %}
+        <div class="nav-group">{{ t('menu.catalog', lang) }}</div>
+        <a class="nav-link" href="/catalog/nomenklatura">{{ t('catalog.nomenklatura', lang) }}</a>
+        <a class="nav-link" href="/catalog/kontragenty">{{ t('catalog.kontragenty', lang) }}</a>
+        <a class="nav-link" href="/catalog/sklady">{{ t('catalog.sklady', lang) }}</a>
+        <div class="nav-group">{{ t('menu.documents', lang) }}</div>
+        <a class="nav-link" href="/documents">{{ t('menu.documents', lang) }}</a>
+        <a class="nav-link" href="/documents/new?doc_type=rashod">{{ t('doc.rashod', lang) }}</a>
+        <a class="nav-link" href="/documents/new?doc_type=prihod">{{ t('doc.prihod', lang) }}</a>
+        <div class="nav-group">{{ t('menu.reports', lang) }}</div>
+        <a class="nav-link" href="/reports/stock">{{ t('report.stock', lang) }}</a>
+        <a class="nav-link" href="/reports/settlements">{{ t('report.settlements', lang) }}</a>
+        <a class="nav-link" href="/reports/money">{{ t('report.money', lang) }}</a>
+      {% endif %}
+
+      <div class="nav-group"></div>
+      <a class="nav-link" href="/logout">{{ t('menu.logout', lang) }}</a>
+    </aside>
+    {% endif %}
+
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

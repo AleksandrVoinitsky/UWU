@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: uwu
+      POSTGRES_PASSWORD: uwu
+      POSTGRES_DB: uwu
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uwu -d uwu"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://uwu:uwu@db:5432/uwu
+      SECRET_KEY: ${SECRET_KEY:-change-me-to-a-long-random-string}
+      ADMIN_LOGIN: ${ADMIN_LOGIN:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@uwu.local}
+      DEFAULT_CURRENCY: ${DEFAULT_CURRENCY:-RUB}
+      DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-ru}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+volumes:
+  pgdata:

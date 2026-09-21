@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ t('menu.users', lang) }}</h1>
+</div>
+
+<div class="card">
+  <h2>{{ t('common.add', lang) }}</h2>
+  <form method="post" action="/admin/users" class="flex" style="flex-wrap:wrap;align-items:flex-end">
+    <div class="field" style="flex:1;min-width:140px"><label>{{ t('auth.username', lang) }}</label><input type="text" name="login" required></div>
+    <div class="field" style="flex:1;min-width:140px"><label>{{ t('auth.password', lang) }}</label><input type="password" name="password" required></div>
+    <div class="field" style="flex:1;min-width:140px"><label>{{ t('common.name', lang) }}</label><input type="text" name="full_name"></div>
+    <div class="field" style="flex:1;min-width:140px"><label>Email</label><input type="email" name="email"></div>
+    <div class="field"><label>Role</label><select name="role_id"><option value="">—</option>{% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Admin</label><input type="checkbox" name="is_admin"></div>
+    <button type="submit" class="btn">{{ t('common.add', lang) }}</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>{{ t('menu.users', lang) }}</h2>
+  <table class="table">
+    <thead>
+      <tr><th>{{ t('auth.username', lang) }}</th><th>{{ t('common.name', lang) }}</th><th>Role</th><th>Status</th><th>{{ t('common.actions', lang) }}</th></tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.login }}</td>
+        <td>{{ u.full_name or '—' }}</td>
+        <td>{% if u.is_admin %}admin{% elif u.role %}{{ u.role.name }}{% else %}—{% endif %}</td>
+        <td>{% if u.is_active %}<span class="badge posted">active</span>{% else %}<span class="badge deleted">disabled</span>{% endif %}</td>
+        <td class="flex">
+          {% if u.id != user.id %}
+          <form method="post" action="/admin/users/{{ u.id }}/toggle">
+            <button class="btn small secondary">{{ t('common.edit', lang) }}</button>
+          </form>
+          <form method="post" action="/admin/users/{{ u.id }}/delete" onsubmit="return confirm('Delete?')">
+            <button class="btn small danger">{{ t('common.delete', lang) }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
