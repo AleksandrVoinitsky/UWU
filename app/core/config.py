@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # --- Администратор (создаётся при первом запуске) ---
     admin_login: str = "admin"
     admin_password: str = "admin"
-    admin_email: str = "admin@uwu.local"
+    admin_email: str = "admin@example.com"
 
     # --- Безопасность ---
     secret_key: str = "change-me"

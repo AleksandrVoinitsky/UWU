@@ -37,6 +37,24 @@ async def create_user(payload: UserCreate, session: AsyncSession = Depends(get_s
     return await user_service.create_user(session, **payload.model_dump())
 
 
+# --- Роли и права (статичные пути должны быть объявлены до /{user_id}) ---
+
+
+@router.get("/roles/list", response_model=list[RoleOut])
+async def list_roles(session: AsyncSession = Depends(get_session)) -> list:
+    return await user_service.list_roles(session)
+
+
+@router.post("/roles", response_model=RoleOut, status_code=status.HTTP_201_CREATED)
+async def create_role(payload: RoleCreate, session: AsyncSession = Depends(get_session)):
+    return await user_service.create_role(session, payload.key, payload.name, payload.permissions)
+
+
+@router.get("/permissions", response_model=list[PermissionOut])
+async def list_permissions() -> list[PermissionOut]:
+    return [PermissionOut(key=k, description=v) for k, v in PERMISSIONS.items()]
+
+
 @router.get("/{user_id}", response_model=UserOut)
 async def get_user(user_id: int, session: AsyncSession = Depends(get_session)) -> User:
     user = await user_service.get_user(session, user_id)
@@ -66,21 +84,3 @@ async def delete_user(user_id: int, session: AsyncSession = Depends(get_session)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete admin")
     await user_service.delete_user(session, user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-# --- Роли ---
-
-
-@router.get("/roles/list", response_model=list[RoleOut])
-async def list_roles(session: AsyncSession = Depends(get_session)) -> list:
-    return await user_service.list_roles(session)
-
-
-@router.post("/roles", response_model=RoleOut, status_code=status.HTTP_201_CREATED)
-async def create_role(payload: RoleCreate, session: AsyncSession = Depends(get_session)):
-    return await user_service.create_role(session, payload.key, payload.name, payload.permissions)
-
-
-@router.get("/permissions", response_model=list[PermissionOut])
-async def list_permissions() -> list[PermissionOut]:
-    return [PermissionOut(key=k, description=v) for k, v in PERMISSIONS.items()]

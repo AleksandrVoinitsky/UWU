@@ -30,7 +30,7 @@ class UserOut(BaseModel):
 
     id: int
     login: str
-    email: EmailStr | None
+    email: str | None  # str (не EmailStr) — выход не должен падать на «невалидных» адресах
     full_name: str | None
     is_active: bool
     is_admin: bool

@@ -47,3 +47,9 @@ async def test_cannot_delete_admin(client, admin_headers, seeded_session):
     admin = next(u for u in users if u.is_admin)
     resp = await client.delete(f"/api/users/{admin.id}", headers=admin_headers)
     assert resp.status_code == 400
+
+
+async def test_list_permissions_endpoint(client, admin_headers):
+    resp = await client.get("/api/users/permissions", headers=admin_headers)
+    assert resp.status_code == 200
+    assert len(resp.json()) > 0

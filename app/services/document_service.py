@@ -14,6 +14,7 @@ from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.constants import Constant
 from app.models.document.base_document import Document, DocumentItem
@@ -169,8 +170,7 @@ async def create_document(
     else:
         _recalc_totals(document, item_objs)
     await session.commit()
-    await session.refresh(document)
-    return document
+    return await get_document(session, document.id)
 
 
 def _recalc_totals(document: Document, items: list[DocumentItem]) -> None:
@@ -183,7 +183,13 @@ def _recalc_totals(document: Document, items: list[DocumentItem]) -> None:
 
 
 async def get_document(session: AsyncSession, document_id: int) -> Document | None:
-    return await session.get(Document, document_id)
+    """Возвращает документ с явно загруженными строками (без lazy-load)."""
+    result = await session.execute(
+        select(Document)
+        .options(selectinload(Document.items))
+        .where(Document.id == document_id)
+    )
+    return result.scalar_one_or_none()
 
 
 async def post_document(session: AsyncSession, document: Document) -> Document:
@@ -215,8 +221,7 @@ async def post_document(session: AsyncSession, document: Document) -> Document:
     document.status = DocumentStatus.POSTED
     document.posted_at = datetime.now(timezone.utc)
     await session.commit()
-    await session.refresh(document)
-    return document
+    return await get_document(session, document.id)
 
 
 async def _check_stock(
@@ -407,8 +412,7 @@ async def unpost_document(session: AsyncSession, document: Document) -> Document
     document.status = DocumentStatus.DRAFT
     document.posted_at = None
     await session.commit()
-    await session.refresh(document)
-    return document
+    return await get_document(session, document.id)
 
 
 async def _delete_movements(session: AsyncSession, document_id: int) -> None:
@@ -472,5 +476,4 @@ async def mark_for_deletion(session: AsyncSession, document: Document) -> Docume
         await unpost_document(session, document)
     document.status = DocumentStatus.MARKED_DELETED
     await session.commit()
-    await session.refresh(document)
-    return document
+    return await get_document(session, document.id)
