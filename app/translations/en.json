@@ -61,5 +61,14 @@
   "chat.greeting": "Hello! How can we help?",
   "chat.placeholder": "Type a message…",
   "common.search": "Search",
-  "common.create": "Create"
+  "common.create": "Create",
+  "menu.rmk": "POS — cash desk",
+  "rmk.search": "Search item",
+  "rmk.cart": "Invoice",
+  "rmk.total": "Total",
+  "rmk.sell": "Sell",
+  "rmk.quantity": "Qty",
+  "rmk.price": "Price",
+  "rmk.empty": "Cart is empty — click an item",
+  "rmk.add_hint": "Double-click to add an item"
 }

@@ -20,25 +20,43 @@
         <a class="nav-link" href="/admin/settings">{{ t('menu.settings', lang) }}</a>
         <a class="nav-link" href="/admin/docs">{{ t('menu.docs', lang) }}</a>
       {% else %}
-        <div class="nav-group">{{ t('menu.dashboard', lang) }}</div>
         <a class="nav-link" href="/">{{ t('menu.dashboard', lang) }}</a>
-        <div class="nav-group">{{ t('menu.catalog', lang) }}</div>
-        <a class="nav-link" href="/catalog/nomenklatura">{{ t('catalog.nomenklatura', lang) }}</a>
-        <a class="nav-link" href="/catalog/kontragenty">{{ t('catalog.kontragenty', lang) }}</a>
-        <a class="nav-link" href="/catalog/sklady">{{ t('catalog.sklady', lang) }}</a>
-        <a class="nav-link" href="/catalog/firmy">{{ t('catalog.firmy', lang) }}</a>
-        <a class="nav-link" href="/catalog/kassy">{{ t('catalog.kassy', lang) }}</a>
-        <a class="nav-link" href="/catalog/valyuty">{{ t('catalog.valyuty', lang) }}</a>
-        <a class="nav-link" href="/catalog/edinitsy">{{ t('catalog.edinitsy', lang) }}</a>
-        <a class="nav-link" href="/catalog/stavki_nds">{{ t('catalog.stavki_nds', lang) }}</a>
-        <div class="nav-group">{{ t('menu.documents', lang) }}</div>
-        <a class="nav-link" href="/documents">{{ t('menu.documents', lang) }}</a>
-        <div class="nav-group">{{ t('menu.reports', lang) }}</div>
-        <a class="nav-link" href="/reports/stock">{{ t('report.stock', lang) }}</a>
-        <a class="nav-link" href="/reports/movements">{{ t('report.movements', lang) }}</a>
-        <a class="nav-link" href="/reports/settlements">{{ t('report.settlements', lang) }}</a>
-        <a class="nav-link" href="/reports/sales">{{ t('report.sales', lang) }}</a>
-        <a class="nav-link" href="/reports/money">{{ t('report.money', lang) }}</a>
+        <a class="nav-link rmk-link" href="/rmk">{{ t('menu.rmk', lang) }}</a>
+
+        <div class="nav-group-parent">
+          <div class="nav-group-header">{{ t('menu.catalog', lang) }} <span class="chevron">›</span></div>
+          <div class="nav-sub">
+            <a class="nav-link" href="/catalog/nomenklatura">{{ t('catalog.nomenklatura', lang) }}</a>
+            <a class="nav-link" href="/catalog/kontragenty">{{ t('catalog.kontragenty', lang) }}</a>
+            <a class="nav-link" href="/catalog/sklady">{{ t('catalog.sklady', lang) }}</a>
+            <a class="nav-link" href="/catalog/firmy">{{ t('catalog.firmy', lang) }}</a>
+            <a class="nav-link" href="/catalog/kassy">{{ t('catalog.kassy', lang) }}</a>
+            <a class="nav-link" href="/catalog/valyuty">{{ t('catalog.valyuty', lang) }}</a>
+            <a class="nav-link" href="/catalog/edinitsy">{{ t('catalog.edinitsy', lang) }}</a>
+            <a class="nav-link" href="/catalog/stavki_nds">{{ t('catalog.stavki_nds', lang) }}</a>
+          </div>
+        </div>
+
+        <div class="nav-group-parent">
+          <div class="nav-group-header">{{ t('menu.documents', lang) }} <span class="chevron">›</span></div>
+          <div class="nav-sub">
+            <a class="nav-link" href="/documents">{{ t('menu.documents', lang) }}</a>
+            <a class="nav-link" href="/documents/new?doc_type=rashod">{{ t('doc.rashod', lang) }}</a>
+            <a class="nav-link" href="/documents/new?doc_type=prihod">{{ t('doc.prihod', lang) }}</a>
+            <a class="nav-link" href="/documents/new?doc_type=peremeshenie">{{ t('doc.peremeshenie', lang) }}</a>
+          </div>
+        </div>
+
+        <div class="nav-group-parent">
+          <div class="nav-group-header">{{ t('menu.reports', lang) }} <span class="chevron">›</span></div>
+          <div class="nav-sub">
+            <a class="nav-link" href="/reports/stock">{{ t('report.stock', lang) }}</a>
+            <a class="nav-link" href="/reports/movements">{{ t('report.movements', lang) }}</a>
+            <a class="nav-link" href="/reports/sales">{{ t('report.sales', lang) }}</a>
+            <a class="nav-link" href="/reports/settlements">{{ t('report.settlements', lang) }}</a>
+            <a class="nav-link" href="/reports/money">{{ t('report.money', lang) }}</a>
+          </div>
+        </div>
       {% endif %}
 
       <div class="sidebar-footer">

@@ -131,4 +131,174 @@
       if (e.key === "Enter") send();
     });
   }
+
+  /* ---------- Боковое меню: клик-переключатель (для тач-устройств) ---------- */
+  document.querySelectorAll(".nav-group-header").forEach(function (header) {
+    header.addEventListener("click", function () {
+      header.parentElement.classList.toggle("open");
+    });
+  });
+
+  /* ---------- Редактирование по клику на строке таблицы ---------- */
+  document.querySelectorAll("tr[data-edit]").forEach(function (row) {
+    row.addEventListener("click", function (e) {
+      if (e.target.closest("a, button, form, input, select, textarea")) return;
+      var modal = document.getElementById(row.getAttribute("data-edit"));
+      if (!modal) return;
+      var form = modal.querySelector("form");
+      if (form) {
+        var pattern = form.getAttribute("data-action-pattern");
+        if (pattern && row.dataset.id) {
+          form.action = pattern.replace("{id}", row.dataset.id);
+        }
+        Object.keys(row.dataset).forEach(function (key) {
+          if (key === "edit" || key === "id") return;
+          var field = form.querySelector('[name="' + key + '"]');
+          if (field) field.value = row.dataset[key];
+        });
+      }
+      openModal(row.getAttribute("data-edit"));
+    });
+  });
+
+  /* ---------- РМК (рабочее место кассира) ---------- */
+  var rmkData = document.getElementById("rmk-data");
+  if (rmkData) {
+    initRMK(rmkData);
+  }
+
+  function initRMK(el) {
+    var items = [];
+    try { items = JSON.parse(el.textContent); } catch (e) { items = []; }
+
+    var grid = document.getElementById("rmk-grid");
+    var search = document.getElementById("rmk-search");
+    var cartBody = document.getElementById("rmk-cart-body");
+    var cartEmpty = document.getElementById("rmk-cart-empty");
+    var totalEl = document.getElementById("rmk-total");
+    var sellBtn = document.getElementById("rmk-sell");
+    var skladSelect = document.getElementById("rmk-sklad");
+
+    // Корзина: id -> {name, qty, price}
+    var cart = {};
+
+    function money(n) {
+      return (Math.round((Number(n) + Number.EPSILON) * 100) / 100).toFixed(2);
+    }
+
+    function renderGrid(filter) {
+      var q = (filter || "").toLowerCase().trim();
+      grid.innerHTML = "";
+      items.forEach(function (it) {
+        if (q && it.name.toLowerCase().indexOf(q) === -1) return;
+        var elItem = document.createElement("div");
+        elItem.className = "rmk-item";
+        elItem.innerHTML =
+          '<div class="name"></div>' +
+          (it.price ? '<div class="price">' + money(it.price) + " ₽</div>" : "");
+        elItem.querySelector(".name").textContent = it.name;
+        elItem.addEventListener("dblclick", function () {
+          addToCart(it.id, it.name, it.price || 0, 1);
+        });
+        elItem.addEventListener("click", function () {
+          addToCart(it.id, it.name, it.price || 0, 1);
+        });
+        grid.appendChild(elItem);
+      });
+    }
+
+    function addToCart(id, name, price, qty) {
+      if (cart[id]) {
+        cart[id].qty += qty;
+      } else {
+        cart[id] = { name: name, price: price, qty: qty };
+      }
+      renderCart();
+    }
+
+    function recalc() {
+      var total = 0;
+      Object.keys(cart).forEach(function (id) {
+        total += cart[id].qty * cart[id].price;
+      });
+      totalEl.textContent = money(total) + " ₽";
+      return total;
+    }
+
+    function renderCart() {
+      var ids = Object.keys(cart);
+      cartEmpty.style.display = ids.length ? "none" : "";
+      cartBody.innerHTML = "";
+      ids.forEach(function (id) {
+        var row = document.createElement("div");
+        row.className = "cart-row";
+        row.innerHTML =
+          '<div class="c-name"></div>' +
+          '<input class="c-qty" type="number" min="0.001" step="0.001">' +
+          '<input class="c-price" type="number" min="0" step="0.01">' +
+          '<div class="c-amount"></div>' +
+          '<button class="c-del" title="Удалить">✕</button>';
+        row.querySelector(".c-name").textContent = cart[id].name;
+        var qtyInput = row.querySelector(".c-qty");
+        var priceInput = row.querySelector(".c-price");
+        var amountEl = row.querySelector(".c-amount");
+        qtyInput.value = cart[id].qty;
+        priceInput.value = cart[id].price;
+
+        function updateAmount() {
+          cart[id].qty = parseFloat(qtyInput.value) || 0;
+          cart[id].price = parseFloat(priceInput.value) || 0;
+          amountEl.textContent = money(cart[id].qty * cart[id].price);
+          recalc();
+        }
+        qtyInput.addEventListener("input", updateAmount);
+        priceInput.addEventListener("input", updateAmount);
+        updateAmount();
+
+        row.querySelector(".c-del").addEventListener("click", function () {
+          delete cart[id];
+          renderCart();
+        });
+
+        cartBody.appendChild(row);
+      });
+      recalc();
+    }
+
+    if (search) search.addEventListener("input", function () { renderGrid(search.value); });
+    renderGrid();
+    renderCart();
+
+    if (sellBtn) {
+      sellBtn.addEventListener("click", function () {
+        var ids = Object.keys(cart);
+        if (!ids.length) return;
+        var lines = ids.map(function (id) {
+          return {
+            nomenklatura_id: parseInt(id, 10),
+            quantity: cart[id].qty,
+            price: cart[id].price,
+          };
+        });
+        var skladId = skladSelect ? skladSelect.value : "";
+        sellBtn.disabled = true;
+        fetch("/rmk/sell", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sklad_id: skladId ? parseInt(skladId, 10) : null, items: lines }),
+        })
+          .then(function (r) {
+            if (!r.ok) return r.json().then(function (e) { throw new Error(e.detail || "Ошибка"); });
+            return r.json();
+          })
+          .then(function (data) {
+            window.location.href = "/documents/" + data.id + "/print";
+          })
+          .catch(function (err) {
+            alert("Не удалось провести продажу: " + err.message);
+            sellBtn.disabled = false;
+          });
+      });
+    }
+  }
 })();

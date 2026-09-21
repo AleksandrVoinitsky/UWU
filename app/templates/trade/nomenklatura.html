@@ -27,7 +27,7 @@
       </thead>
       <tbody>
         {% for item in items %}
-        <tr data-row>
+        <tr data-row data-edit="modal-nomen-edit" data-id="{{ item.id }}" data-name="{{ item.name }}" data-full_name="{{ item.full_name or '' }}" data-vid="{{ item.vid }}" data-artikul="{{ item.artikul or '' }}" style="cursor:pointer" title="Нажмите для редактирования">
           <td class="muted">{{ item.code }}</td>
           <td>{{ item.name }}</td>
           <td class="muted">{{ item.artikul or '—' }}</td>
@@ -79,6 +79,34 @@
       <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
         <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
         <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Модальное окно редактирования -->
+<div class="modal-backdrop" id="modal-nomen-edit">
+  <div class="modal">
+    <div class="modal-header"><h3>{{ t('common.edit', lang) }} · {{ t('catalog.nomenklatura', lang) }}</h3><button class="modal-close" data-modal-close>✕</button></div>
+    <form method="post" action="" data-action-pattern="/catalog/nomenklatura/{id}/update">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+          <div class="field"><label>Полное наименование</label><input type="text" name="full_name"></div>
+          <div class="field"><label>Вид</label>
+            <select name="vid">
+              <option value="tovar">Товар</option>
+              <option value="material">Материал</option>
+              <option value="produkciya">Продукция</option>
+              <option value="usluga">Услуга</option>
+            </select>
+          </div>
+          <div class="field"><label>Артикул</label><input type="text" name="artikul"></div>
+        </div>
+      </div>
+      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
+        <button type="submit" class="btn primary">{{ t('common.save', lang) }}</button>
       </div>
     </form>
   </div>

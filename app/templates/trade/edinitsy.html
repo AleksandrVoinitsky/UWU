@@ -14,7 +14,7 @@
       <thead><tr><th>{{ t('common.name', lang) }}</th><th>Сокращение</th><th class="num">Коэффициент</th></tr></thead>
       <tbody>
         {% for item in items %}
-        <tr data-row><td>{{ item.name }}</td><td class="muted">{{ item.short_name }}</td><td class="num">{{ item.coefficient }}</td></tr>
+        <tr data-row data-edit="modal-ed-edit" data-id="{{ item.id }}" data-name="{{ item.name }}" data-short_name="{{ item.short_name }}" style="cursor:pointer" title="Нажмите для редактирования"><td>{{ item.name }}</td><td class="muted">{{ item.short_name }}</td><td class="num">{{ item.coefficient }}</td></tr>
         {% else %}<tr data-empty><td colspan="3" class="muted">Нет записей</td></tr>{% endfor %}
       </tbody>
     </table>
@@ -34,6 +34,24 @@
       <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
         <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
         <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-ed-edit">
+  <div class="modal">
+    <div class="modal-header"><h3>{{ t('common.edit', lang) }} · {{ t('catalog.edinitsy', lang) }}</h3><button class="modal-close" data-modal-close>✕</button></div>
+    <form method="post" action="" data-action-pattern="/catalog/edinitsy/{id}/update">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+          <div class="field"><label>Сокращение</label><input type="text" name="short_name" required></div>
+        </div>
+      </div>
+      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
+        <button type="submit" class="btn primary">{{ t('common.save', lang) }}</button>
       </div>
     </form>
   </div>

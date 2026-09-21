@@ -7,11 +7,12 @@
 """
 from __future__ import annotations
 
+import json
 from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -258,6 +259,202 @@ async def create_tip_tsen(
 ):
     await catalog_service.create_one(session, cat.TipTsen, name=name)
     return RedirectResponse("/catalog/tipy_tsen", status_code=303)
+
+
+# --- Редактирование справочников (по клику на строку) ---
+
+
+def _or_none(value: str) -> str | None:
+    return value.strip() if value else None
+
+
+@router.post("/catalog/nomenklatura/{item_id}/update")
+async def update_nomenklatura(
+    item_id: int, name: str = Form(...), full_name: str = Form(""), vid: str = Form("tovar"),
+    artikul: str = Form(""), session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    obj = await catalog_service.get_one(session, cat.Nomenklatura, item_id)
+    if obj:
+        await catalog_service.update_one(
+            session, obj, name=name, full_name=_or_none(full_name), vid=vid, artikul=_or_none(artikul)
+        )
+    return RedirectResponse("/catalog/nomenklatura", status_code=303)
+
+
+@router.post("/catalog/kontragenty/{item_id}/update")
+async def update_kontragent(
+    item_id: int, name: str = Form(...), full_name: str = Form(""), inn: str = Form(""),
+    phones: str = Form(""), vid: str = Form("yur"),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    obj = await catalog_service.get_one(session, cat.Kontragent, item_id)
+    if obj:
+        await catalog_service.update_one(
+            session, obj, name=name, full_name=_or_none(full_name), inn=_or_none(inn),
+            phones=_or_none(phones), vid=vid,
+        )
+    return RedirectResponse("/catalog/kontragenty", status_code=303)
+
+
+@router.post("/catalog/sklady/{item_id}/update")
+async def update_sklad(
+    item_id: int, code: str = Form(...), name: str = Form(...), tip: str = Form("optovy"),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    obj = await catalog_service.get_one(session, cat.Sklad, item_id)
+    if obj:
+        await catalog_service.update_one(session, obj, code=code, name=name, tip=tip)
+    return RedirectResponse("/catalog/sklady", status_code=303)
+
+
+@router.post("/catalog/firmy/{item_id}/update")
+async def update_firma(
+    item_id: int, name: str = Form(...), full_name: str = Form(""), inn: str = Form(""),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    obj = await catalog_service.get_one(session, cat.Firma, item_id)
+    if obj:
+        await catalog_service.update_one(session, obj, name=name, full_name=_or_none(full_name), inn=_or_none(inn))
+    return RedirectResponse("/catalog/firmy", status_code=303)
+
+
+@router.post("/catalog/kassy/{item_id}/update")
+async def update_kassa(
+    item_id: int, name: str = Form(...),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    obj = await catalog_service.get_one(session, cat.Kassa, item_id)
+    if obj:
+        await catalog_service.update_one(session, obj, name=name)
+    return RedirectResponse("/catalog/kassy", status_code=303)
+
+
+@router.post("/catalog/valyuty/{item_id}/update")
+async def update_valyuta(
+    item_id: int, code: str = Form(...), name: str = Form(...),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    obj = await catalog_service.get_one(session, cat.Valyuta, item_id)
+    if obj:
+        await catalog_service.update_one(session, obj, code=code, name=name)
+    return RedirectResponse("/catalog/valyuty", status_code=303)
+
+
+@router.post("/catalog/edinitsy/{item_id}/update")
+async def update_edinitsa(
+    item_id: int, name: str = Form(...), short_name: str = Form(...),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    obj = await catalog_service.get_one(session, cat.Edinitsa, item_id)
+    if obj:
+        await catalog_service.update_one(session, obj, name=name, short_name=short_name)
+    return RedirectResponse("/catalog/edinitsy", status_code=303)
+
+
+@router.post("/catalog/stavki_nds/{item_id}/update")
+async def update_stavka_nds(
+    item_id: int, name: str = Form(...), rate: str = Form(...),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    obj = await catalog_service.get_one(session, cat.StavkaNDS, item_id)
+    if obj:
+        await catalog_service.update_one(session, obj, name=name, rate=Decimal(rate))
+    return RedirectResponse("/catalog/stavki_nds", status_code=303)
+
+
+@router.post("/catalog/tipy_tsen/{item_id}/update")
+async def update_tip_tsen(
+    item_id: int, name: str = Form(...),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    obj = await catalog_service.get_one(session, cat.TipTsen, item_id)
+    if obj:
+        await catalog_service.update_one(session, obj, name=name)
+    return RedirectResponse("/catalog/tipy_tsen", status_code=303)
+
+
+# --- РМК (рабочее место кассира) ---
+
+
+@router.get("/rmk", response_class=HTMLResponse)
+async def rmk_page(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    if user.is_admin:
+        return RedirectResponse("/admin", status_code=303)
+    result = await session.execute(select(cat.Nomenklatura).order_by(cat.Nomenklatura.name))
+    nomen = list(result.scalars())
+
+    # Цены из справочника цен (если заданы).
+    prices = await session.execute(select(cat.TsenaNomenklatury))
+    price_map: dict[int, Decimal] = {}
+    for p in prices.scalars():
+        if p.nomenklatura_id not in price_map:
+            price_map[p.nomenklatura_id] = p.price
+
+    items = [
+        {"id": n.id, "name": n.name, "price": float(price_map[n.id]) if n.id in price_map else 0.0}
+        for n in nomen
+    ]
+    sklady = await catalog_service.list_all(session, cat.Sklad)
+    return _page(
+        request, user, "trade/rmk.html",
+        items_json=json.dumps(items, ensure_ascii=False),
+        sklady=sklady,
+    )
+
+
+@router.post("/rmk/sell")
+async def rmk_sell(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    data = await request.json()
+    items = data.get("items") or []
+    if not items:
+        return JSONResponse({"detail": "Накладная пуста"}, status_code=400)
+
+    sklad_id = data.get("sklad_id")
+    try:
+        document = await document_service.create_document(
+            session,
+            doc_type=DocType.RASHOD,
+            subtype=DocSubtype.CASH,
+            doc_date=date.today(),
+            sklad_id=sklad_id,
+            items=[
+                {"nomenklatura_id": int(i["nomenklatura_id"]), "quantity": Decimal(str(i["quantity"])), "price": Decimal(str(i["price"]))}
+                for i in items
+            ],
+            created_by_id=user.id,
+        )
+        await document_service.post_document(session, document)
+    except InsufficientStockError as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=409)
+    except document_service.DocumentError as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=400)
+
+    return {"id": document.id}
+
+
+# --- Печатная форма накладной ---
+
+
+@router.get("/documents/{document_id}/print", response_class=HTMLResponse)
+async def document_print(
+    document_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    document = await document_service.get_document(session, document_id)
+    if document is None:
+        return _page(request, user, "trade/error.html", error="Документ не найден", back="/documents")
+    names = await _resolve_names(session, document)
+    return _page(request, user, "trade/invoice.html", document=document, names=names)
 
 
 # --- Документы ---

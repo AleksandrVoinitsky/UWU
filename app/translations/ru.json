@@ -61,5 +61,14 @@
   "chat.greeting": "Здравствуйте! Чем можем помочь?",
   "chat.placeholder": "Введите сообщение…",
   "common.search": "Поиск",
-  "common.create": "Создать"
+  "common.create": "Создать",
+  "menu.rmk": "РМК — касса",
+  "rmk.search": "Поиск товара",
+  "rmk.cart": "Накладная",
+  "rmk.total": "Итого",
+  "rmk.sell": "Продажа",
+  "rmk.quantity": "Кол-во",
+  "rmk.price": "Цена",
+  "rmk.empty": "Список пуст — нажмите на товар",
+  "rmk.add_hint": "Двойной клик — добавить позицию"
 }

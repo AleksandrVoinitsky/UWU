@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block page_title %}{{ t('menu.rmk', lang) }}{% endblock %}
+{% block content %}
+
+<div class="rmk-layout">
+  <!-- Товары -->
+  <div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">
+        <h2>{{ t('catalog.nomenklatura', lang) }}</h2>
+        <div class="flex flex-wrap">
+          <div class="search-input"><span class="icon">⌕</span><input type="text" id="rmk-search" placeholder="{{ t('rmk.search', lang) }}…"></div>
+          <div class="field" style="margin:0;min-width:160px">
+            <label>{{ t('report.warehouse', lang) }}</label>
+            <select id="rmk-sklad">
+              {% for s in sklady %}<option value="{{ s.id }}" {% if s.is_default %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="rmk-items" id="rmk-grid"></div>
+      <div class="muted small mt">{{ t('rmk.add_hint', lang) }}</div>
+    </div>
+  </div>
+
+  <!-- Накладная (корзина) -->
+  <div class="rmk-cart">
+    <div class="cart-header">{{ t('rmk.cart', lang) }}</div>
+    <div class="cart-body">
+      <div class="cart-empty" id="rmk-cart-empty">{{ t('rmk.empty', lang) }}</div>
+      <div id="rmk-cart-body"></div>
+    </div>
+    <div class="cart-footer">
+      <div class="rmk-total">
+        <span class="label">{{ t('rmk.total', lang) }}</span>
+        <span class="value" id="rmk-total">0.00 ₽</span>
+      </div>
+      <button class="btn primary rmk-sell" id="rmk-sell">{{ t('rmk.sell', lang) }}</button>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="rmk-data">{{ items_json | safe }}</script>
+{% endblock %}

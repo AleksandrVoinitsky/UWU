@@ -14,7 +14,7 @@
       <thead><tr><th>{{ t('common.name', lang) }}</th><th>ИНН</th></tr></thead>
       <tbody>
         {% for item in items %}
-        <tr data-row><td>{{ item.name }}</td><td class="muted">{{ item.inn or '—' }}</td></tr>
+        <tr data-row data-edit="modal-firma-edit" data-id="{{ item.id }}" data-name="{{ item.name }}" data-full_name="{{ item.full_name or '' }}" data-inn="{{ item.inn or '' }}" style="cursor:pointer" title="Нажмите для редактирования"><td>{{ item.name }}</td><td class="muted">{{ item.inn or '—' }}</td></tr>
         {% else %}<tr data-empty><td colspan="2" class="muted">Нет записей</td></tr>{% endfor %}
       </tbody>
     </table>
@@ -35,6 +35,25 @@
       <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
         <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
         <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-firma-edit">
+  <div class="modal">
+    <div class="modal-header"><h3>{{ t('common.edit', lang) }} · {{ t('catalog.firmy', lang) }}</h3><button class="modal-close" data-modal-close>✕</button></div>
+    <form method="post" action="" data-action-pattern="/catalog/firmy/{id}/update">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+          <div class="field"><label>Полное наименование</label><input type="text" name="full_name"></div>
+          <div class="field"><label>ИНН</label><input type="text" name="inn"></div>
+        </div>
+      </div>
+      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
+        <button type="submit" class="btn primary">{{ t('common.save', lang) }}</button>
       </div>
     </form>
   </div>

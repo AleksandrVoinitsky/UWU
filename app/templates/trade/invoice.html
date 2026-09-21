@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block page_title %}{{ document.number }}{% endblock %}
+{% block content %}
+
+<div class="no-print" style="margin-bottom:16px;display:flex;gap:10px">
+  <button class="btn primary" onclick="window.print()">Печать</button>
+  <a class="btn secondary" href="/rmk">← {{ t('menu.rmk', lang) }}</a>
+  <a class="btn text" href="/documents">Журнал</a>
+</div>
+
+<div class="invoice">
+  <div class="inv-header">
+    <div>
+      <div class="inv-title">Расходная накладная</div>
+      <div class="muted">№ {{ document.number }}</div>
+    </div>
+    <div class="inv-meta">
+      <div>от {{ document.date }}</div>
+      <div>Статус: {{ 'Проведён' if document.status == 'posted' else document.status }}</div>
+    </div>
+  </div>
+
+  <div class="inv-parties">
+    <div>
+      <div class="lbl">Склад</div>
+      <div>{{ names.sklad or '—' }}</div>
+    </div>
+    <div>
+      <div class="lbl">Покупатель</div>
+      <div>{{ names.kontragent or 'Розничный покупатель' }}</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th style="width:40px">№</th><th>Наименование</th><th style="text-align:right">Кол-во</th><th style="text-align:right">Цена</th><th style="text-align:right">Сумма</th></tr>
+    </thead>
+    <tbody>
+      {% for i in names['items'] %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ i.name }}</td>
+        <td style="text-align:right">{{ i.quantity }}</td>
+        <td style="text-align:right">{{ "%.2f"|format(i.price) }}</td>
+        <td style="text-align:right">{{ "%.2f"|format(i.amount) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="inv-total">Итого: {{ "%.2f"|format(document.total) }}</div>
+
+  <div style="margin-top:40px;display:flex;justify-content:space-between;font-size:13px;color:var(--text-secondary)">
+    <div>Отпустил: ______________</div>
+    <div>Получил: ______________</div>
+  </div>
+</div>
+{% endblock %}
