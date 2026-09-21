@@ -32,6 +32,7 @@ _STOCK_DOC_TYPES = {
     DocType.OPRIHODOVANIE,
     DocType.VVOD_OSTATKOV,
     DocType.VOZVRAT,
+    DocType.INVENTARIZACIYA,
 }
 
 # Документы прихода (формируют партии).
@@ -214,8 +215,11 @@ async def post_document(session: AsyncSession, document: Document) -> Document:
 
         cost_method = await _get_cost_method(session)
 
-        for item in items:
-            await _apply_stock_movement(session, document, item, doc_type, cost_method)
+        if doc_type == DocType.INVENTARIZACIYA:
+            await _apply_inventory(session, document, items, cost_method)
+        else:
+            for item in items:
+                await _apply_stock_movement(session, document, item, doc_type, cost_method)
 
     await _apply_money_and_settlement(session, document, doc_type)
 
@@ -313,6 +317,54 @@ async def _apply_stock_movement(
             quantity=item.quantity,
             amount=amount,
         )
+
+
+async def _apply_inventory(
+    session: AsyncSession,
+    document: Document,
+    items: list[DocumentItem],
+    cost_method: CostMethod,
+) -> None:
+    """Инвентаризация: корректирует остатки до фактического количества.
+
+    ``item.quantity`` — фактическое количество; отклонение = факт − учёт.
+    Излишек оприходуется, недостача списывается.
+    """
+    for item in items:
+        sklad = item.sklad_id or document.sklad_id
+        if sklad is None:
+            raise DocumentError("Склад обязателен для инвентаризации")
+        book = await stock_service.get_balance(session, item.nomenklatura_id, sklad)
+        deviation = item.quantity - book
+        if deviation > 0:
+            # Излишек — оприходование.
+            await stock_service.create_incoming(
+                session,
+                document_id=document.id,
+                date=document.date,
+                nomenklatura_id=item.nomenklatura_id,
+                sklad_id=sklad,
+                quantity=deviation,
+                price=item.price or Decimal("0"),
+            )
+        elif deviation < 0:
+            # Недостача — списание.
+            consumed, amount = await stock_service.consume_batches(
+                session,
+                nomenklatura_id=item.nomenklatura_id,
+                sklad_id=sklad,
+                quantity=-deviation,
+                method=cost_method,
+            )
+            await stock_service.register_outgoing(
+                session,
+                document_id=document.id,
+                date=document.date,
+                nomenklatura_id=item.nomenklatura_id,
+                sklad_id=sklad,
+                quantity=-deviation,
+                amount=amount,
+            )
 
 
 async def _apply_money_and_settlement(

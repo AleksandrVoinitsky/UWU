@@ -238,7 +238,12 @@ async def create_kassa(
 
 @router.get("/catalog/valyuty", response_class=HTMLResponse)
 async def catalog_valyuty(request: Request, session=Depends(get_session), user=Depends(get_current_user_from_cookie)):
-    return await _catalog_page(request, user, session, cat.Valyuta, "trade/valyuty.html", "Валюты")
+    items = await catalog_service.list_all(session, cat.Valyuta)
+    rates = {}
+    for v in items:
+        r = await catalog_service.get_latest_rate(session, v.id)
+        rates[v.id] = r
+    return _page(request, user, "trade/valyuty.html", items=items, rates=rates)
 
 
 @router.post("/catalog/valyuty")
@@ -378,12 +383,16 @@ async def update_kassa(
 
 @router.post("/catalog/valyuty/{item_id}/update")
 async def update_valyuta(
-    item_id: int, code: str = Form(...), name: str = Form(...),
+    item_id: int, code: str = Form(...), name: str = Form(...), rate: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
     obj = await catalog_service.get_one(session, cat.Valyuta, item_id)
     if obj:
-        await catalog_service.update_one(session, obj, code=code, name=name)
+        obj.code = code
+        obj.name = name
+        await session.commit()
+        if rate.strip():
+            await catalog_service.set_rate(session, item_id, date.today(), Decimal(rate))
     return RedirectResponse("/catalog/valyuty", status_code=303)
 
 
@@ -702,6 +711,59 @@ async def dogovor_create(
         payment_term_days=int(payment_term_days) if payment_term_days else None,
     )
     return RedirectResponse("/dogovory", status_code=303)
+
+
+# --- Инвентаризация ---
+
+
+@router.get("/inventarizaciya", response_class=HTMLResponse)
+async def inventarizaciya_form(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    balances = await report_service.stock_balances(session)
+    sklady = await catalog_service.list_all(session, cat.Sklad)
+    return _page(request, user, "trade/inventarizaciya.html", balances=balances, sklady=sklady)
+
+
+@router.post("/inventarizaciya")
+async def inventarizaciya_submit(
+    request: Request,
+    sklad_id: str = Form(""),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    form = await request.form()
+    items = []
+    for key, value in form.items():
+        if not key.startswith("actual_"):
+            continue
+        parts = key.split("_")  # actual_{nomen_id}_{sklad_id}
+        if len(parts) < 3:
+            continue
+        nomen_id = int(parts[1])
+        item_sklad = int(parts[2])
+        if not value.strip():
+            continue
+        actual = Decimal(value)
+        items.append(
+            {"nomenklatura_id": nomen_id, "sklad_id": item_sklad, "quantity": actual, "price": Decimal("0")}
+        )
+
+    if not items:
+        return RedirectResponse("/inventarizaciya", status_code=303)
+
+    document = await document_service.create_document(
+        session,
+        doc_type=DocType.INVENTARIZACIYA,
+        doc_date=date.today(),
+        sklad_id=int(sklad_id) if sklad_id else None,
+        items=items,
+        created_by_id=user.id,
+    )
+    await document_service.post_document(session, document)
+    return RedirectResponse("/documents", status_code=303)
 
 
 # --- Документы ---

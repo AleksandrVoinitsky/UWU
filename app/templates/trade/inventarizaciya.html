@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block page_title %}Инвентаризация{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="card-header">
+    <h2>Инвентаризация остатков</h2>
+    <div class="flex flex-wrap" style="align-items:flex-end">
+      <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#inv-table" placeholder="{{ t('common.search', lang) }}…"></div>
+      <div class="field" style="margin:0;min-width:180px">
+        <label>Склад</label>
+        <select id="inv-sklad" onchange="filterSklad()">
+          <option value="">Все склады</option>
+          {% for s in sklady %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" action="/inventarizaciya">
+    <input type="hidden" name="sklad_id" id="inv-sklad-hidden">
+    <div class="table-wrap">
+      <table class="table" id="inv-table">
+        <thead>
+          <tr><th>Номенклатура</th><th>Склад</th><th class="num">Учёт (книжное)</th><th class="num">Факт</th><th class="num">Отклонение</th></tr>
+        </thead>
+        <tbody>
+          {% for b in balances %}
+          <tr data-row data-sklad="{{ b.sklad_id }}">
+            <td>{{ b.nomenklatura }}</td>
+            <td class="muted">{{ b.sklad }}</td>
+            <td class="num">{{ b.quantity }}</td>
+            <td class="num"><input type="number" step="0.001" name="actual_{{ b.nomenklatura_id }}_{{ b.sklad_id }}" value="{{ b.quantity }}" style="width:110px;text-align:right" oninput="recalcDiff(this)"></td>
+            <td class="num dev" data-book="{{ b.quantity }}">0</td>
+          </tr>
+          {% else %}
+          <tr data-empty><td colspan="5" class="muted">Нет остатков</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn primary">Провести инвентаризацию</button>
+      <a class="btn text" href="/documents">Отмена</a>
+    </div>
+  </form>
+</div>
+
+<script>
+function recalcDiff(input) {
+  var row = input.closest('tr');
+  var book = parseFloat(row.querySelector('.dev').dataset.book) || 0;
+  var actual = parseFloat(input.value) || 0;
+  var diff = actual - book;
+  var cell = row.querySelector('.dev');
+  cell.textContent = (diff > 0 ? '+' : '') + diff.toFixed(3);
+  cell.style.color = diff === 0 ? '' : (diff > 0 ? 'var(--ok)' : 'var(--bad)');
+}
+function filterSklad() {
+  var sel = document.getElementById('inv-sklad');
+  var val = sel.value;
+  document.getElementById('inv-sklad-hidden').value = val;
+  document.querySelectorAll('#inv-table tbody tr[data-sklad]').forEach(function(r) {
+    r.style.display = (!val || r.dataset.sklad === val) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

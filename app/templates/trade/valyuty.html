@@ -11,11 +11,15 @@
   </div>
   <div class="table-wrap">
     <table class="table" id="val-table">
-      <thead><tr><th>{{ t('common.code', lang) }}</th><th>{{ t('common.name', lang) }}</th></tr></thead>
+      <thead><tr><th>{{ t('common.code', lang) }}</th><th>{{ t('common.name', lang) }}</th><th class="num">Курс</th></tr></thead>
       <tbody>
         {% for item in items %}
-        <tr data-row data-edit="modal-val-edit" data-id="{{ item.id }}" data-code="{{ item.code }}" data-name="{{ item.name }}" style="cursor:pointer" title="Нажмите для редактирования"><td class="muted">{{ item.code }}</td><td>{{ item.name }}</td></tr>
-        {% else %}<tr data-empty><td colspan="2" class="muted">Нет записей</td></tr>{% endfor %}
+        <tr data-row data-edit="modal-val-edit" data-id="{{ item.id }}" data-code="{{ item.code }}" data-name="{{ item.name }}" style="cursor:pointer" title="Нажмите для редактирования">
+          <td class="muted">{{ item.code }}</td>
+          <td>{{ item.name }}</td>
+          <td class="num">{{ "%.4f"|format(rates.get(item.id)) if rates.get(item.id) is not none else '—' }}</td>
+        </tr>
+        {% else %}<tr data-empty><td colspan="3" class="muted">Нет записей</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>
@@ -47,6 +51,7 @@
         <div class="form-row">
           <div class="field"><label>{{ t('common.code', lang) }}</label><input type="text" name="code" required></div>
           <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+          <div class="field"><label>Курс (на сегодня)</label><input type="number" step="0.0001" name="rate" placeholder="например 1.0000"></div>
         </div>
       </div>
       <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">

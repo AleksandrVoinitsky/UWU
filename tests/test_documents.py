@@ -174,3 +174,24 @@ async def test_settlement_after_credit_sale(seeded_session):
         )
     ).scalar()
     assert debt == Decimal("300.00")
+
+
+async def test_inventory_adjusts_stock(seeded_session):
+    item = await _make_item(seeded_session)
+    sklad = await _make_sklad(seeded_session)
+
+    d1 = await _prihod(seeded_session, item, sklad, Decimal("5"), Decimal("100"))
+    await document_service.post_document(seeded_session, d1)
+    assert await get_balance(seeded_session, item.id, sklad.id) == Decimal("5")
+
+    # Инвентаризация: фактически 2 (недостача 3).
+    inv = await document_service.create_document(
+        seeded_session,
+        doc_type=DocType.INVENTARIZACIYA,
+        doc_date=date(2025, 1, 5),
+        sklad_id=sklad.id,
+        items=[{"nomenklatura_id": item.id, "sklad_id": sklad.id, "quantity": Decimal("2"), "price": Decimal("0")}],
+    )
+    await document_service.post_document(seeded_session, inv)
+
+    assert await get_balance(seeded_session, item.id, sklad.id) == Decimal("2")

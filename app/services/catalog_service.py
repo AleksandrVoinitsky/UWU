@@ -8,13 +8,15 @@
 """
 from __future__ import annotations
 
+from datetime import date
+from decimal import Decimal
 from typing import Any, TypeVar
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import Base
-from app.models.catalog import Kontragent, Nomenklatura
+from app.models.catalog import CurrencyRate, Kontragent, Nomenklatura
 from app.models.constants import DEFAULT_CONSTANTS, Constant
 
 ModelT = TypeVar("ModelT", bound=Base)
@@ -92,4 +94,47 @@ async def set_constant(session: AsyncSession, key: str, value: Any) -> None:
         session.add(constant)
     else:
         constant.value = value
+    await session.commit()
+
+
+# --- Курсы валют (периодические) ---
+
+
+async def get_latest_rate(
+    session: AsyncSession, currency_id: int, on_date: date | None = None
+) -> Decimal | None:
+    """Курс валюты на дату (последний курс ≤ даты)."""
+    target = on_date or date.today()
+    result = await session.execute(
+        select(CurrencyRate)
+        .where(CurrencyRate.currency_id == currency_id, CurrencyRate.on_date <= target)
+        .order_by(CurrencyRate.on_date.desc())
+        .limit(1)
+    )
+    row = result.scalar_one_or_none()
+    return row.rate if row else None
+
+
+async def set_rate(
+    session: AsyncSession,
+    currency_id: int,
+    on_date: date,
+    rate: Decimal,
+    multiplicity: int = 1,
+) -> None:
+    """Устанавливает (или обновляет) курс валюты на дату."""
+    result = await session.execute(
+        select(CurrencyRate).where(
+            CurrencyRate.currency_id == currency_id,
+            CurrencyRate.on_date == on_date,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        session.add(
+            CurrencyRate(currency_id=currency_id, on_date=on_date, rate=rate, multiplicity=multiplicity)
+        )
+    else:
+        row.rate = rate
+        row.multiplicity = multiplicity
     await session.commit()
