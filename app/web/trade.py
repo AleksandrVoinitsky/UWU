@@ -87,6 +87,13 @@ def _month_range() -> tuple[str, str]:
     return start.isoformat(), today.isoformat()
 
 
+def _deny(user: User, perm: str) -> Response | None:
+    """Возвращает редирект, если у пользователя нет права (иначе None)."""
+    if not user.has_permission(perm):
+        return RedirectResponse("/", status_code=303)
+    return None
+
+
 def _csv_response(rows: list[dict], filename: str) -> Response:
     """Формирует CSV-ответ для экспорта отчёта."""
     output = io.StringIO()
@@ -175,6 +182,9 @@ async def create_nomenklatura(
     price_mode: str = Form("free"), tip_tsen_id: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     code = await catalog_service.next_nomenklatura_code(session)
     await catalog_service.create_one(
         session, cat.Nomenklatura, code=code, name=name, full_name=full_name or None,
@@ -201,6 +211,9 @@ async def create_kontragent(
     phones: str = Form(""), vid: str = Form("yur"),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     code = await catalog_service.next_kontragent_code(session)
     await catalog_service.create_one(
         session, cat.Kontragent, code=code, name=name, full_name=full_name or None,
@@ -219,6 +232,9 @@ async def create_sklad(
     code: str = Form(...), name: str = Form(...), tip: str = Form("optovy"),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     await catalog_service.create_one(session, cat.Sklad, code=code, name=name, tip=tip)
     return RedirectResponse("/catalog/sklady", status_code=303)
 
@@ -233,6 +249,9 @@ async def create_firma(
     name: str = Form(...), full_name: str = Form(""), inn: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     await catalog_service.create_one(
         session, cat.Firma, name=name, full_name=full_name or None, inn=inn or None
     )
@@ -249,6 +268,9 @@ async def catalog_kassy(request: Request, session=Depends(get_session), user=Dep
 async def create_kassa(
     name: str = Form(...), session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     await catalog_service.create_one(session, cat.Kassa, name=name)
     return RedirectResponse("/catalog/kassy", status_code=303)
 
@@ -268,6 +290,9 @@ async def create_valyuta(
     code: str = Form(...), name: str = Form(...),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     await catalog_service.create_one(session, cat.Valyuta, code=code, name=name)
     return RedirectResponse("/catalog/valyuty", status_code=303)
 
@@ -282,6 +307,9 @@ async def create_edinitsa(
     name: str = Form(...), short_name: str = Form(...),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     await catalog_service.create_one(session, cat.Edinitsa, name=name, short_name=short_name)
     return RedirectResponse("/catalog/edinitsy", status_code=303)
 
@@ -296,6 +324,9 @@ async def create_stavka_nds(
     name: str = Form(...), rate: str = Form(...),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     await catalog_service.create_one(session, cat.StavkaNDS, name=name, rate=Decimal(rate))
     return RedirectResponse("/catalog/stavki_nds", status_code=303)
 
@@ -310,6 +341,9 @@ async def create_tip_tsen(
     name: str = Form(...), markup_percent: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     await catalog_service.create_one(
         session, cat.TipTsen, name=name, markup_percent=_or_decimal(markup_percent)
     )
@@ -335,6 +369,9 @@ async def update_nomenklatura(
     price_mode: str = Form("free"), tip_tsen_id: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     obj = await catalog_service.get_one(session, cat.Nomenklatura, item_id)
     if obj:
         obj.name = name
@@ -356,6 +393,9 @@ async def update_kontragent(
     phones: str = Form(""), vid: str = Form("yur"),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     obj = await catalog_service.get_one(session, cat.Kontragent, item_id)
     if obj:
         await catalog_service.update_one(
@@ -370,6 +410,9 @@ async def update_sklad(
     item_id: int, code: str = Form(...), name: str = Form(...), tip: str = Form("optovy"),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     obj = await catalog_service.get_one(session, cat.Sklad, item_id)
     if obj:
         await catalog_service.update_one(session, obj, code=code, name=name, tip=tip)
@@ -381,6 +424,9 @@ async def update_firma(
     item_id: int, name: str = Form(...), full_name: str = Form(""), inn: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     obj = await catalog_service.get_one(session, cat.Firma, item_id)
     if obj:
         await catalog_service.update_one(session, obj, name=name, full_name=_or_none(full_name), inn=_or_none(inn))
@@ -392,6 +438,9 @@ async def update_kassa(
     item_id: int, name: str = Form(...),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     obj = await catalog_service.get_one(session, cat.Kassa, item_id)
     if obj:
         await catalog_service.update_one(session, obj, name=name)
@@ -403,6 +452,9 @@ async def update_valyuta(
     item_id: int, code: str = Form(...), name: str = Form(...), rate: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     obj = await catalog_service.get_one(session, cat.Valyuta, item_id)
     if obj:
         obj.code = code
@@ -418,6 +470,9 @@ async def update_edinitsa(
     item_id: int, name: str = Form(...), short_name: str = Form(...),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     obj = await catalog_service.get_one(session, cat.Edinitsa, item_id)
     if obj:
         await catalog_service.update_one(session, obj, name=name, short_name=short_name)
@@ -429,6 +484,9 @@ async def update_stavka_nds(
     item_id: int, name: str = Form(...), rate: str = Form(...),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     obj = await catalog_service.get_one(session, cat.StavkaNDS, item_id)
     if obj:
         await catalog_service.update_one(session, obj, name=name, rate=Decimal(rate))
@@ -440,6 +498,9 @@ async def update_tip_tsen(
     item_id: int, name: str = Form(...), markup_percent: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     obj = await catalog_service.get_one(session, cat.TipTsen, item_id)
     if obj:
         obj.name = name
@@ -462,6 +523,9 @@ async def create_sotrudnik(
     name: str = Form(...), position: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     await catalog_service.create_one(session, cat.Sotrudnik, name=name, position=position or None)
     return RedirectResponse("/catalog/sotrudniki", status_code=303)
 
@@ -471,6 +535,9 @@ async def update_sotrudnik(
     item_id: int, name: str = Form(...), position: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     obj = await catalog_service.get_one(session, cat.Sotrudnik, item_id)
     if obj:
         obj.name = name
@@ -496,6 +563,9 @@ async def create_schet(
     bik: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     await catalog_service.create_one(
         session, cat.RaschetnySchet,
         kontragent_id=int(kontragent_id), bank_name=bank_name or None, account=account, bik=bik or None,
@@ -509,6 +579,9 @@ async def update_schet(
     account: str = Form(...), bik: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     obj = await catalog_service.get_one(session, cat.RaschetnySchet, item_id)
     if obj:
         obj.kontragent_id = int(kontragent_id)
@@ -529,6 +602,9 @@ async def update_nomenklatura_prices(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     """Сохраняет закупочную/свободную цену и явные цены по видам цен."""
     obj = await catalog_service.get_one(session, cat.Nomenklatura, item_id)
     if obj is None:
@@ -720,6 +796,9 @@ async def zakaz_create(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     form = await request.form()
     items = _parse_items(form)
     await document_service.create_document(
@@ -859,6 +938,9 @@ async def dogovor_create(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
     await catalog_service.create_one(
         session, cat.Dogovor,
         kontragent_id=int(kontragent_id), name=name, number=number or None,
@@ -998,6 +1080,9 @@ async def document_create_submit(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "documents.write")
+    if denied:
+        return denied
     form = await request.form()
     items = _parse_items(form)
     amount = form.get("amount")
@@ -1091,6 +1176,9 @@ async def document_edit_submit(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "documents.write")
+    if denied:
+        return denied
     document = await document_service.get_document(session, document_id)
     if document is None:
         return RedirectResponse("/documents", status_code=303)
@@ -1126,6 +1214,9 @@ async def _resolve_names(session: AsyncSession, document: Document) -> dict:
 
 @router.post("/documents/{document_id}/post")
 async def document_post(document_id: int, session=Depends(get_session), user=Depends(get_current_user_from_cookie)):
+    denied = _deny(user, "documents.post")
+    if denied:
+        return denied
     document = await document_service.get_document(session, document_id)
     if document:
         try:
@@ -1137,6 +1228,9 @@ async def document_post(document_id: int, session=Depends(get_session), user=Dep
 
 @router.post("/documents/{document_id}/unpost")
 async def document_unpost(document_id: int, session=Depends(get_session), user=Depends(get_current_user_from_cookie)):
+    denied = _deny(user, "documents.post")
+    if denied:
+        return denied
     document = await document_service.get_document(session, document_id)
     if document:
         await document_service.unpost_document(session, document)
@@ -1145,6 +1239,9 @@ async def document_unpost(document_id: int, session=Depends(get_session), user=D
 
 @router.post("/documents/{document_id}/delete")
 async def document_delete(document_id: int, session=Depends(get_session), user=Depends(get_current_user_from_cookie)):
+    denied = _deny(user, "documents.write")
+    if denied:
+        return denied
     document = await document_service.get_document(session, document_id)
     if document:
         await document_service.mark_for_deletion(session, document)

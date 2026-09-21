@@ -9,11 +9,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.deps import get_current_user_from_cookie
 from app.core.i18n import translate
+from app.models.registry import AuditLog
 from app.models.users import PERMISSIONS, User
 from app.models.catalog import Valyuta
 from app.schemas.auth import UserCreate
@@ -185,3 +187,18 @@ async def admin_save_settings(
                 continue
             await catalog_service.set_constant(session, const_key, value)
     return RedirectResponse("/admin/settings", status_code=303)
+
+
+@router.get("/admin/audit", response_class=HTMLResponse)
+async def admin_audit(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    if not user.is_admin:
+        return RedirectResponse("/", status_code=303)
+    result = await session.execute(select(AuditLog).order_by(AuditLog.id.desc()).limit(200))
+    logs = list(result.scalars())
+    # Имена пользователей.
+    user_map = {u.id: u.login for u in await user_service.list_users(session)}
+    return _page(request, user, "admin/audit.html", logs=logs, user_map=user_map)

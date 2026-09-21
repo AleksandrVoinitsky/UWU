@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block page_title %}Журнал действий{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header"><h2>Журнал действий (история изменений)</h2></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Время</th><th>Пользователь</th><th>Объект</th><th>Действие</th></tr></thead>
+      <tbody>
+        {% for log in logs %}
+        <tr data-row>
+          <td class="muted">{{ log.created_at }}</td>
+          <td>{{ user_map.get(log.user_id, '—') }}</td>
+          <td>{{ log.entity_type }} #{{ log.entity_id }}</td>
+          <td>{{ log.action }}</td>
+        </tr>
+        {% else %}<tr data-empty><td colspan="4" class="muted">Нет записей</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

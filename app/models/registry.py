@@ -138,3 +138,15 @@ class CashShift(Base, IdMixin):
     opened_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     opening_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
     closing_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+
+
+class AuditLog(Base, IdMixin):
+    """Журнал действий (история изменений)."""
+
+    __tablename__ = "audit_logs"
+
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    entity_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    entity_id: Mapped[int | None] = mapped_column(Numeric(15, 0), nullable=True)
+    action: Mapped[str] = mapped_column(String(30), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

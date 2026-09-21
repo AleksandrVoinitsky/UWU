@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 from app.models.constants import Constant
 from app.models.document.base_document import Document, DocumentItem
 from app.models.enums import CostMethod, DocSubtype, DocType, DocumentStatus, RestockControl
-from app.models.registry import AccountingEntry, MoneyMovement, SettlementMovement, StockMovement
+from app.models.registry import AccountingEntry, AuditLog, MoneyMovement, SettlementMovement, StockMovement
 from app.services import stock_service
 from app.services.stock_service import InsufficientStockError
 
@@ -37,6 +37,18 @@ _STOCK_DOC_TYPES = {
 
 # Документы прихода (формируют партии).
 _INCOMING = {DocType.PRIHOD, DocType.OPRIHODOVANIE, DocType.VVOD_OSTATKOV, DocType.VOZVRAT}
+
+
+def _log(session: AsyncSession, document: Document, action: str) -> None:
+    """Записывает действие над документом в журнал (история изменений)."""
+    session.add(
+        AuditLog(
+            user_id=document.created_by_id,
+            entity_type="document",
+            entity_id=document.id,
+            action=action,
+        )
+    )
 
 
 class DocumentError(Exception):
@@ -268,6 +280,7 @@ async def post_document(session: AsyncSession, document: Document) -> Document:
 
     document.status = DocumentStatus.POSTED
     document.posted_at = datetime.now(timezone.utc)
+    _log(session, document, "post")
     await session.commit()
     return await get_document(session, document.id)
 
@@ -562,6 +575,7 @@ async def unpost_document(session: AsyncSession, document: Document) -> Document
 
     document.status = DocumentStatus.DRAFT
     document.posted_at = None
+    _log(session, document, "unpost")
     await session.commit()
     return await get_document(session, document.id)
 
@@ -626,5 +640,6 @@ async def mark_for_deletion(session: AsyncSession, document: Document) -> Docume
     if document.status == DocumentStatus.POSTED:
         await unpost_document(session, document)
     document.status = DocumentStatus.MARKED_DELETED
+    _log(session, document, "delete")
     await session.commit()
     return await get_document(session, document.id)
