@@ -145,6 +145,8 @@ class NomenklaturaBase(BaseModel):
     nds_rate_id: int | None = None
     purchase_price: Decimal | None = None
     retail_price: Decimal | None = None
+    price_mode: str = "free"
+    tip_tsen_id: int | None = None
     properties: dict[str, Any] = Field(default_factory=dict)
 
 

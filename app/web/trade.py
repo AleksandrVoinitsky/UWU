@@ -126,28 +126,27 @@ async def _catalog_page(request, user, session, model, template, title, **extra)
 async def catalog_nomenklatura(request: Request, session=Depends(get_session), user=Depends(get_current_user_from_cookie)):
     result = await session.execute(
         select(cat.Nomenklatura)
-        .options(selectinload(cat.Nomenklatura.base_unit), selectinload(cat.Nomenklatura.nds_rate))
+        .options(
+            selectinload(cat.Nomenklatura.base_unit),
+            selectinload(cat.Nomenklatura.nds_rate),
+            selectinload(cat.Nomenklatura.tip_tsen),
+        )
         .order_by(cat.Nomenklatura.id)
     )
     items = list(result.scalars())
     units = await catalog_service.list_all(session, cat.Edinitsa)
     nds = await catalog_service.list_all(session, cat.StavkaNDS)
     tipy = await catalog_service.list_all(session, cat.TipTsen)
+    tipy_map = {t.id: t for t in tipy}
 
-    # Явные цены {nomen_id: {tip_id: price}}.
-    prices_result = await session.execute(select(cat.TsenaNomenklatury))
-    explicit: dict[int, dict[int, float]] = {}
-    for p in prices_result.scalars():
-        explicit.setdefault(p.nomenklatura_id, {})[p.tip_tsen_id] = float(p.price)
+    # Итоговая цена для таблицы.
+    eff_prices = {
+        n.id: price_service.effective_price(n, tipy_map) for n in items
+    }
 
     return _page(
         request, user, "trade/nomenklatura.html",
-        items=items, units=units, nds=nds,
-        tipy_json=json.dumps(
-            [{"id": t.id, "name": t.name, "markup_percent": float(t.markup_percent) if t.markup_percent is not None else None} for t in tipy],
-            ensure_ascii=False,
-        ),
-        explicit_json=json.dumps(explicit, ensure_ascii=False),
+        items=items, units=units, nds=nds, tipy=tipy, eff_prices=eff_prices,
     )
 
 
@@ -156,6 +155,7 @@ async def create_nomenklatura(
     name: str = Form(...), full_name: str = Form(""), vid: str = Form("tovar"),
     artikul: str = Form(""), base_unit_id: str = Form(""), nds_rate_id: str = Form(""),
     purchase_price: str = Form(""), retail_price: str = Form(""),
+    price_mode: str = Form("free"), tip_tsen_id: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
     code = await catalog_service.next_nomenklatura_code(session)
@@ -166,6 +166,8 @@ async def create_nomenklatura(
         nds_rate_id=int(nds_rate_id) if nds_rate_id else None,
         purchase_price=_or_decimal(purchase_price),
         retail_price=_or_decimal(retail_price),
+        price_mode=price_mode if price_mode in ("free", "by_type") else "free",
+        tip_tsen_id=int(tip_tsen_id) if (price_mode == "by_type" and tip_tsen_id) else None,
     )
     return RedirectResponse("/catalog/nomenklatura", status_code=303)
 
@@ -308,6 +310,7 @@ def _or_decimal(value: str) -> Decimal | None:
 async def update_nomenklatura(
     item_id: int, name: str = Form(...), full_name: str = Form(""), vid: str = Form("tovar"),
     artikul: str = Form(""), purchase_price: str = Form(""), retail_price: str = Form(""),
+    price_mode: str = Form("free"), tip_tsen_id: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
     obj = await catalog_service.get_one(session, cat.Nomenklatura, item_id)
@@ -319,6 +322,8 @@ async def update_nomenklatura(
         # Цены задаём явно (пустое значение очищает цену).
         obj.purchase_price = _or_decimal(purchase_price)
         obj.retail_price = _or_decimal(retail_price)
+        obj.price_mode = price_mode if price_mode in ("free", "by_type") else "free"
+        obj.tip_tsen_id = int(tip_tsen_id) if (price_mode == "by_type" and tip_tsen_id) else None
         await session.commit()
     return RedirectResponse("/catalog/nomenklatura", status_code=303)
 
@@ -462,23 +467,14 @@ async def rmk_page(
         return RedirectResponse("/admin", status_code=303)
     result = await session.execute(select(cat.Nomenklatura).order_by(cat.Nomenklatura.name))
     nomen = list(result.scalars())
-
-    # Цены из справочника цен (если заданы).
-    prices = await session.execute(select(cat.TsenaNomenklatury))
-    price_map: dict[int, Decimal] = {}
-    for p in prices.scalars():
-        if p.nomenklatura_id not in price_map:
-            price_map[p.nomenklatura_id] = p.price
+    tipy = await catalog_service.list_all(session, cat.TipTsen)
+    tipy_map = {t.id: t for t in tipy}
 
     items = [
         {
             "id": n.id,
             "name": n.name,
-            "price": (
-                float(n.retail_price)
-                if n.retail_price is not None
-                else (float(price_map[n.id]) if n.id in price_map else 0.0)
-            ),
+            "price": float(price_service.effective_price(n, tipy_map) or Decimal("0")),
         }
         for n in nomen
     ]

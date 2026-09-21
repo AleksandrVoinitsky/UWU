@@ -44,6 +44,12 @@ class Nomenklatura(Base, IdMixin, TimestampMixin):
     purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     retail_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
 
+    # Режим цены: "free" — свободная цена, "by_type" — по виду цен (наценка от закупочной).
+    price_mode: Mapped[str] = mapped_column(String(10), default="free", nullable=False)
+    tip_tsen_id: Mapped[int | None] = mapped_column(ForeignKey("tipy_tsen.id"), nullable=True)
+
+    tip_tsen: Mapped["TipTsen | None"] = relationship()
+
     parent: Mapped["Nomenklatura | None"] = relationship(remote_side="Nomenklatura.id")
     base_unit: Mapped["Edinitsa | None"] = relationship(foreign_keys=[base_unit_id])  # noqa: F821
     main_unit: Mapped["Edinitsa | None"] = relationship(foreign_keys=[main_unit_id])  # noqa: F821

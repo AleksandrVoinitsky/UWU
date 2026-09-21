@@ -154,11 +154,34 @@
         Object.keys(row.dataset).forEach(function (key) {
           if (key === "edit" || key === "id") return;
           var field = form.querySelector('[name="' + key + '"]');
-          if (field) field.value = row.dataset[key];
+          if (!field) return;
+          if (field.type === "radio") {
+            var target = form.querySelector('[name="' + key + '"][value="' + row.dataset[key] + '"]');
+            if (target) target.checked = true;
+          } else {
+            field.value = row.dataset[key];
+          }
         });
+        if (typeof syncPriceMode === "function") syncPriceMode(form);
       }
       openModal(row.getAttribute("data-edit"));
     });
+  });
+
+  /* Переключатель «свободная цена / по виду цен» */
+  window.syncPriceMode = function (form) {
+    var checked = form.querySelector('input[name="price_mode"]:checked');
+    var mode = checked ? checked.value : "free";
+    var free = form.querySelector(".pm-field-free");
+    var type = form.querySelector(".pm-field-type");
+    if (free) free.style.display = mode === "free" ? "" : "none";
+    if (type) type.style.display = mode === "by_type" ? "" : "none";
+  };
+
+  document.addEventListener("change", function (e) {
+    if (e.target && e.target.name === "price_mode") {
+      syncPriceMode(e.target.closest("form"));
+    }
   });
 
   /* ---------- Цены номенклатуры по видам ---------- */

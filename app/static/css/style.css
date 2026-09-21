@@ -350,7 +350,7 @@ input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   width: 100%;
-  max-width: 560px;
+  max-width: 1100px;
   max-height: 88vh;
   overflow-y: auto;
   transform: translateY(16px) scale(0.98);
@@ -562,8 +562,7 @@ input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
 .nav-sub {
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.5s var(--ease), opacity 0.4s var(--ease);
-  transition-delay: 0.18s; /* плавное сворачивание — курсор успевает «доехать» */
+  transition: max-height 2.5s var(--ease), opacity 2.0s var(--ease);
   opacity: 0;
 }
 
@@ -571,13 +570,12 @@ input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
 .nav-group-parent.open .nav-sub {
   max-height: 420px;
   opacity: 1;
-  transition-delay: 0s;
 }
 
 .nav-group-parent:hover .chevron,
 .nav-group-parent.open .chevron {
   transform: rotate(90deg);
-  transition: transform 0.4s var(--ease);
+  transition: transform 2.0s var(--ease);
 }
 
 .nav-sub .nav-link {

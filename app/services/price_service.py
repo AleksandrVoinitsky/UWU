@@ -29,6 +29,20 @@ def auto_price(purchase_price: Decimal | None, markup_percent: Decimal | None) -
     return (purchase_price * (Decimal("1") + markup / Decimal("100"))).quantize(Decimal("0.01"))
 
 
+def effective_price(nomenklatura: Nomenklatura, tipy_map: dict[int, TipTsen]) -> Decimal | None:
+    """Итоговая цена продажи номенклатуры.
+
+    В режиме ``by_type`` — автонаценка от закупочной по выбранному виду цен;
+    иначе — свободная цена.
+    """
+    if nomenklatura.price_mode == "by_type" and nomenklatura.tip_tsen_id:
+        tip = tipy_map.get(nomenklatura.tip_tsen_id)
+        if tip is not None:
+            return auto_price(nomenklatura.purchase_price, tip.markup_percent)
+        return None
+    return nomenklatura.retail_price
+
+
 async def get_explicit_prices(
     session: AsyncSession, nomenklatura_id: int
 ) -> dict[int, Decimal]:

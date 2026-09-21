@@ -58,3 +58,24 @@ async def test_zakaz_creation(seeded_session):
     assert zakaz.doc_type == "zakaz"
     assert zakaz.extra["state"] == "new"
     assert zakaz.total == Decimal("300.00")
+
+
+async def test_effective_price_by_type(seeded_session):
+    tip = await catalog_service.create_one(
+        seeded_session, TipTsen, name="Розница", markup_percent=Decimal("25")
+    )
+    tip_map = {tip.id: tip}
+
+    # Режим «по виду цен» — автонаценка от закупочной.
+    nomen = await catalog_service.create_one(
+        seeded_session, Nomenklatura, code="002", name="Товар2",
+        purchase_price=Decimal("100"), price_mode="by_type", tip_tsen_id=tip.id,
+    )
+    assert price_service.effective_price(nomen, tip_map) == Decimal("125.00")
+
+    # Режим «свободная цена».
+    nomen2 = await catalog_service.create_one(
+        seeded_session, Nomenklatura, code="003", name="Товар3",
+        purchase_price=Decimal("100"), retail_price=Decimal("199"), price_mode="free",
+    )
+    assert price_service.effective_price(nomen2, tip_map) == Decimal("199.00")
