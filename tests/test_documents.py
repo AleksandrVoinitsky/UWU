@@ -232,3 +232,35 @@ async def test_accounting_entries_generated(seeded_session):
     assert entries[0].account_debit == "41"
     assert entries[0].account_credit == "60"
     assert entries[0].amount == Decimal("500.00")
+
+
+async def test_update_document_items(seeded_session):
+    item = await _make_item(seeded_session)
+    sklad = await _make_sklad(seeded_session)
+
+    doc = await document_service.create_document(
+        seeded_session,
+        doc_type=DocType.PRIHOD,
+        doc_date=date(2025, 1, 1),
+        sklad_id=sklad.id,
+        items=[{"nomenklatura_id": item.id, "quantity": Decimal("3"), "price": Decimal("100")}],
+    )
+    assert doc.total == Decimal("300.00")
+
+    # Изменяем строки (2 × 150 = 300).
+    updated = await document_service.update_document_items(
+        seeded_session, doc,
+        [{"nomenklatura_id": item.id, "quantity": Decimal("2"), "price": Decimal("150")}],
+    )
+    assert updated.total == Decimal("300.00")
+    assert len(updated.items) == 1
+    assert updated.items[0].quantity == Decimal("2")
+
+    # Проведённый документ редактировать нельзя.
+    await document_service.post_document(seeded_session, updated)
+    import pytest
+    with pytest.raises(document_service.DocumentError):
+        await document_service.update_document_items(
+            seeded_session, updated,
+            [{"nomenklatura_id": item.id, "quantity": Decimal("1"), "price": Decimal("100")}],
+        )

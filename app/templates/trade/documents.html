@@ -71,6 +71,7 @@
           <td>
             <div class="flex" style="gap:4px;justify-content:flex-end">
               {% if d.status == 'draft' %}
+              <a class="btn text small" href="/documents/{{ d.id }}/edit">Изменить</a>
               <form method="post" action="/documents/{{ d.id }}/post"><button class="btn text small">Провести</button></form>
               {% elif d.status == 'posted' %}
               <form method="post" action="/documents/{{ d.id }}/unpost"><button class="btn text small">Отменить</button></form>

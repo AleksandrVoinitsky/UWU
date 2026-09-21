@@ -194,6 +194,48 @@ async def get_document(session: AsyncSession, document_id: int) -> Document | No
     return result.scalar_one_or_none()
 
 
+async def update_document_items(
+    session: AsyncSession, document: Document, items: list[dict]
+) -> Document:
+    """Заменяет строки документа (только для непроведённого) и пересчитывает итоги."""
+    if document.status == DocumentStatus.POSTED:
+        raise DocumentError("Cannot edit items of a posted document")
+
+    existing = await _load_items(session, document)
+    for item in existing:
+        await session.delete(item)
+    await session.flush()
+
+    nds_rates = await _load_nds_rates(session)
+    item_objs: list[DocumentItem] = []
+    for row in items:
+        item = DocumentItem(
+            document_id=document.id,
+            nomenklatura_id=row["nomenklatura_id"],
+            sklad_id=row.get("sklad_id") or document.sklad_id,
+            quantity=row["quantity"],
+            price=row["price"],
+            amount=Decimal("0"),
+            nds_rate_id=row.get("nds_rate_id"),
+        )
+        session.add(item)
+        item_objs.append(item)
+        await session.flush()
+        _compute_item_amounts(item, nds_rates.get(item.nds_rate_id) if item.nds_rate_id else None)
+
+    _recalc_totals(document, item_objs)
+    await session.commit()
+
+    # Перезагружаем документ со строками (identity map может хранить устаревшие строки).
+    result = await session.execute(
+        select(Document)
+        .options(selectinload(Document.items))
+        .where(Document.id == document.id)
+        .execution_options(populate_existing=True)
+    )
+    return result.scalar_one()
+
+
 async def post_document(session: AsyncSession, document: Document) -> Document:
     """Проводит документ: контроль остатков + формирование движений."""
     if document.status == DocumentStatus.POSTED:

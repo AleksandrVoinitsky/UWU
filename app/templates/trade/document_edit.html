@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block page_title %}Редактирование {{ document.number }}{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="card-header">
+    <h2>{{ DOC_LABELS.get(document.doc_type, document.doc_type) }} · {{ document.number }}</h2>
+    <a class="btn text small" href="/documents">← {{ t('menu.documents', lang) }}</a>
+  </div>
+
+  <form method="post" action="/documents/{{ document.id }}/edit">
+    <div class="flex flex-wrap" style="gap:20px;margin-bottom:12px">
+      <div><span class="muted small">Дата</span> <span>{{ document.date }}</span></div>
+      <div><span class="muted small">Склад</span> <span>{{ sklad_name or '—' }}</span></div>
+    </div>
+
+    <div class="card-header"><h3>Строки документа</h3></div>
+    <div id="items">
+      {% for item in document.items %}
+      <div class="form-row item-row" style="grid-template-columns:2fr 1fr 1fr 40px">
+        <div class="field"><label>Номенклатура</label>
+          <select name="item_nomenklatura_id">
+            {% for n in nomenklatura %}<option value="{{ n.id }}" {% if n.id == item.nomenklatura_id %}selected{% endif %}>{{ n.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field"><label>{{ t('report.quantity', lang) }}</label><input type="number" step="0.001" name="item_quantity" value="{{ item.quantity }}"></div>
+        <div class="field"><label>Цена</label><input type="number" step="0.01" name="item_price" value="{{ item.price }}"></div>
+        <div class="field"><button type="button" class="btn text small" onclick="this.closest('.item-row').remove()">✕</button></div>
+      </div>
+      {% else %}
+      <div class="form-row item-row" style="grid-template-columns:2fr 1fr 1fr 40px">
+        <div class="field"><label>Номенклатура</label>
+          <select name="item_nomenklatura_id">{% for n in nomenklatura %}<option value="{{ n.id }}">{{ n.name }}</option>{% endfor %}</select>
+        </div>
+        <div class="field"><label>{{ t('report.quantity', lang) }}</label><input type="number" step="0.001" name="item_quantity"></div>
+        <div class="field"><label>Цена</label><input type="number" step="0.01" name="item_price"></div>
+        <div class="field"><button type="button" class="btn text small" onclick="this.closest('.item-row').remove()">✕</button></div>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="btn secondary small" onclick="addRow()">+ Добавить строку</button>
+
+    <hr class="divider">
+    <div class="form-actions">
+      <button type="submit" class="btn primary">{{ t('common.save', lang) }}</button>
+      <a class="btn text" href="/documents">{{ t('common.cancel', lang) }}</a>
+    </div>
+  </form>
+</div>
+
+<script>
+function addRow() {
+  var tpl = document.querySelector('.item-row');
+  var clone = tpl.cloneNode(true);
+  clone.querySelectorAll('input').forEach(i => i.value = '');
+  document.getElementById('items').appendChild(clone);
+}
+</script>
+{% endblock %}

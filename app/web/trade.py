@@ -945,6 +945,44 @@ async def document_detail(
     return _page(request, user, "trade/document_detail.html", document=document, names=names)
 
 
+@router.get("/documents/{document_id}/edit", response_class=HTMLResponse)
+async def document_edit_form(
+    document_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    document = await document_service.get_document(session, document_id)
+    if document is None or document.status == "posted":
+        return RedirectResponse("/documents", status_code=303)
+    nomenklatura = await catalog_service.list_all(session, cat.Nomenklatura)
+    sklady = await catalog_service.list_all(session, cat.Sklad)
+    nomen_map = {n.id: n.name for n in nomenklatura}
+    sklad_map = {s.id: s.name for s in sklady}
+    sklad_name = sklad_map.get(document.sklad_id) if document.sklad_id else None
+    return _page(
+        request, user, "trade/document_edit.html",
+        document=document, nomenklatura=nomenklatura, sklady=sklady,
+        nomen_map=nomen_map, sklad_name=sklad_name,
+    )
+
+
+@router.post("/documents/{document_id}/edit")
+async def document_edit_submit(
+    document_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    document = await document_service.get_document(session, document_id)
+    if document is None:
+        return RedirectResponse("/documents", status_code=303)
+    form = await request.form()
+    items = _parse_items(form)
+    await document_service.update_document_items(session, document, items)
+    return RedirectResponse("/documents", status_code=303)
+
+
 async def _resolve_names(session: AsyncSession, document: Document) -> dict:
     """Подставляет наименования для отображения документа."""
     names: dict = {"items": []}
