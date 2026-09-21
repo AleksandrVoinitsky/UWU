@@ -262,6 +262,8 @@ async def _apply_stock_movement(
         raise DocumentError("Warehouse is required for stock documents")
 
     if doc_type in _INCOMING:
+        # Принятые на реализацию учитываются раздельно (не собственность).
+        ownership = "received" if (doc_type == DocType.PRIHOD and document.subtype == "realization") else "own"
         await stock_service.create_incoming(
             session,
             document_id=document.id,
@@ -270,6 +272,7 @@ async def _apply_stock_movement(
             sklad_id=source_sklad,
             quantity=item.quantity,
             price=item.price,
+            ownership=ownership,
         )
     elif doc_type == DocType.PEREMESHENIE:
         target_sklad = document.sklad_to_id

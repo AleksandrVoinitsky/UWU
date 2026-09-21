@@ -32,10 +32,11 @@ async def stock_balances(session: AsyncSession) -> list[dict]:
         select(
             StockBatch.nomenklatura_id,
             StockBatch.sklad_id,
+            StockBatch.ownership,
             func.sum(StockBatch.quantity),
             func.sum(StockBatch.quantity * StockBatch.unit_cost),
         )
-        .group_by(StockBatch.nomenklatura_id, StockBatch.sklad_id)
+        .group_by(StockBatch.nomenklatura_id, StockBatch.sklad_id, StockBatch.ownership)
         .having(func.sum(StockBatch.quantity) != 0)
     )
     result = await session.execute(stmt)
@@ -49,7 +50,7 @@ async def stock_balances(session: AsyncSession) -> list[dict]:
     reserved_map = {(r[0], r[1]): r[2] for r in res_result.all()}
 
     rows = []
-    for nomen_id, sklad_id, qty, cost in result.all():
+    for nomen_id, sklad_id, ownership, qty, cost in result.all():
         nomen = await session.get(Nomenklatura, nomen_id)
         sklad = await session.get(Sklad, sklad_id)
         reserved = reserved_map.get((nomen_id, sklad_id), Decimal("0"))
@@ -60,6 +61,7 @@ async def stock_balances(session: AsyncSession) -> list[dict]:
                 "artikul": nomen.artikul if nomen else None,
                 "sklad_id": sklad_id,
                 "sklad": sklad.name if sklad else f"#{sklad_id}",
+                "ownership": ownership,
                 "quantity": qty,
                 "reserved": reserved,
                 "available": qty - reserved,
@@ -279,3 +281,36 @@ async def accounting_entries(session: AsyncSession, start: date, end: date) -> l
             }
         )
     return rows
+
+
+async def commission_report(session: AsyncSession) -> dict:
+    """Отчёт по комиссионной торговле: принятые на реализацию + долг комитентам."""
+    stmt = (
+        select(
+            StockBatch.nomenklatura_id,
+            StockBatch.sklad_id,
+            func.sum(StockBatch.quantity),
+        )
+        .where(StockBatch.ownership == "received", StockBatch.quantity > 0)
+        .group_by(StockBatch.nomenklatura_id, StockBatch.sklad_id)
+    )
+    result = await session.execute(stmt)
+    received = []
+    for nomen_id, sklad_id, qty in result.all():
+        nomen = await session.get(Nomenklatura, nomen_id)
+        sklad = await session.get(Sklad, sklad_id)
+        received.append(
+            {
+                "nomenklatura": nomen.name if nomen else f"#{nomen_id}",
+                "sklad": sklad.name if sklad else f"#{sklad_id}",
+                "quantity": qty,
+            }
+        )
+
+    # Долг комитентам (отрицательные суммы взаиморасчётов).
+    debt_stmt = select(func.coalesce(func.sum(SettlementMovement.amount), 0)).where(
+        SettlementMovement.amount < 0
+    )
+    debt = -(await session.execute(debt_stmt)).scalar() or Decimal("0")
+
+    return {"received": received, "debt": debt}

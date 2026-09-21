@@ -69,6 +69,7 @@ async def create_incoming(
     sklad_id: int,
     quantity: Decimal,
     price: Decimal,
+    ownership: str = "own",
 ) -> StockBatch:
     """Оприходует партию и регистрирует движение прихода."""
     batch = StockBatch(
@@ -76,6 +77,7 @@ async def create_incoming(
         sklad_id=sklad_id,
         quantity=quantity,
         unit_cost=price,
+        ownership=ownership,
         source_document_id=document_id,
     )
     session.add(batch)

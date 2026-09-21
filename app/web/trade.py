@@ -1095,3 +1095,13 @@ async def report_accounting(
     rows = await report_service.accounting_entries(session, date.fromisoformat(s), date.fromisoformat(e))
     total = sum((r["amount"] for r in rows), Decimal("0"))
     return _page(request, user, "trade/report_accounting.html", rows=rows, start=s, end=e, total=total)
+
+
+@router.get("/reports/commission", response_class=HTMLResponse)
+async def report_commission(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    data = await report_service.commission_report(session)
+    return _page(request, user, "trade/report_commission.html", data=data)

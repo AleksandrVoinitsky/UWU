@@ -30,6 +30,8 @@ class StockBatch(Base, IdMixin):
     sklad_id: Mapped[int] = mapped_column(ForeignKey("sklady.id"), nullable=False, index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False)
     unit_cost: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    # Раздельный учёт: own (собственные), received (принятые на реализацию), transferred (переданные на реализацию).
+    ownership: Mapped[str] = mapped_column(String(20), default="own", nullable=False)
     source_document_id: Mapped[int | None] = mapped_column(
         ForeignKey("documents.id"), nullable=True
     )

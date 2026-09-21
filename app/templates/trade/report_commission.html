@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block page_title %}Комиссионная торговля{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="card-header"><h2>Комиссионная торговля</h2></div>
+  <div class="grid">
+    <div class="card" style="margin:0">
+      <div class="stat">{{ "%.2f"|format(data.debt) }}</div>
+      <div class="stat-label">Долг комитентам</div>
+    </div>
+    <div class="card" style="margin:0">
+      <div class="stat">{{ data.received|length }}</div>
+      <div class="stat-label">Позиций на реализации</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2>Принятые на реализацию (остатки)</h2>
+    <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#comm-table" placeholder="{{ t('common.search', lang) }}…"></div>
+  </div>
+  <div class="table-wrap">
+    <table class="table" id="comm-table">
+      <thead><tr><th>Номенклатура</th><th>Склад</th><th class="num">{{ t('report.quantity', lang) }}</th></tr></thead>
+      <tbody>
+        {% for r in data.received %}
+        <tr data-row><td>{{ r.nomenklatura }}</td><td class="muted">{{ r.sklad }}</td><td class="num">{{ r.quantity }}</td></tr>
+        {% else %}<tr data-empty><td colspan="3" class="muted">Нет принятых на реализацию</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="muted small mt">Товар принимается на реализацию документом «Приходная накладная» с типом расчёта «Реализация».</div>
+</div>
+{% endblock %}
