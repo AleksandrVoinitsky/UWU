@@ -69,11 +69,14 @@ async def get_current_user_from_cookie(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> User:
-    """Требует аутентификации по cookie-токену (для веб-интерфейса)."""
+    """Требует аутентификации по cookie-токену (для веб-интерфейса).
+
+    При отсутствии валидной сессии перенаправляет на страницу входа.
+    """
     user = await get_current_user_optional(request, session)
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
+            status_code=status.HTTP_303_SEE_OTHER,
+            headers={"Location": "/login"},
         )
     return user
