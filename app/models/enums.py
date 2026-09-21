@@ -112,6 +112,8 @@ class DocType(StrEnum):
     PRIHODNY_KASSOVY_ORDER = "pko"       # Приходный кассовый ордер
     RASHODNY_KASSOVY_ORDER = "rko"       # Расходный кассовый ордер
     VVOD_OSTATKOV_DENEG = "vvod_ostatkov_deneg"  # Ввод остатков денег
+    ZAKAZ = "zakaz"                              # Заявка покупателя
+    VOZVRAT = "vozvrat"                          # Возврат товара от покупателя
 
 
 class DocSubtype(StrEnum):

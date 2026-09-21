@@ -42,6 +42,15 @@ DOC_LABELS = {
     "rko": "Расходный кассовый ордер",
     "platezhnoe_poruchenie": "Платёжное поручение",
     "vvod_ostatkov_deneg": "Ввод остатков денег",
+    "zakaz": "Заявка покупателя",
+    "vozvrat": "Возврат товара",
+}
+
+ZAKAZ_STATES = {
+    "new": "Новая",
+    "in_work": "В работе",
+    "done": "Выполнена",
+    "cancelled": "Отменена",
 }
 
 # Виды документов, у которых есть табличная часть.
@@ -530,6 +539,72 @@ async def document_print(
         return _page(request, user, "trade/error.html", error="Документ не найден", back="/documents")
     names = await _resolve_names(session, document)
     return _page(request, user, "trade/invoice.html", document=document, names=names)
+
+
+# --- Заявки покупателя ---
+
+
+@router.get("/zakazy", response_class=HTMLResponse)
+async def zakazy_list(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    stmt = (
+        select(Document)
+        .where(Document.doc_type == DocType.ZAKAZ.value)
+        .order_by(Document.date.desc(), Document.id.desc())
+    )
+    result = await session.execute(stmt)
+    zakazy = list(result.scalars())
+    kontragenty = await catalog_service.list_all(session, cat.Kontragent)
+    nomen = await catalog_service.list_all(session, cat.Nomenklatura)
+    kg_map = {k.id: k.name for k in kontragenty}
+    return _page(
+        request, user, "trade/zakazy.html",
+        zakazy=zakazy, kontragenty=kontragenty, nomen=nomen, kg_map=kg_map,
+        ZAKAZ_STATES=ZAKAZ_STATES, today=date.today().isoformat(),
+    )
+
+
+@router.post("/zakazy")
+async def zakaz_create(
+    request: Request,
+    kontragent_id: str = Form(...),
+    doc_date: str = Form(...),
+    comment: str = Form(""),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    form = await request.form()
+    items = _parse_items(form)
+    await document_service.create_document(
+        session,
+        doc_type=DocType.ZAKAZ,
+        doc_date=date.fromisoformat(doc_date),
+        kontragent_id=int(kontragent_id),
+        comment=comment or None,
+        extra={"state": "new"},
+        items=items,
+        created_by_id=user.id,
+    )
+    return RedirectResponse("/zakazy", status_code=303)
+
+
+@router.post("/zakazy/{zakaz_id}/state")
+async def zakaz_state(
+    zakaz_id: int,
+    state: str = Form(...),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    doc = await document_service.get_document(session, zakaz_id)
+    if doc:
+        extra = dict(doc.extra or {})
+        extra["state"] = state if state in ZAKAZ_STATES else "new"
+        doc.extra = extra
+        await session.commit()
+    return RedirectResponse("/zakazy", status_code=303)
 
 
 # --- Документы ---
