@@ -852,6 +852,8 @@ async def document_new_form(
     kassy = await catalog_service.list_all(session, cat.Kassa)
     firmy = await catalog_service.list_all(session, cat.Firma)
     nds = await catalog_service.list_all(session, cat.StavkaNDS)
+    # Открытые накладные (основание для оплат).
+    open_invoices = await report_service.open_invoices(session)
     return _page(
         request, user, "trade/document_form.html",
         doc_type=doc_type, nomenklatura=nomenklatura, sklady=sklady,
@@ -860,6 +862,7 @@ async def document_new_form(
         is_item_doc=doc_type in _ITEM_DOCS,
         is_money_doc=doc_type in _MONEY_DOCS,
         label=DOC_LABELS.get(doc_type, doc_type),
+        open_invoices=open_invoices,
     )
 
 
@@ -882,6 +885,10 @@ async def document_create_submit(
     items = _parse_items(form)
     amount = form.get("amount")
     total = Decimal(amount) if amount else None
+    base_document_id = form.get("base_document_id")
+    extra = {}
+    if base_document_id:
+        extra["base_document_id"] = int(base_document_id)
     try:
         document = await document_service.create_document(
             session,
@@ -895,6 +902,7 @@ async def document_create_submit(
             firma_id=int(firma_id) if firma_id else None,
             comment=comment or None,
             total=total,
+            extra=extra,
             items=items,
             created_by_id=user.id,
         )
@@ -1105,3 +1113,20 @@ async def report_commission(
 ):
     data = await report_service.commission_report(session)
     return _page(request, user, "trade/report_commission.html", data=data)
+
+
+@router.get("/reports/invoices", response_class=HTMLResponse)
+async def report_invoices(
+    request: Request,
+    kontragent_id: str | None = None,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    rows = await report_service.open_invoices(
+        session, int(kontragent_id) if kontragent_id else None
+    )
+    kontragenty = await catalog_service.list_all(session, cat.Kontragent)
+    return _page(
+        request, user, "trade/report_invoices.html",
+        rows=rows, kontragenty=kontragenty, kontragent_id=kontragent_id,
+    )

@@ -314,3 +314,43 @@ async def commission_report(session: AsyncSession) -> dict:
     debt = -(await session.execute(debt_stmt)).scalar() or Decimal("0")
 
     return {"received": received, "debt": debt}
+
+
+async def open_invoices(
+    session: AsyncSession, kontragent_id: int | None = None
+) -> list[dict]:
+    """Задолженность по документам: накладные с ненулевым остатком взаиморасчётов.
+
+    Положительный остаток — контрагент должен нам, отрицательный — мы должны.
+    """
+    stmt = (
+        select(
+            SettlementMovement.base_document_id,
+            func.sum(SettlementMovement.amount),
+        )
+        .where(SettlementMovement.base_document_id.isnot(None))
+        .group_by(SettlementMovement.base_document_id)
+        .having(func.sum(SettlementMovement.amount) != 0)
+    )
+    result = await session.execute(stmt)
+    rows = []
+    for base_id, open_amount in result.all():
+        doc = await session.get(Document, base_id)
+        if doc is None:
+            continue
+        if kontragent_id and doc.kontragent_id != kontragent_id:
+            continue
+        kontragent = await session.get(Kontragent, doc.kontragent_id) if doc.kontragent_id else None
+        rows.append(
+            {
+                "document_id": base_id,
+                "number": doc.number,
+                "date": doc.date,
+                "doc_type": doc.doc_type,
+                "kontragent": kontragent.name if kontragent else "—",
+                "total": doc.total,
+                "open": open_amount,
+            }
+        )
+    rows.sort(key=lambda r: r["date"])
+    return rows

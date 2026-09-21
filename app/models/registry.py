@@ -86,9 +86,12 @@ class SettlementMovement(Base, IdMixin):
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     kontragent_id: Mapped[int] = mapped_column(ForeignKey("kontragenty.id"), nullable=False, index=True)
     dogovor_id: Mapped[int | None] = mapped_column(ForeignKey("dogovory.id"), nullable=True)
+    # Основание: документ-накладная, которую погашает данное движение (для оплат).
+    base_document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)  # + долг нам / - долг мы
 
-    document: Mapped["Document"] = relationship()  # noqa: F821
+    document: Mapped["Document"] = relationship(foreign_keys=[document_id])  # noqa: F821
+    base_document: Mapped["Document | None"] = relationship(foreign_keys=[base_document_id])  # noqa: F821
     kontragent: Mapped["Kontragent"] = relationship()  # noqa: F821
     dogovor: Mapped["Dogovor | None"] = relationship()  # noqa: F821
 

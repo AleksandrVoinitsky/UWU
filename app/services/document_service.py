@@ -376,6 +376,8 @@ async def _apply_money_and_settlement(
 ) -> None:
     """Формирует движения денег и взаиморасчётов."""
     subtype = DocSubtype(document.subtype) if document.subtype else None
+    # Основание (для оплат — погашаемая накладная).
+    base_document_id = (document.extra or {}).get("base_document_id")
 
     # Взаиморасчёты по товарным накладным (кроме наличных).
     if doc_type == DocType.RASHOD and subtype in (DocSubtype.CREDIT, DocSubtype.REALIZATION):
@@ -386,6 +388,7 @@ async def _apply_money_and_settlement(
                     date=document.date,
                     kontragent_id=document.kontragent_id,
                     dogovor_id=document.dogovor_id,
+                    base_document_id=document.id,
                     amount=document.total,
                 )
             )
@@ -397,6 +400,7 @@ async def _apply_money_and_settlement(
                     date=document.date,
                     kontragent_id=document.kontragent_id,
                     dogovor_id=document.dogovor_id,
+                    base_document_id=document.id,
                     amount=-document.total,
                 )
             )
@@ -419,6 +423,7 @@ async def _apply_money_and_settlement(
                     date=document.date,
                     kontragent_id=document.kontragent_id,
                     dogovor_id=document.dogovor_id,
+                    base_document_id=base_document_id,
                     amount=-document.total,
                 )
             )
@@ -439,6 +444,7 @@ async def _apply_money_and_settlement(
                     date=document.date,
                     kontragent_id=document.kontragent_id,
                     dogovor_id=document.dogovor_id,
+                    base_document_id=base_document_id,
                     amount=document.total,
                 )
             )

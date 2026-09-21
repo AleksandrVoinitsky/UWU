@@ -82,3 +82,51 @@ async def test_money_balance(seeded_session):
 
     balance = await report_service.money_balance(seeded_session)
     assert balance == Decimal("500.00")
+
+
+async def test_open_invoices_settlement(seeded_session):
+    from app.models.catalog import Kontragent
+
+    item, sklad, kontragent = await _setup(seeded_session)
+
+    # Продажа в кредит 300.
+    doc = await document_service.create_document(
+        seeded_session,
+        doc_type=DocType.PRIHOD,
+        doc_date=date(2025, 1, 1),
+        sklad_id=sklad.id,
+        items=[{"nomenklatura_id": item.id, "quantity": Decimal("10"), "price": Decimal("100")}],
+    )
+    await document_service.post_document(seeded_session, doc)
+
+    rashod = await document_service.create_document(
+        seeded_session,
+        doc_type=DocType.RASHOD,
+        subtype=DocSubtype.CREDIT,
+        doc_date=date(2025, 1, 2),
+        sklad_id=sklad.id,
+        kontragent_id=kontragent.id,
+        items=[{"nomenklatura_id": item.id, "quantity": Decimal("3"), "price": Decimal("120")}],
+    )
+    await document_service.post_document(seeded_session, rashod)
+
+    # Открытая накладная: долг 360.
+    invoices = await report_service.open_invoices(seeded_session)
+    inv = next((i for i in invoices if i["document_id"] == rashod.id), None)
+    assert inv is not None
+    assert inv["open"] == Decimal("360.00")
+
+    # Оплата 200 с основанием на накладную.
+    pko = await document_service.create_document(
+        seeded_session,
+        doc_type=DocType.PRIHODNY_KASSOVY_ORDER,
+        doc_date=date(2025, 1, 3),
+        kontragent_id=kontragent.id,
+        total=Decimal("200"),
+        extra={"base_document_id": rashod.id},
+    )
+    await document_service.post_document(seeded_session, pko)
+
+    invoices = await report_service.open_invoices(seeded_session)
+    inv = next((i for i in invoices if i["document_id"] == rashod.id), None)
+    assert inv["open"] == Decimal("160.00")

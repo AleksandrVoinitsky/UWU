@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block page_title %}Задолженность по документам{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h2>Задолженность по документам</h2>
+    <form method="get" action="/reports/invoices" class="flex flex-wrap" style="align-items:flex-end">
+      <div class="field" style="margin:0;min-width:200px"><label>Контрагент</label>
+        <select name="kontragent_id"><option value="">Все</option>
+          {% for k in kontragenty %}<option value="{{ k.id }}" {% if kontragent_id == k.id|string %}selected{% endif %}>{{ k.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn secondary">Применить</button>
+    </form>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>№</th><th>Дата</th><th>Тип</th><th>Контрагент</th><th class="num">Сумма</th><th class="num">Остаток</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-row>
+          <td><a href="/documents/{{ r.document_id }}">{{ r.number }}</a></td>
+          <td>{{ r.date }}</td>
+          <td class="muted">{{ DOC_LABELS.get(r.doc_type, r.doc_type) }}</td>
+          <td>{{ r.kontragent }}</td>
+          <td class="num">{{ "%.2f"|format(r.total) }}</td>
+          <td class="num" {% if r.open < 0 %}style="color:var(--bad)"{% endif %}>{{ "%.2f"|format(r.open) }}</td>
+        </tr>
+        {% else %}<tr data-empty><td colspan="6" class="muted">Нет открытых документов</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
