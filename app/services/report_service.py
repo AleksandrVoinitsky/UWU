@@ -18,6 +18,7 @@ from app.models.document.base_document import Document, DocumentItem
 from app.models.enums import DocType, DocumentStatus
 from app.models.registry import (
     MoneyMovement,
+    Reservation,
     SettlementMovement,
     StockBatch,
     StockMovement,
@@ -37,10 +38,20 @@ async def stock_balances(session: AsyncSession) -> list[dict]:
         .having(func.sum(StockBatch.quantity) != 0)
     )
     result = await session.execute(stmt)
+    # Резерв по позициям.
+    res_stmt = select(
+        Reservation.nomenklatura_id,
+        Reservation.sklad_id,
+        func.sum(Reservation.quantity),
+    ).group_by(Reservation.nomenklatura_id, Reservation.sklad_id)
+    res_result = await session.execute(res_stmt)
+    reserved_map = {(r[0], r[1]): r[2] for r in res_result.all()}
+
     rows = []
     for nomen_id, sklad_id, qty, cost in result.all():
         nomen = await session.get(Nomenklatura, nomen_id)
         sklad = await session.get(Sklad, sklad_id)
+        reserved = reserved_map.get((nomen_id, sklad_id), Decimal("0"))
         rows.append(
             {
                 "nomenklatura_id": nomen_id,
@@ -49,6 +60,8 @@ async def stock_balances(session: AsyncSession) -> list[dict]:
                 "sklad_id": sklad_id,
                 "sklad": sklad.name if sklad else f"#{sklad_id}",
                 "quantity": qty,
+                "reserved": reserved,
+                "available": qty - reserved,
                 "cost": (cost or Decimal("0")).quantize(Decimal("0.01")),
             }
         )

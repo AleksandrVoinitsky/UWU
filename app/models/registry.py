@@ -16,7 +16,7 @@ from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.models.base import IdMixin
+from app.models.base import IdMixin, TimestampMixin
 
 
 class StockBatch(Base, IdMixin):
@@ -89,3 +89,17 @@ class SettlementMovement(Base, IdMixin):
     document: Mapped["Document"] = relationship()  # noqa: F821
     kontragent: Mapped["Kontragent"] = relationship()  # noqa: F821
     dogovor: Mapped["Dogovor | None"] = relationship()  # noqa: F821
+
+
+class Reservation(Base, IdMixin, TimestampMixin):
+    """Резерв товара под заявку/клиента (уменьшает доступный остаток)."""
+
+    __tablename__ = "reservations"
+
+    nomenklatura_id: Mapped[int] = mapped_column(ForeignKey("nomenklatura.id"), nullable=False, index=True)
+    sklad_id: Mapped[int] = mapped_column(ForeignKey("sklady.id"), nullable=False, index=True)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False)
+    zakaz_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"), nullable=True)
+
+    nomenklatura: Mapped["Nomenklatura"] = relationship()  # noqa: F821
+    sklad: Mapped["Sklad"] = relationship()  # noqa: F821

@@ -16,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import CostMethod
-from app.models.registry import StockBatch, StockMovement
+from app.models.registry import Reservation, StockBatch, StockMovement
 
 
 @dataclass
@@ -185,3 +185,58 @@ class InsufficientStockError(Exception):
             f"Insufficient stock for item {nomenklatura_id} on warehouse {sklad_id}: "
             f"available {available}, required {required}"
         )
+
+
+# --- Резервирование ---
+
+
+async def get_reserved(
+    session: AsyncSession, nomenklatura_id: int, sklad_id: int | None = None
+) -> Decimal:
+    """Зарезервированное количество (по складу или суммарно)."""
+    stmt = select(func.coalesce(func.sum(Reservation.quantity), 0)).where(
+        Reservation.nomenklatura_id == nomenklatura_id
+    )
+    if sklad_id is not None:
+        stmt = stmt.where(Reservation.sklad_id == sklad_id)
+    result = await session.execute(stmt)
+    return result.scalar() or Decimal("0")
+
+
+async def get_available(
+    session: AsyncSession, nomenklatura_id: int, sklad_id: int | None = None
+) -> Decimal:
+    """Доступный остаток = учёт − резерв."""
+    book = await get_balance(session, nomenklatura_id, sklad_id)
+    reserved = await get_reserved(session, nomenklatura_id, sklad_id)
+    return book - reserved
+
+
+async def reserve(
+    session: AsyncSession,
+    *,
+    nomenklatura_id: int,
+    sklad_id: int,
+    quantity: Decimal,
+    zakaz_id: int | None = None,
+) -> None:
+    """Резервирует товар (проверяет доступный остаток)."""
+    available = await get_available(session, nomenklatura_id, sklad_id)
+    if quantity > available:
+        raise InsufficientStockError(
+            nomenklatura_id=nomenklatura_id, sklad_id=sklad_id,
+            available=available, required=quantity,
+        )
+    session.add(
+        Reservation(
+            nomenklatura_id=nomenklatura_id, sklad_id=sklad_id,
+            quantity=quantity, zakaz_id=zakaz_id,
+        )
+    )
+
+
+async def release_for_zakaz(session: AsyncSession, zakaz_id: int) -> None:
+    """Снимает резерв по заявке."""
+    from sqlalchemy import delete
+
+    await session.execute(delete(Reservation).where(Reservation.zakaz_id == zakaz_id))

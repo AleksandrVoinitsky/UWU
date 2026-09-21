@@ -24,7 +24,7 @@ from app.models import catalog as cat
 from app.models.document.base_document import Document
 from app.models.enums import DocSubtype, DocType, DocumentStatus
 from app.models.users import User
-from app.services import catalog_service, document_service, price_service, report_service
+from app.services import catalog_service, document_service, price_service, report_service, stock_service
 from app.services.stock_service import InsufficientStockError
 from app.templates import render
 
@@ -680,6 +680,43 @@ async def zakaz_state(
         extra["state"] = state if state in ZAKAZ_STATES else "new"
         doc.extra = extra
         await session.commit()
+        # При выполнении/отмене — снимаем резерв.
+        if state in ("done", "cancelled"):
+            await stock_service.release_for_zakaz(session, zakaz_id)
+            await session.commit()
+    return RedirectResponse("/zakazy", status_code=303)
+
+
+@router.post("/zakazy/{zakaz_id}/reserve")
+async def zakaz_reserve(
+    zakaz_id: int,
+    sklad_id: str = Form(""),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    """Резервирует товар по заявке на складе (по умолчанию — основной склад)."""
+    zakaz = await document_service.get_document(session, zakaz_id)
+    if zakaz and zakaz.items:
+        sklady = await catalog_service.list_all(session, cat.Sklad)
+        target = (
+            int(sklad_id)
+            if sklad_id
+            else next((s.id for s in sklady if s.is_default), sklady[0].id if sklady else None)
+        )
+        if target is not None:
+            await stock_service.release_for_zakaz(session, zakaz_id)
+            try:
+                for item in zakaz.items:
+                    await stock_service.reserve(
+                        session,
+                        nomenklatura_id=item.nomenklatura_id,
+                        sklad_id=target,
+                        quantity=item.quantity,
+                        zakaz_id=zakaz_id,
+                    )
+                await session.commit()
+            except InsufficientStockError:
+                await session.rollback()
     return RedirectResponse("/zakazy", status_code=303)
 
 

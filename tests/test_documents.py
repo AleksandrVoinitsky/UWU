@@ -195,3 +195,23 @@ async def test_inventory_adjusts_stock(seeded_session):
     await document_service.post_document(seeded_session, inv)
 
     assert await get_balance(seeded_session, item.id, sklad.id) == Decimal("2")
+
+
+async def test_reservation_reduces_available(seeded_session):
+    from app.services import stock_service
+
+    item = await _make_item(seeded_session)
+    sklad = await _make_sklad(seeded_session)
+
+    d1 = await _prihod(seeded_session, item, sklad, Decimal("5"), Decimal("100"))
+    await document_service.post_document(seeded_session, d1)
+
+    # Резервируем 3 из 5.
+    await stock_service.reserve(
+        seeded_session, nomenklatura_id=item.id, sklad_id=sklad.id,
+        quantity=Decimal("3"), zakaz_id=None,
+    )
+    await seeded_session.commit()
+
+    assert await stock_service.get_available(seeded_session, item.id, sklad.id) == Decimal("2")
+    assert await stock_service.get_reserved(seeded_session, item.id, sklad.id) == Decimal("3")

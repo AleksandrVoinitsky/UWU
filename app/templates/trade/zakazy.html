@@ -27,6 +27,9 @@
           <td>
             <div class="flex" style="gap:4px;justify-content:flex-end">
               {% set st = z.extra.get('state', 'new') if z.extra else 'new' %}
+              {% if st in ['new', 'in_work'] %}
+              <form method="post" action="/zakazy/{{ z.id }}/reserve"><button class="btn text small">Резерв</button></form>
+              {% endif %}
               {% if st == 'new' %}
               <form method="post" action="/zakazy/{{ z.id }}/state"><input type="hidden" name="state" value="in_work"><button class="btn text small">В работу</button></form>
               {% elif st == 'in_work' %}

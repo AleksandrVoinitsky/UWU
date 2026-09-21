@@ -12,7 +12,7 @@
   <div class="table-wrap">
     <table class="table" id="stock-table">
       <thead>
-        <tr><th>Номенклатура</th><th>{{ t('report.warehouse', lang) }}</th><th class="num">{{ t('report.quantity', lang) }}</th><th class="num">{{ t('report.cost', lang) }}</th></tr>
+        <tr><th>Номенклатура</th><th>{{ t('report.warehouse', lang) }}</th><th class="num">{{ t('report.quantity', lang) }}</th><th class="num">Резерв</th><th class="num">Доступно</th><th class="num">{{ t('report.cost', lang) }}</th></tr>
       </thead>
       <tbody>
         {% for b in balances %}
@@ -20,9 +20,11 @@
           <td>{{ b.nomenklatura }}{% if b.artikul %} <span class="muted small">({{ b.artikul }})</span>{% endif %}</td>
           <td class="muted">{{ b.sklad }}</td>
           <td class="num">{{ b.quantity }}</td>
+          <td class="num muted">{{ b.reserved if b.reserved else '—' }}</td>
+          <td class="num">{{ b.available }}</td>
           <td class="num">{{ "%.2f"|format(b.cost) }}</td>
         </tr>
-        {% else %}<tr data-empty><td colspan="4" class="muted">Нет остатков</td></tr>{% endfor %}
+        {% else %}<tr data-empty><td colspan="6" class="muted">Нет остатков</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>

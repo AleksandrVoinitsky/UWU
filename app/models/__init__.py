@@ -35,6 +35,7 @@ from app.models.enums import (  # noqa: F401
 )
 from app.models.registry import (  # noqa: F401
     MoneyMovement,
+    Reservation,
     SettlementMovement,
     StockBatch,
     StockMovement,

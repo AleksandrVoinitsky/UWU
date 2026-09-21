@@ -238,7 +238,7 @@ async def _check_stock(
     """Проверяет достаточность остатков перед расходом."""
     for item in items:
         sklad_id = item.sklad_id if restock == RestockControl.BY_WAREHOUSE else None
-        balance = await stock_service.get_balance(session, item.nomenklatura_id, sklad_id)
+        balance = await stock_service.get_available(session, item.nomenklatura_id, sklad_id)
         if balance < item.quantity:
             raise InsufficientStockError(
                 nomenklatura_id=item.nomenklatura_id,
