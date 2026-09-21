@@ -27,6 +27,7 @@ DEFAULT_CONSTANTS: dict[str, Any] = {
     "allow_future_dates": False,    # Разрешить будущие даты
     "cost_method": "fifo",          # Метод списания себестоимости
     "prefix_ib": "",                # Префикс информационной базы
+    "enforce_min_price": False,     # Контроль минимальной цены (не ниже закупочной)
 }
 
 

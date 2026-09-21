@@ -24,7 +24,7 @@ from app.models import catalog as cat
 from app.models.document.base_document import Document
 from app.models.enums import DocSubtype, DocType, DocumentStatus
 from app.models.users import User
-from app.services import catalog_service, document_service, price_service, report_service, stock_service
+from app.services import cash_service, catalog_service, document_service, price_service, report_service, stock_service
 from app.services.stock_service import InsufficientStockError
 from app.templates import render
 
@@ -559,11 +559,49 @@ async def rmk_page(
         for n in nomen
     ]
     sklady = await catalog_service.list_all(session, cat.Sklad)
+    kassy = await catalog_service.list_all(session, cat.Kassa)
+
+    # Текущая кассовая смена.
+    shift = await cash_service.get_open_shift(session)
+    revenue = await cash_service.shift_revenue(session, shift) if shift else Decimal("0")
+    expenses = await cash_service.shift_expenses(session, shift) if shift else Decimal("0")
+
     return _page(
         request, user, "trade/rmk.html",
         items_json=json.dumps(items, ensure_ascii=False),
-        sklady=sklady,
+        sklady=sklady, kassy=kassy,
+        shift=shift, revenue=revenue, expenses=expenses,
     )
+
+
+@router.post("/rmk/shift/open")
+async def rmk_shift_open(
+    kassa_id: str = Form(""),
+    opening_amount: str = Form("0"),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    existing = await cash_service.get_open_shift(session)
+    if existing is None:
+        await cash_service.open_shift(
+            session,
+            kassa_id=int(kassa_id) if kassa_id else None,
+            opening_amount=Decimal(opening_amount or "0"),
+            user_id=user.id,
+        )
+    return RedirectResponse("/rmk", status_code=303)
+
+
+@router.post("/rmk/shift/close")
+async def rmk_shift_close(
+    closing_amount: str = Form("0"),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    shift = await cash_service.get_open_shift(session)
+    if shift:
+        await cash_service.close_shift(session, shift, Decimal(closing_amount or "0"))
+    return RedirectResponse("/rmk", status_code=303)
 
 
 @router.post("/rmk/sell")
@@ -578,11 +616,24 @@ async def rmk_sell(
         return JSONResponse({"detail": "Накладная пуста"}, status_code=400)
 
     sklad_id = data.get("sklad_id")
+    doc_type = DocType.VOZVRAT if data.get("return") else DocType.RASHOD
+
+    # Контроль минимальной цены (продажа не ниже закупочной).
+    if doc_type == DocType.RASHOD:
+        constants = await catalog_service.get_constants(session)
+        if constants.get("enforce_min_price"):
+            nomen = await catalog_service.list_all(session, cat.Nomenklatura)
+            purchase_map = {n.id: n.purchase_price for n in nomen}
+            for i in items:
+                pp = purchase_map.get(int(i["nomenklatura_id"]))
+                if pp is not None and Decimal(str(i["price"])) < pp:
+                    return JSONResponse({"detail": f"Цена ниже закупочной ({pp})"}, status_code=400)
+
     try:
         document = await document_service.create_document(
             session,
-            doc_type=DocType.RASHOD,
-            subtype=DocSubtype.CASH,
+            doc_type=doc_type,
+            subtype=DocSubtype.CASH if doc_type == DocType.RASHOD else None,
             doc_date=date.today(),
             sklad_id=sklad_id,
             items=[

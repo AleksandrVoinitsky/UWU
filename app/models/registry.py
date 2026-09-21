@@ -124,3 +124,17 @@ class AccountingEntry(Base, IdMixin):
     kontragent_id: Mapped[int | None] = mapped_column(ForeignKey("kontragenty.id"), nullable=True)
 
     document: Mapped["Document"] = relationship()  # noqa: F821
+
+
+class CashShift(Base, IdMixin):
+    """Кассовая смена (открытие/закрытие рабочего дня кассира)."""
+
+    __tablename__ = "cash_shifts"
+
+    kassa_id: Mapped[int | None] = mapped_column(ForeignKey("kassy.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(10), default="open", nullable=False)  # open | closed
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    opened_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    opening_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
+    closing_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)

@@ -35,6 +35,9 @@
       <div class="field">
         <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="const_allow_future_dates" {% if constants.allow_future_dates %}checked{% endif %} style="width:auto"> Разрешить будущие даты</label>
       </div>
+      <div class="field">
+        <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="const_enforce_min_price" {% if constants.enforce_min_price %}checked{% endif %} style="width:auto"> Контроль минимальной цены (не ниже закупочной)</label>
+      </div>
     </div>
     <div class="form-actions"><button type="submit" class="btn primary">{{ t('common.save', lang) }}</button></div>
   </form>

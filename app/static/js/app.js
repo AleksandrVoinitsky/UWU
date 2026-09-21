@@ -259,6 +259,7 @@
     var cartEmpty = document.getElementById("rmk-cart-empty");
     var totalEl = document.getElementById("rmk-total");
     var sellBtn = document.getElementById("rmk-sell");
+    var returnBtn = document.getElementById("rmk-return");
     var skladSelect = document.getElementById("rmk-sklad");
 
     // Корзина: id -> {name, qty, price}
@@ -351,36 +352,39 @@
     renderGrid();
     renderCart();
 
-    if (sellBtn) {
-      sellBtn.addEventListener("click", function () {
-        var ids = Object.keys(cart);
-        if (!ids.length) return;
-        var lines = ids.map(function (id) {
-          return {
-            nomenklatura_id: parseInt(id, 10),
-            quantity: cart[id].qty,
-            price: cart[id].price,
-          };
-        });
-        var skladId = skladSelect ? skladSelect.value : "";
-        sellBtn.disabled = true;
-        fetch("/rmk/sell", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sklad_id: skladId ? parseInt(skladId, 10) : null, items: lines }),
-        })
-          .then(function (r) {
-            if (!r.ok) return r.json().then(function (e) { throw new Error(e.detail || "Ошибка"); });
-            return r.json();
-          })
-          .then(function (data) {
-            window.location.href = "/documents/" + data.id + "/print";
-          })
-          .catch(function (err) {
-            alert("Не удалось провести продажу: " + err.message);
-            sellBtn.disabled = false;
-          });
+    function doSell(isReturn) {
+      var ids = Object.keys(cart);
+      if (!ids.length) return;
+      var lines = ids.map(function (id) {
+        return {
+          nomenklatura_id: parseInt(id, 10),
+          quantity: cart[id].qty,
+          price: cart[id].price,
+        };
       });
+      var skladId = skladSelect ? skladSelect.value : "";
+      if (sellBtn) sellBtn.disabled = true;
+      if (returnBtn) returnBtn.disabled = true;
+      fetch("/rmk/sell", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sklad_id: skladId ? parseInt(skladId, 10) : null, items: lines, return: !!isReturn }),
+      })
+        .then(function (r) {
+          if (!r.ok) return r.json().then(function (e) { throw new Error(e.detail || "Ошибка"); });
+          return r.json();
+        })
+        .then(function (data) {
+          window.location.href = "/documents/" + data.id + "/print";
+        })
+        .catch(function (err) {
+          alert("Ошибка: " + err.message);
+          if (sellBtn) sellBtn.disabled = false;
+          if (returnBtn) returnBtn.disabled = false;
+        });
     }
+
+    if (sellBtn) sellBtn.addEventListener("click", function () { doSell(false); });
+    if (returnBtn) returnBtn.addEventListener("click", function () { doSell(true); });
   }
 })();

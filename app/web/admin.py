@@ -173,8 +173,15 @@ async def admin_save_settings(
     if not user.is_admin:
         return RedirectResponse("/", status_code=303)
     form = await request.form()
+    # Чекбоксы: отсутствуют в форме, если сняты — явно сбрасываем в False.
+    for checkbox_key in ("allow_future_dates", "enforce_min_price"):
+        await catalog_service.set_constant(
+            session, checkbox_key, f"const_{checkbox_key}" in form
+        )
     for key, value in form.items():
         if key.startswith("const_"):
             const_key = key[len("const_"):]
+            if const_key in ("allow_future_dates", "enforce_min_price"):
+                continue
             await catalog_service.set_constant(session, const_key, value)
     return RedirectResponse("/admin/settings", status_code=303)

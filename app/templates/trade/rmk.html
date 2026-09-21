@@ -2,6 +2,61 @@
 {% block page_title %}{{ t('menu.rmk', lang) }}{% endblock %}
 {% block content %}
 
+<!-- Кассовая смена -->
+<div class="card" style="padding:14px 18px;margin-bottom:16px">
+  <div class="flex-between flex-wrap">
+    {% if shift %}
+    <div class="flex flex-wrap" style="gap:20px">
+      <div><span class="muted small">Смена</span> <span class="badge posted">открыта</span></div>
+      <div><span class="muted small">Выручка</span> <span style="font-weight:600">{{ "%.2f"|format(revenue) }} ₽</span></div>
+      <div><span class="muted small">Расход</span> <span style="font-weight:600">{{ "%.2f"|format(expenses) }} ₽</span></div>
+    </div>
+    <button class="btn secondary" data-modal-open="modal-close-shift">Закрыть смену (Z-отчёт)</button>
+    {% else %}
+    <div class="flex" style="gap:10px">
+      <span class="badge neutral">Смена закрыта</span>
+      <button class="btn primary" data-modal-open="modal-open-shift">Открыть смену</button>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Модалка открытия смены -->
+<div class="modal-backdrop" id="modal-open-shift">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><h3>Открыть смену</h3><button class="modal-close" data-modal-close>✕</button></div>
+    <form method="post" action="/rmk/shift/open">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="field"><label>Касса</label><select name="kassa_id"><option value="">—</option>{% for k in kassy %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}</select></div>
+          <div class="field"><label>Размен (начальный остаток)</label><input type="number" step="0.01" name="opening_amount" value="0"></div>
+        </div>
+      </div>
+      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn secondary" data-modal-close>Отмена</button>
+        <button type="submit" class="btn primary">Открыть</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Модалка закрытия смены -->
+<div class="modal-backdrop" id="modal-close-shift">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><h3>Закрыть смену (Z-отчёт)</h3><button class="modal-close" data-modal-close>✕</button></div>
+    <form method="post" action="/rmk/shift/close">
+      <div class="modal-body">
+        <div class="muted small mb">Выручка: {{ "%.2f"|format(revenue) }} ₽ · Расход: {{ "%.2f"|format(expenses) }} ₽</div>
+        <div class="field"><label>Фактический остаток в кассе</label><input type="number" step="0.01" name="closing_amount" required></div>
+      </div>
+      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn secondary" data-modal-close>Отмена</button>
+        <button type="submit" class="btn primary">Закрыть</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="rmk-layout">
   <!-- Товары -->
   <div>
@@ -36,6 +91,7 @@
         <span class="value" id="rmk-total">0.00 ₽</span>
       </div>
       <button class="btn primary rmk-sell" id="rmk-sell">{{ t('rmk.sell', lang) }}</button>
+      <button class="btn secondary" id="rmk-return" style="width:100%;justify-content:center;margin-top:8px">Возврат</button>
     </div>
   </div>
 </div>
