@@ -1305,7 +1305,12 @@ async def report_sales(
     s, e = _month_range() if not (start and end) else (start, end)
     rows = await report_service.sales_report(session, date.fromisoformat(s), date.fromisoformat(e))
     total = sum((r["total"] for r in rows), Decimal("0"))
-    return _page(request, user, "trade/report_sales.html", rows=rows, start=s, end=e, total=total)
+    total_cost = sum((r["cost"] for r in rows), Decimal("0"))
+    total_profit = sum((r["profit"] for r in rows), Decimal("0"))
+    return _page(
+        request, user, "trade/report_sales.html",
+        rows=rows, start=s, end=e, total=total, total_cost=total_cost, total_profit=total_profit,
+    )
 
 
 @router.get("/reports/settlements", response_class=HTMLResponse)
@@ -1450,3 +1455,26 @@ async def report_purchase_sales(
     if format == "csv":
         return _csv_response(rows, "purchase_sales.csv")
     return _page(request, user, "trade/report_purchase_sales.html", rows=rows, start=s, end=e)
+
+
+@router.get("/reports/batches", response_class=HTMLResponse)
+async def report_batches(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    rows = await report_service.batch_report(session)
+    return _page(request, user, "trade/report_batches.html", rows=rows)
+
+
+@router.get("/reports/cash-book", response_class=HTMLResponse)
+async def report_cash_book(
+    request: Request,
+    start: str | None = None,
+    end: str | None = None,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    s, e = _month_range() if not (start and end) else (start, end)
+    rows = await report_service.cash_book(session, date.fromisoformat(s), date.fromisoformat(e))
+    return _page(request, user, "trade/report_cash_book.html", rows=rows, start=s, end=e)

@@ -118,12 +118,19 @@ async def sales_report(
     rows = []
     for doc in result.scalars():
         kontragent = await session.get(Kontragent, doc.kontragent_id) if doc.kontragent_id else None
+        # Себестоимость = сумма расходных движений по документу.
+        cost_stmt = select(func.coalesce(func.sum(StockMovement.amount), 0)).where(
+            StockMovement.document_id == doc.id, StockMovement.quantity < 0
+        )
+        cost = -(await session.execute(cost_stmt)).scalar() or Decimal("0")
         rows.append(
             {
                 "date": doc.date,
                 "number": doc.number,
                 "kontragent": kontragent.name if kontragent else None,
                 "total": doc.total,
+                "cost": cost,
+                "profit": doc.total - cost,
             }
         )
     return rows
@@ -353,6 +360,60 @@ async def open_invoices(
             }
         )
     rows.sort(key=lambda r: r["date"])
+    return rows
+
+
+async def batch_report(session: AsyncSession) -> list[dict]:
+    """Отчёт по партиям: остатки партий с себестоимостью."""
+    stmt = (
+        select(StockBatch)
+        .where(StockBatch.quantity > 0)
+        .order_by(StockBatch.nomenklatura_id, StockBatch.created_at)
+    )
+    result = await session.execute(stmt)
+    rows = []
+    for b in result.scalars():
+        nomen = await session.get(Nomenklatura, b.nomenklatura_id)
+        sklad = await session.get(Sklad, b.sklad_id)
+        rows.append(
+            {
+                "nomenklatura": nomen.name if nomen else f"#{b.nomenklatura_id}",
+                "sklad": sklad.name if sklad else f"#{b.sklad_id}",
+                "quantity": b.quantity,
+                "unit_cost": b.unit_cost,
+                "cost": (b.quantity * b.unit_cost).quantize(Decimal("0.01")),
+                "ownership": b.ownership,
+                "created_at": b.created_at.date() if b.created_at else None,
+            }
+        )
+    return rows
+
+
+async def cash_book(session: AsyncSession, start: date, end: date) -> list[dict]:
+    """Кассовая книга: движения денег по дням (приход/расход/остаток)."""
+    stmt = (
+        select(
+            MoneyMovement.date,
+            func.coalesce(func.sum(case((MoneyMovement.amount > 0, MoneyMovement.amount), else_=0)), 0),
+            func.coalesce(func.sum(case((MoneyMovement.amount < 0, MoneyMovement.amount), else_=0)), 0),
+        )
+        .where(MoneyMovement.date >= start, MoneyMovement.date <= end)
+        .group_by(MoneyMovement.date)
+        .order_by(MoneyMovement.date)
+    )
+    result = await session.execute(stmt)
+    rows = []
+    running = Decimal("0")
+    for day, income, expense in result.all():
+        running += income + expense
+        rows.append(
+            {
+                "date": day,
+                "income": income,
+                "expense": expense,
+                "balance": running,
+            }
+        )
     return rows
 
 

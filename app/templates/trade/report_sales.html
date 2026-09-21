@@ -16,7 +16,7 @@
   <div class="table-wrap">
     <table class="table" id="sales-table">
       <thead>
-        <tr><th>{{ t('report.date', lang) }}</th><th>№</th><th>Контрагент</th><th class="num">{{ t('report.amount', lang) }}</th></tr>
+        <tr><th>{{ t('report.date', lang) }}</th><th>№</th><th>Контрагент</th><th class="num">Выручка</th><th class="num">Себестоимость</th><th class="num">Прибыль</th></tr>
       </thead>
       <tbody>
         {% for r in rows %}
@@ -25,14 +25,18 @@
           <td class="muted">{{ r.number }}</td>
           <td>{{ r.kontragent or '—' }}</td>
           <td class="num">{{ "%.2f"|format(r.total) }}</td>
+          <td class="num muted">{{ "%.2f"|format(r.cost) }}</td>
+          <td class="num" {% if r.profit < 0 %}style="color:var(--bad)"{% else %}style="color:var(--ok)"{% endif %}>{{ "%.2f"|format(r.profit) }}</td>
         </tr>
-        {% else %}<tr data-empty><td colspan="4" class="muted">Нет продаж</td></tr>{% endfor %}
+        {% else %}<tr data-empty><td colspan="6" class="muted">Нет продаж</td></tr>{% endfor %}
       </tbody>
       {% if rows %}
       <tfoot>
         <tr>
           <td colspan="3" class="muted">{{ t('report.total', lang) }}</td>
           <td class="num" style="font-weight:600">{{ "%.2f"|format(total) }}</td>
+          <td class="num" style="font-weight:600">{{ "%.2f"|format(total_cost) }}</td>
+          <td class="num" style="font-weight:600;color:var(--ok)">{{ "%.2f"|format(total_profit) }}</td>
         </tr>
       </tfoot>
       {% endif %}

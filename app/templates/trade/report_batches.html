@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block page_title %}Партии товаров{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h2>Партии товаров (остатки)</h2>
+    <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#batch-table" placeholder="{{ t('common.search', lang) }}…"></div>
+  </div>
+  <div class="table-wrap">
+    <table class="table" id="batch-table">
+      <thead><tr><th>Номенклатура</th><th>Склад</th><th>Раздел</th><th class="num">Кол-во</th><th class="num">Себестоимость ед.</th><th class="num">Стоимость</th><th>Поступила</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-row>
+          <td>{{ r.nomenklatura }}</td>
+          <td class="muted">{{ r.sklad }}</td>
+          <td>{{ {'own':'Собственный','received':'На реализации','transferred':'Передан'}.get(r.ownership, r.ownership) }}</td>
+          <td class="num">{{ r.quantity }}</td>
+          <td class="num muted">{{ "%.2f"|format(r.unit_cost) }}</td>
+          <td class="num">{{ "%.2f"|format(r.cost) }}</td>
+          <td class="muted">{{ r.created_at or '—' }}</td>
+        </tr>
+        {% else %}<tr data-empty><td colspan="7" class="muted">Нет партий</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
