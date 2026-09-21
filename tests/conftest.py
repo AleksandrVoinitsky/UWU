@@ -15,6 +15,7 @@ import os
 from collections.abc import AsyncGenerator
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -44,7 +45,7 @@ engine = _test_engine
 async_session_factory = _test_session_factory
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest_asyncio.fixture(scope="session", loop_scope="session", autouse=True)
 async def _setup_db():
     """Создаёт схему БД один раз на сессию тестов."""
     async with engine.begin() as conn:
