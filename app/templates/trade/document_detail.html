@@ -7,7 +7,9 @@
     <h2>{{ DOC_LABELS.get(document.doc_type, document.doc_type) }} · {{ document.number }}</h2>
     <div class="flex">
       <a class="btn text small" href="/documents">← {{ t('menu.documents', lang) }}</a>
+      <a class="btn secondary small" href="/documents/{{ document.id }}/print" target="_blank">Печать</a>
       {% if document.status == 'draft' %}
+      <a class="btn text small" href="/documents/{{ document.id }}/edit">Изменить</a>
       <form method="post" action="/documents/{{ document.id }}/post"><button class="btn primary small">Провести</button></form>
       {% elif document.status == 'posted' %}
       <form method="post" action="/documents/{{ document.id }}/unpost"><button class="btn secondary small">Отменить проведение</button></form>

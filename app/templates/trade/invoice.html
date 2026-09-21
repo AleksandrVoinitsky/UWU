@@ -11,7 +11,7 @@
 <div class="invoice">
   <div class="inv-header">
     <div>
-      <div class="inv-title">Расходная накладная</div>
+      <div class="inv-title">{{ DOC_LABELS.get(document.doc_type, document.doc_type) }}</div>
       <div class="muted">№ {{ document.number }}</div>
     </div>
     <div class="inv-meta">
