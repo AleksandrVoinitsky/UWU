@@ -2,17 +2,23 @@
 {% block page_title %}{{ t('report.settlements', lang) }}{% endblock %}
 {% block content %}
 <div class="card">
-  <div class="card-header"><h2>{{ t('report.settlements', lang) }}</h2><a class="btn text small" href="/reports">← {{ t('menu.reports', lang) }}</a></div>
+  <div class="card-header">
+    <h2>{{ t('report.settlements', lang) }}</h2>
+    <div class="flex flex-wrap">
+      <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#settle-table" placeholder="{{ t('common.search', lang) }}…"></div>
+      <a class="btn text small" href="/reports">← {{ t('menu.reports', lang) }}</a>
+    </div>
+  </div>
   <div class="table-wrap">
-    <table class="table">
+    <table class="table" id="settle-table">
       <thead><tr><th>Контрагент</th><th class="num">{{ t('report.debt', lang) }}</th></tr></thead>
       <tbody>
         {% for r in rows %}
-        <tr>
+        <tr data-row>
           <td>{{ r.kontragent }}</td>
           <td class="num">{{ "%.2f"|format(r.debt) }}</td>
         </tr>
-        {% else %}<tr><td colspan="2" class="muted">Нет задолженности</td></tr>{% endfor %}
+        {% else %}<tr data-empty><td colspan="2" class="muted">Нет задолженности</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>

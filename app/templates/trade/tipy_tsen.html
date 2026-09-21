@@ -2,25 +2,37 @@
 {% block page_title %}Типы цен{% endblock %}
 {% block content %}
 <div class="card">
-  <div class="card-header"><h2>{{ t('common.add', lang) }}</h2></div>
-  <form method="post" action="/catalog/tipy_tsen">
-    <div class="form-row">
-      <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+  <div class="card-header">
+    <h2>Типы цен <span class="muted">· {{ items|length }}</span></h2>
+    <div class="flex flex-wrap">
+      <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#tip-table" placeholder="{{ t('common.search', lang) }}…"></div>
+      <button class="btn primary" data-modal-open="modal-tip">{{ t('common.create', lang) }}</button>
     </div>
-    <div class="form-actions"><button type="submit" class="btn primary">{{ t('common.add', lang) }}</button></div>
-  </form>
-</div>
-<div class="card">
-  <div class="card-header"><h2>Типы цен</h2><span class="muted">{{ items|length }}</span></div>
+  </div>
   <div class="table-wrap">
-    <table class="table">
+    <table class="table" id="tip-table">
       <thead><tr><th>{{ t('common.name', lang) }}</th><th>Включает НДС</th><th class="num">Наценка</th></tr></thead>
       <tbody>
         {% for item in items %}
-        <tr><td>{{ item.name }}</td><td>{{ 'Да' if item.includes_nds else 'Нет' }}</td><td class="num">{{ item.markup_percent or '—' }}</td></tr>
-        {% else %}<tr><td colspan="3" class="muted">Нет записей</td></tr>{% endfor %}
+        <tr data-row><td>{{ item.name }}</td><td>{{ 'Да' if item.includes_nds else 'Нет' }}</td><td class="num">{{ item.markup_percent or '—' }}</td></tr>
+        {% else %}<tr data-empty><td colspan="3" class="muted">Нет записей</td></tr>{% endfor %}
       </tbody>
     </table>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-tip">
+  <div class="modal">
+    <div class="modal-header"><h3>{{ t('common.create', lang) }} · Тип цен</h3><button class="modal-close" data-modal-close>✕</button></div>
+    <form method="post" action="/catalog/tipy_tsen">
+      <div class="modal-body">
+        <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+      </div>
+      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
+        <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
+      </div>
+    </form>
   </div>
 </div>
 {% endblock %}

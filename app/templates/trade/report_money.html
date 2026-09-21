@@ -10,24 +10,27 @@
 <div class="card">
   <div class="card-header">
     <h2>Движения</h2>
-    <form method="get" action="/reports/money" class="flex flex-wrap" style="align-items:flex-end">
-      <div class="field" style="margin:0"><label>С</label><input type="date" name="start" value="{{ start }}"></div>
-      <div class="field" style="margin:0"><label>По</label><input type="date" name="end" value="{{ end }}"></div>
-      <button type="submit" class="btn secondary">Применить</button>
-    </form>
+    <div class="flex flex-wrap" style="align-items:flex-end">
+      <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#money-table" placeholder="{{ t('common.search', lang) }}…"></div>
+      <form method="get" action="/reports/money" class="flex flex-wrap" style="align-items:flex-end;gap:8px">
+        <div class="field" style="margin:0"><label>С</label><input type="date" name="start" value="{{ start }}"></div>
+        <div class="field" style="margin:0"><label>По</label><input type="date" name="end" value="{{ end }}"></div>
+        <button type="submit" class="btn secondary">Применить</button>
+      </form>
+    </div>
   </div>
   <div class="table-wrap">
-    <table class="table">
+    <table class="table" id="money-table">
       <thead><tr><th>{{ t('report.date', lang) }}</th><th>{{ t('report.document', lang) }}</th><th>Контрагент</th><th class="num">{{ t('report.amount', lang) }}</th></tr></thead>
       <tbody>
         {% for m in rows %}
-        <tr>
+        <tr data-row>
           <td>{{ m.date }}</td>
           <td class="muted">{{ m.document }}</td>
           <td>{{ m.kontragent or '—' }}</td>
           <td class="num">{{ "%.2f"|format(m.amount) }}</td>
         </tr>
-        {% else %}<tr><td colspan="4" class="muted">Нет движений</td></tr>{% endfor %}
+        {% else %}<tr data-empty><td colspan="4" class="muted">Нет движений</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>

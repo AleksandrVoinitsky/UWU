@@ -55,5 +55,11 @@
   "report.period": "Period",
   "report.amount": "Amount",
   "report.debt": "Debt",
-  "report.total": "Total"
+  "report.total": "Total",
+  "chat.title": "Messages",
+  "chat.status": "online",
+  "chat.greeting": "Hello! How can we help?",
+  "chat.placeholder": "Type a message…",
+  "common.search": "Search",
+  "common.create": "Create"
 }

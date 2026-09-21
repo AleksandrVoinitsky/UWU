@@ -4,45 +4,17 @@
 
 <div class="card">
   <div class="card-header">
-    <h2>{{ t('common.add', lang) }}</h2>
-  </div>
-  <form method="post" action="/catalog/nomenklatura">
-    <div class="form-row">
-      <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
-      <div class="field"><label>Полное наименование</label><input type="text" name="full_name"></div>
-      <div class="field"><label>Вид</label>
-        <select name="vid">
-          <option value="tovar">Товар</option>
-          <option value="material">Материал</option>
-          <option value="produkciya">Продукция</option>
-          <option value="usluga">Услуга</option>
-        </select>
+    <h2>{{ t('catalog.nomenklatura', lang) }} <span class="muted">· {{ items|length }}</span></h2>
+    <div class="flex flex-wrap">
+      <div class="search-input">
+        <span class="icon">⌕</span>
+        <input type="text" data-search="#nomen-table" placeholder="{{ t('common.search', lang) }}…">
       </div>
-      <div class="field"><label>Артикул</label><input type="text" name="artikul"></div>
-      <div class="field"><label>Ед. изм.</label>
-        <select name="base_unit_id"><option value="">—</option>
-          {% for u in units %}<option value="{{ u.id }}">{{ u.short_name }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="field"><label>НДС</label>
-        <select name="nds_rate_id"><option value="">—</option>
-          {% for n in nds %}<option value="{{ n.id }}">{{ n.name }}</option>{% endfor %}
-        </select>
-      </div>
+      <button class="btn primary" data-modal-open="modal-nomen">{{ t('common.create', lang) }}</button>
     </div>
-    <div class="form-actions">
-      <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
-    </div>
-  </form>
-</div>
-
-<div class="card">
-  <div class="card-header">
-    <h2>{{ t('catalog.nomenklatura', lang) }}</h2>
-    <span class="muted">{{ items|length }}</span>
   </div>
   <div class="table-wrap">
-    <table class="table">
+    <table class="table" id="nomen-table">
       <thead>
         <tr>
           <th>{{ t('common.code', lang) }}</th>
@@ -55,7 +27,7 @@
       </thead>
       <tbody>
         {% for item in items %}
-        <tr>
+        <tr data-row>
           <td class="muted">{{ item.code }}</td>
           <td>{{ item.name }}</td>
           <td class="muted">{{ item.artikul or '—' }}</td>
@@ -64,10 +36,51 @@
           <td>{{ item.nds_rate.name if item.nds_rate else '—' }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="6" class="muted">Нет записей</td></tr>
+        <tr data-empty><td colspan="6" class="muted">Нет записей</td></tr>
         {% endfor %}
       </tbody>
     </table>
+  </div>
+</div>
+
+<!-- Модальное окно создания -->
+<div class="modal-backdrop" id="modal-nomen">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>{{ t('common.create', lang) }} · {{ t('catalog.nomenklatura', lang) }}</h3>
+      <button class="modal-close" data-modal-close aria-label="Закрыть">✕</button>
+    </div>
+    <form method="post" action="/catalog/nomenklatura">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required autofocus></div>
+          <div class="field"><label>Полное наименование</label><input type="text" name="full_name"></div>
+          <div class="field"><label>Вид</label>
+            <select name="vid">
+              <option value="tovar">Товар</option>
+              <option value="material">Материал</option>
+              <option value="produkciya">Продукция</option>
+              <option value="usluga">Услуга</option>
+            </select>
+          </div>
+          <div class="field"><label>Артикул</label><input type="text" name="artikul"></div>
+          <div class="field"><label>Ед. изм.</label>
+            <select name="base_unit_id"><option value="">—</option>
+              {% for u in units %}<option value="{{ u.id }}">{{ u.short_name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field"><label>НДС</label>
+            <select name="nds_rate_id"><option value="">—</option>
+              {% for n in nds %}<option value="{{ n.id }}">{{ n.name }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
+        <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
+      </div>
+    </form>
   </div>
 </div>
 {% endblock %}

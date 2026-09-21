@@ -2,21 +2,27 @@
 {% block page_title %}{{ t('report.stock', lang) }}{% endblock %}
 {% block content %}
 <div class="card">
-  <div class="card-header"><h2>{{ t('report.stock', lang) }}</h2><a class="btn text small" href="/reports">← {{ t('menu.reports', lang) }}</a></div>
+  <div class="card-header">
+    <h2>{{ t('report.stock', lang) }}</h2>
+    <div class="flex flex-wrap">
+      <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#stock-table" placeholder="{{ t('common.search', lang) }}…"></div>
+      <a class="btn text small" href="/reports">← {{ t('menu.reports', lang) }}</a>
+    </div>
+  </div>
   <div class="table-wrap">
-    <table class="table">
+    <table class="table" id="stock-table">
       <thead>
         <tr><th>Номенклатура</th><th>{{ t('report.warehouse', lang) }}</th><th class="num">{{ t('report.quantity', lang) }}</th><th class="num">{{ t('report.cost', lang) }}</th></tr>
       </thead>
       <tbody>
         {% for b in balances %}
-        <tr>
+        <tr data-row>
           <td>{{ b.nomenklatura }}{% if b.artikul %} <span class="muted small">({{ b.artikul }})</span>{% endif %}</td>
           <td class="muted">{{ b.sklad }}</td>
           <td class="num">{{ b.quantity }}</td>
           <td class="num">{{ "%.2f"|format(b.cost) }}</td>
         </tr>
-        {% else %}<tr><td colspan="4" class="muted">Нет остатков</td></tr>{% endfor %}
+        {% else %}<tr data-empty><td colspan="4" class="muted">Нет остатков</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>

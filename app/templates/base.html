@@ -70,5 +70,34 @@
       {% block content %}{% endblock %}
     </main>
   </div>
+
+  {% if user %}
+  <!-- Плавающий чат (заглушка мессенджера с клиентами) -->
+  <button id="chat-fab" class="chat-fab" title="{{ t('chat.title', lang) }}" aria-label="Чат">
+    <span class="dot"></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+    </svg>
+  </button>
+
+  <div id="chat-popup" class="chat-popup">
+    <div class="chat-header">
+      <div>
+        <div class="title">{{ t('chat.title', lang) }}</div>
+        <div class="status">{{ t('chat.status', lang) }}</div>
+      </div>
+      <button id="chat-close" class="modal-close" aria-label="Закрыть">✕</button>
+    </div>
+    <div id="chat-messages" class="chat-messages">
+      <div class="msg incoming"><span>{{ t('chat.greeting', lang) }}</span><span class="time">—</span></div>
+    </div>
+    <div class="chat-input">
+      <input id="chat-input" type="text" placeholder="{{ t('chat.placeholder', lang) }}">
+      <button id="chat-send" class="btn primary small">➤</button>
+    </div>
+  </div>
+  {% endif %}
+
+  <script src="/static/js/app.js"></script>
 </body>
 </html>

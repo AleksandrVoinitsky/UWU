@@ -21,8 +21,9 @@
 
 <div class="card">
   <div class="card-header">
-    <h2>Журнал</h2>
+    <h2>Журнал <span class="muted">· {{ documents|length }}</span></h2>
     <form method="get" action="/documents" class="flex flex-wrap" style="align-items:flex-end">
+      <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#doc-table" placeholder="{{ t('common.search', lang) }}…"></div>
       <div class="field" style="margin:0"><label>Тип</label>
         <select name="doc_type">
           <option value="">Все</option>
@@ -46,7 +47,7 @@
   </div>
 
   <div class="table-wrap">
-    <table class="table">
+    <table class="table" id="doc-table">
       <thead>
         <tr>
           <th>№</th><th>Дата</th><th>Тип</th><th>Контрагент</th>
@@ -55,7 +56,7 @@
       </thead>
       <tbody>
         {% for d in documents %}
-        <tr>
+        <tr data-row>
           <td><a href="/documents/{{ d.id }}">{{ d.number }}</a></td>
           <td>{{ d.date }}</td>
           <td>{{ DOC_LABELS.get(d.doc_type, d.doc_type) }}{% if d.subtype %} · {{ d.subtype }}{% endif %}</td>
@@ -80,7 +81,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="muted">Нет документов</td></tr>
+        <tr data-empty><td colspan="7" class="muted">Нет документов</td></tr>
         {% endfor %}
       </tbody>
     </table>

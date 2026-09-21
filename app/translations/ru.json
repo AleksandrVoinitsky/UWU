@@ -55,5 +55,11 @@
   "report.period": "Период",
   "report.amount": "Сумма",
   "report.debt": "Задолженность",
-  "report.total": "Итого"
+  "report.total": "Итого",
+  "chat.title": "Сообщения",
+  "chat.status": "в сети",
+  "chat.greeting": "Здравствуйте! Чем можем помочь?",
+  "chat.placeholder": "Введите сообщение…",
+  "common.search": "Поиск",
+  "common.create": "Создать"
 }
