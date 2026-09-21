@@ -103,3 +103,19 @@ class Reservation(Base, IdMixin, TimestampMixin):
 
     nomenklatura: Mapped["Nomenklatura"] = relationship()  # noqa: F821
     sklad: Mapped["Sklad"] = relationship()  # noqa: F821
+
+
+class AccountingEntry(Base, IdMixin):
+    """Бухгалтерская проводка (автоматически формируется при проведении)."""
+
+    __tablename__ = "accounting_entries"
+
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), nullable=False, index=True)
+    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    account_debit: Mapped[str] = mapped_column(String(20), nullable=False)
+    account_credit: Mapped[str] = mapped_column(String(20), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    nomenklatura_id: Mapped[int | None] = mapped_column(ForeignKey("nomenklatura.id"), nullable=True)
+    kontragent_id: Mapped[int | None] = mapped_column(ForeignKey("kontragenty.id"), nullable=True)
+
+    document: Mapped["Document"] = relationship()  # noqa: F821

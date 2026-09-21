@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block page_title %}Бухгалтерские проводки{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h2>Бухгалтерские проводки</h2>
+    <form method="get" action="/reports/accounting" class="flex flex-wrap" style="align-items:flex-end">
+      <div class="field" style="margin:0"><label>С</label><input type="date" name="start" value="{{ start }}"></div>
+      <div class="field" style="margin:0"><label>По</label><input type="date" name="end" value="{{ end }}"></div>
+      <button type="submit" class="btn secondary">Применить</button>
+    </form>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>{{ t('report.date', lang) }}</th><th>{{ t('report.document', lang) }}</th><th>Дт</th><th>Кт</th><th>Контрагент</th><th class="num">{{ t('report.amount', lang) }}</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-row>
+          <td>{{ r.date }}</td>
+          <td class="muted">{{ r.document }}</td>
+          <td class="muted">{{ r.debit }}</td>
+          <td class="muted">{{ r.credit }}</td>
+          <td>{{ r.kontragent or '—' }}</td>
+          <td class="num">{{ "%.2f"|format(r.amount) }}</td>
+        </tr>
+        {% else %}<tr data-empty><td colspan="6" class="muted">Нет проводок</td></tr>{% endfor %}
+      </tbody>
+      {% if rows %}
+      <tfoot><tr><td colspan="5" class="muted">Итого оборот</td><td class="num" style="font-weight:600">{{ "%.2f"|format(total) }}</td></tr></tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% endblock %}

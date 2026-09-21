@@ -34,6 +34,7 @@ from app.models.enums import (  # noqa: F401
     ZakazState,
 )
 from app.models.registry import (  # noqa: F401
+    AccountingEntry,
     MoneyMovement,
     Reservation,
     SettlementMovement,

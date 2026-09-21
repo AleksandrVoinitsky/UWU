@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 from app.models.constants import Constant
 from app.models.document.base_document import Document, DocumentItem
 from app.models.enums import CostMethod, DocSubtype, DocType, DocumentStatus, RestockControl
-from app.models.registry import MoneyMovement, SettlementMovement, StockMovement
+from app.models.registry import AccountingEntry, MoneyMovement, SettlementMovement, StockMovement
 from app.services import stock_service
 from app.services.stock_service import InsufficientStockError
 
@@ -222,6 +222,7 @@ async def post_document(session: AsyncSession, document: Document) -> Document:
                 await _apply_stock_movement(session, document, item, doc_type, cost_method)
 
     await _apply_money_and_settlement(session, document, doc_type)
+    await _apply_accounting(session, document, doc_type)
 
     document.status = DocumentStatus.POSTED
     document.posted_at = datetime.now(timezone.utc)
@@ -449,6 +450,52 @@ async def _apply_money_and_settlement(
         )
 
 
+async def _apply_accounting(session: AsyncSession, document: Document, doc_type: DocType) -> None:
+    """Формирует автоматические бухгалтерские проводки при проведении."""
+
+    def entry(debit: str, credit: str, amount: Decimal, *, kontragent_id: int | None = None):
+        if amount == 0:
+            return
+        session.add(
+            AccountingEntry(
+                document_id=document.id,
+                date=document.date,
+                account_debit=debit,
+                account_credit=credit,
+                amount=amount,
+                kontragent_id=kontragent_id,
+            )
+        )
+
+    if doc_type == DocType.PRIHOD:
+        # Поступление товаров: Дт 41 «Товары» / Кт 60 «Расчёты с поставщиками».
+        entry("41", "60", document.total, kontragent_id=document.kontragent_id)
+    elif doc_type == DocType.VOZVRAT:
+        # Возврат товара от покупателя: Дт 41 / Кт 62.
+        entry("41", "62", document.total, kontragent_id=document.kontragent_id)
+    elif doc_type == DocType.RASHOD:
+        # Продажа: Дт 62 «Покупатели» / Кт 90.1 «Выручка».
+        entry("62", "90.1", document.total, kontragent_id=document.kontragent_id)
+        # Себестоимость: Дт 90.2 / Кт 41 (по сумме списанных партий).
+        result = await session.execute(
+            select(func.coalesce(func.sum(StockMovement.amount), 0)).where(
+                StockMovement.document_id == document.id,
+                StockMovement.quantity < 0,
+            )
+        )
+        cost = -(result.scalar() or Decimal("0"))
+        entry("90.2", "41", cost)
+    elif doc_type == DocType.PRIHODNY_KASSOVY_ORDER:
+        # Приход наличных: Дт 50 «Касса» / Кт 62 «Покупатели».
+        entry("50", "62", document.total, kontragent_id=document.kontragent_id)
+    elif doc_type == DocType.RASHODNY_KASSOVY_ORDER:
+        # Расход наличных: Дт 62 / Кт 50.
+        entry("62", "50", document.total, kontragent_id=document.kontragent_id)
+    elif doc_type == DocType.PLATEZHNOE_PORUCHENIE:
+        # Безналичный платёж: Дт 60 «Поставщики» / Кт 51 «Расчётный счёт».
+        entry("60", "51", document.total, kontragent_id=document.kontragent_id)
+
+
 async def unpost_document(session: AsyncSession, document: Document) -> Document:
     """Отменяет проведение: удаляет движения и восстанавливает партии."""
     if document.status != DocumentStatus.POSTED:
@@ -469,7 +516,7 @@ async def unpost_document(session: AsyncSession, document: Document) -> Document
 
 
 async def _delete_movements(session: AsyncSession, document_id: int) -> None:
-    for model in (MoneyMovement, SettlementMovement):
+    for model in (MoneyMovement, SettlementMovement, AccountingEntry):
         result = await session.execute(
             select(model).where(model.document_id == document_id)
         )

@@ -17,6 +17,7 @@ from app.models.catalog import Kontragent, Nomenklatura, Sklad
 from app.models.document.base_document import Document, DocumentItem
 from app.models.enums import DocType, DocumentStatus
 from app.models.registry import (
+    AccountingEntry,
     MoneyMovement,
     Reservation,
     SettlementMovement,
@@ -250,6 +251,31 @@ async def abc_analysis(session: AsyncSession, start: date, end: date) -> list[di
                 "pct": pct,
                 "cum_pct": cum_pct,
                 "class": cls,
+            }
+        )
+    return rows
+
+
+async def accounting_entries(session: AsyncSession, start: date, end: date) -> list[dict]:
+    """Журнал бухгалтерских проводок за период."""
+    stmt = (
+        select(AccountingEntry)
+        .where(AccountingEntry.date >= start, AccountingEntry.date <= end)
+        .order_by(AccountingEntry.date, AccountingEntry.id)
+    )
+    result = await session.execute(stmt)
+    rows = []
+    for e in result.scalars():
+        doc = await session.get(Document, e.document_id)
+        kontragent = await session.get(Kontragent, e.kontragent_id) if e.kontragent_id else None
+        rows.append(
+            {
+                "date": e.date,
+                "document": doc.number if doc else f"#{e.document_id}",
+                "debit": e.account_debit,
+                "credit": e.account_credit,
+                "amount": e.amount,
+                "kontragent": kontragent.name if kontragent else None,
             }
         )
     return rows

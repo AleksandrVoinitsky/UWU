@@ -1081,3 +1081,17 @@ async def report_abc(
     s, e = _month_range() if not (start and end) else (start, end)
     rows = await report_service.abc_analysis(session, date.fromisoformat(s), date.fromisoformat(e))
     return _page(request, user, "trade/report_abc.html", rows=rows, start=s, end=e)
+
+
+@router.get("/reports/accounting", response_class=HTMLResponse)
+async def report_accounting(
+    request: Request,
+    start: str | None = None,
+    end: str | None = None,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    s, e = _month_range() if not (start and end) else (start, end)
+    rows = await report_service.accounting_entries(session, date.fromisoformat(s), date.fromisoformat(e))
+    total = sum((r["amount"] for r in rows), Decimal("0"))
+    return _page(request, user, "trade/report_accounting.html", rows=rows, start=s, end=e, total=total)

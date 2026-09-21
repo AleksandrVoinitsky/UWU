@@ -215,3 +215,20 @@ async def test_reservation_reduces_available(seeded_session):
 
     assert await stock_service.get_available(seeded_session, item.id, sklad.id) == Decimal("2")
     assert await stock_service.get_reserved(seeded_session, item.id, sklad.id) == Decimal("3")
+
+
+async def test_accounting_entries_generated(seeded_session):
+    from app.models.registry import AccountingEntry
+    from sqlalchemy import select
+
+    item = await _make_item(seeded_session)
+    sklad = await _make_sklad(seeded_session)
+
+    d1 = await _prihod(seeded_session, item, sklad, Decimal("5"), Decimal("100"))
+    await document_service.post_document(seeded_session, d1)
+
+    entries = (await seeded_session.execute(select(AccountingEntry))).scalars().all()
+    assert len(entries) == 1
+    assert entries[0].account_debit == "41"
+    assert entries[0].account_credit == "60"
+    assert entries[0].amount == Decimal("500.00")
