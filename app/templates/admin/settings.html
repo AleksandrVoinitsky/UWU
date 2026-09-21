@@ -1,46 +1,42 @@
 {% extends "base.html" %}
+{% block page_title %}{{ t('menu.settings', lang) }}{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1>{{ t('menu.settings', lang) }}</h1>
-</div>
-
 <div class="card">
-  <h2>Константы</h2>
+  <div class="card-header"><h2>Константы</h2></div>
   <form method="post" action="/admin/settings">
-    <div class="field">
-      <label>Контроль остатков</label>
-      <select name="const_restock_control">
-        <option value="by_warehouse" {% if constants.restock_control == 'by_warehouse' %}selected{% endif %}>По складу</option>
-        <option value="by_firm" {% if constants.restock_control == 'by_firm' %}selected{% endif %}>По фирме</option>
-        <option value="none" {% if constants.restock_control == 'none' %}selected{% endif %}>Без контроля</option>
-      </select>
+    <div class="form-row">
+      <div class="field">
+        <label>Контроль остатков</label>
+        <select name="const_restock_control">
+          <option value="by_warehouse" {% if constants.restock_control == 'by_warehouse' %}selected{% endif %}>По складу</option>
+          <option value="by_firm" {% if constants.restock_control == 'by_firm' %}selected{% endif %}>По фирме</option>
+          <option value="none" {% if constants.restock_control == 'none' %}selected{% endif %}>Без контроля</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Метод списания себестоимости</label>
+        <select name="const_cost_method">
+          <option value="fifo" {% if constants.cost_method == 'fifo' %}selected{% endif %}>FIFO</option>
+          <option value="lifo" {% if constants.cost_method == 'lifo' %}selected{% endif %}>LIFO</option>
+          <option value="average" {% if constants.cost_method == 'average' %}selected{% endif %}>Средняя</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Префикс ИБ</label>
+        <input type="text" name="const_prefix_ib" value="{{ constants.prefix_ib or '' }}">
+      </div>
+      <div class="field">
+        <label>Валюта бухгалтерского учёта</label>
+        <select name="const_currency_buh_id">
+          <option value="">—</option>
+          {% for v in valyuty %}<option value="{{ v.id }}" {% if constants.currency_buh_id == v.id %}selected{% endif %}>{{ v.code }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="const_allow_future_dates" {% if constants.allow_future_dates %}checked{% endif %} style="width:auto"> Разрешить будущие даты</label>
+      </div>
     </div>
-    <div class="field">
-      <label>Метод списания себестоимости</label>
-      <select name="const_cost_method">
-        <option value="fifo" {% if constants.cost_method == 'fifo' %}selected{% endif %}>FIFO</option>
-        <option value="lifo" {% if constants.cost_method == 'lifo' %}selected{% endif %}>LIFO</option>
-        <option value="average" {% if constants.cost_method == 'average' %}selected{% endif %}>Средняя</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>Префикс ИБ</label>
-      <input type="text" name="const_prefix_ib" value="{{ constants.prefix_ib or '' }}">
-    </div>
-    <div class="field">
-      <label>Валюта бухгалтерского учёта</label>
-      <select name="const_currency_buh_id">
-        <option value="">—</option>
-        {% for v in valyuty %}
-        <option value="{{ v.id }}" {% if constants.currency_buh_id == v.id %}selected{% endif %}>{{ v.code }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="field">
-      <label>Разрешить будущие даты</label>
-      <input type="checkbox" name="const_allow_future_dates" {% if constants.allow_future_dates %}checked{% endif %}>
-    </div>
-    <button type="submit" class="btn">{{ t('common.save', lang) }}</button>
+    <div class="form-actions"><button type="submit" class="btn primary">{{ t('common.save', lang) }}</button></div>
   </form>
 </div>
 {% endblock %}

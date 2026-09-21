@@ -1,39 +1,35 @@
 {% extends "base.html" %}
+{% block page_title %}{{ t('menu.dashboard', lang) }}{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1>{{ t('menu.dashboard', lang) }}</h1>
-  <p class="subtitle">{{ t('menu.settings', lang) }}</p>
-</div>
-
 <div class="grid">
   <div class="card">
     <div class="stat">{{ users|length }}</div>
-    <div class="muted">{{ t('menu.users', lang) }}</div>
+    <div class="stat-label">{{ t('menu.users', lang) }}</div>
   </div>
   <div class="card">
     <div class="stat">{{ roles|length }}</div>
-    <div class="muted">{{ t('menu.roles', lang) }}</div>
+    <div class="stat-label">{{ t('menu.roles', lang) }}</div>
   </div>
 </div>
 
 <div class="card">
-  <div class="flex-between mb">
+  <div class="card-header">
     <h2>{{ t('menu.users', lang) }}</h2>
-    <a class="btn small" href="/admin/users">{{ t('common.edit', lang) }}</a>
+    <a class="btn text small" href="/admin/users">{{ t('common.edit', lang) }} →</a>
   </div>
-  <table class="table">
-    <thead>
-      <tr><th>{{ t('auth.username', lang) }}</th><th>{{ t('common.name', lang) }}</th><th>Status</th></tr>
-    </thead>
-    <tbody>
-      {% for u in users %}
-      <tr>
-        <td>{{ u.login }}</td>
-        <td>{{ u.full_name or '—' }}</td>
-        <td>{% if u.is_admin %}<span class="badge posted">admin</span>{% elif u.is_active %}<span class="badge posted">active</span>{% else %}<span class="badge deleted">disabled</span>{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>{{ t('auth.username', lang) }}</th><th>{{ t('common.name', lang) }}</th><th>Статус</th></tr></thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>{{ u.login }}</td>
+          <td>{{ u.full_name or '—' }}</td>
+          <td>{% if u.is_admin %}<span class="badge neutral">admin</span>{% elif u.is_active %}<span class="badge posted">active</span>{% else %}<span class="badge deleted">disabled</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

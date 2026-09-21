@@ -1,13 +1,26 @@
 {% extends "base.html" %}
+{% block page_title %}{{ t('menu.reports', lang) }}{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1>{{ t('menu.reports', lang) }}</h1>
-</div>
-<div class="card">
-  <div class="flex">
-    <a class="btn" href="/reports/stock">{{ t('report.stock', lang) }}</a>
-    <a class="btn" href="/reports/settlements">{{ t('report.settlements', lang) }}</a>
-    <a class="btn" href="/reports/money">{{ t('report.money', lang) }}</a>
-  </div>
+<div class="grid">
+  <a class="card" href="/reports/stock" style="display:block">
+    <div class="stat" style="font-size:16px">{{ t('report.stock', lang) }}</div>
+    <div class="muted small">Остатки по складам</div>
+  </a>
+  <a class="card" href="/reports/movements" style="display:block">
+    <div class="stat" style="font-size:16px">{{ t('report.movements', lang) }}</div>
+    <div class="muted small">Движение позиций за период</div>
+  </a>
+  <a class="card" href="/reports/sales" style="display:block">
+    <div class="stat" style="font-size:16px">{{ t('report.sales', lang) }}</div>
+    <div class="muted small">Продажи за период</div>
+  </a>
+  <a class="card" href="/reports/settlements" style="display:block">
+    <div class="stat" style="font-size:16px">{{ t('report.settlements', lang) }}</div>
+    <div class="muted small">Задолженность контрагентов</div>
+  </a>
+  <a class="card" href="/reports/money" style="display:block">
+    <div class="stat" style="font-size:16px">{{ t('report.money', lang) }}</div>
+    <div class="muted small">Движение денежных средств</div>
+  </a>
 </div>
 {% endblock %}

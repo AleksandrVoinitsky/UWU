@@ -9,7 +9,7 @@
 <body>
   <div class="app">
     {% if user %}
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="brand">UWU</div>
 
       {% if section == 'admin' %}
@@ -20,30 +20,53 @@
         <a class="nav-link" href="/admin/settings">{{ t('menu.settings', lang) }}</a>
         <a class="nav-link" href="/admin/docs">{{ t('menu.docs', lang) }}</a>
       {% else %}
+        <div class="nav-group">{{ t('menu.dashboard', lang) }}</div>
+        <a class="nav-link" href="/">{{ t('menu.dashboard', lang) }}</a>
         <div class="nav-group">{{ t('menu.catalog', lang) }}</div>
         <a class="nav-link" href="/catalog/nomenklatura">{{ t('catalog.nomenklatura', lang) }}</a>
         <a class="nav-link" href="/catalog/kontragenty">{{ t('catalog.kontragenty', lang) }}</a>
         <a class="nav-link" href="/catalog/sklady">{{ t('catalog.sklady', lang) }}</a>
+        <a class="nav-link" href="/catalog/firmy">{{ t('catalog.firmy', lang) }}</a>
+        <a class="nav-link" href="/catalog/kassy">{{ t('catalog.kassy', lang) }}</a>
+        <a class="nav-link" href="/catalog/valyuty">{{ t('catalog.valyuty', lang) }}</a>
+        <a class="nav-link" href="/catalog/edinitsy">{{ t('catalog.edinitsy', lang) }}</a>
+        <a class="nav-link" href="/catalog/stavki_nds">{{ t('catalog.stavki_nds', lang) }}</a>
         <div class="nav-group">{{ t('menu.documents', lang) }}</div>
         <a class="nav-link" href="/documents">{{ t('menu.documents', lang) }}</a>
-        <a class="nav-link" href="/documents/new?doc_type=rashod">{{ t('doc.rashod', lang) }}</a>
-        <a class="nav-link" href="/documents/new?doc_type=prihod">{{ t('doc.prihod', lang) }}</a>
         <div class="nav-group">{{ t('menu.reports', lang) }}</div>
         <a class="nav-link" href="/reports/stock">{{ t('report.stock', lang) }}</a>
+        <a class="nav-link" href="/reports/movements">{{ t('report.movements', lang) }}</a>
         <a class="nav-link" href="/reports/settlements">{{ t('report.settlements', lang) }}</a>
+        <a class="nav-link" href="/reports/sales">{{ t('report.sales', lang) }}</a>
         <a class="nav-link" href="/reports/money">{{ t('report.money', lang) }}</a>
       {% endif %}
 
-      <div class="nav-group"></div>
-      <div class="flex" style="padding:8px 12px">
-        <a class="nav-link" href="/set-language/ru" style="padding:2px 8px">RU</a>
-        <a class="nav-link" href="/set-language/en" style="padding:2px 8px">EN</a>
+      <div class="sidebar-footer">
+        <div class="flex" style="gap:4px;padding:4px 8px">
+          <a class="nav-link" href="/set-language/ru">RU</a>
+          <a class="nav-link" href="/set-language/en">EN</a>
+        </div>
+        <a class="nav-link" href="/logout">{{ t('menu.logout', lang) }}</a>
       </div>
-      <a class="nav-link" href="/logout">{{ t('menu.logout', lang) }}</a>
     </aside>
     {% endif %}
 
     <main class="content">
+      {% if user %}
+      <div class="topbar">
+        <div class="flex" style="gap:10px">
+          <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+          <div class="page-title">{% block page_title %}{% endblock %}</div>
+        </div>
+        <div class="topbar-actions">
+          <span class="user-chip">
+            <span class="avatar">{{ user.login[0] }}</span>
+            <span>{{ user.full_name or user.login }}</span>
+          </span>
+        </div>
+      </div>
+      {% endif %}
+
       {% block content %}{% endblock %}
     </main>
   </div>

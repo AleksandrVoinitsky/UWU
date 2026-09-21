@@ -1,18 +1,17 @@
 {% extends "base.html" %}
+{% block page_title %}{{ t('menu.docs', lang) }}{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1>{{ t('menu.docs', lang) }}</h1>
-</div>
-
-<div class="app" style="min-height:0">
-  <aside class="sidebar" style="position:static;height:auto;width:220px;border-right:1px solid var(--border)">
-    <div class="nav-group">Docs</div>
-    {% for f in files %}
-    <a class="nav-link {% if f == current %}active{% endif %}" href="/admin/docs/{{ f }}">{{ f }}</a>
-    {% endfor %}
-  </aside>
-  <div class="content docs-body" style="padding:0 0 0 24px">
-    {{ content | safe }}
+<div class="card" style="padding:0;overflow:hidden">
+  <div style="display:flex;min-height:60vh">
+    <div style="width:200px;border-right:1px solid var(--border);padding:16px 12px;flex-shrink:0">
+      <div class="nav-group" style="padding-top:0">Docs</div>
+      {% for f in files %}
+      <a class="nav-link" href="/admin/docs/{{ f }}" {% if f == current %}style="background:var(--surface-hover);font-weight:500"{% endif %}>{{ f }}</a>
+      {% endfor %}
+    </div>
+    <div class="docs-body" style="flex:1;padding:24px 28px">
+      {{ content | safe }}
+    </div>
   </div>
 </div>
 {% endblock %}

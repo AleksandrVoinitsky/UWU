@@ -1,14 +1,24 @@
 {% extends "base.html" %}
+{% block page_title %}{{ t('report.stock', lang) }}{% endblock %}
 {% block content %}
-<div class="page-header"><h1>{{ t('report.stock', lang) }}</h1></div>
 <div class="card">
-  <table class="table">
-    <thead><tr><th>{{ t('common.name', lang) }}</th><th>Склад</th><th>Количество</th><th>Стоимость</th></tr></thead>
-    <tbody>
-      {% for b in balances %}
-      <tr><td>{{ b.nomenklatura }}</td><td>{{ b.sklad }}</td><td>{{ b.quantity }}</td><td>{{ b.cost }}</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="card-header"><h2>{{ t('report.stock', lang) }}</h2><a class="btn text small" href="/reports">← {{ t('menu.reports', lang) }}</a></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Номенклатура</th><th>{{ t('report.warehouse', lang) }}</th><th class="num">{{ t('report.quantity', lang) }}</th><th class="num">{{ t('report.cost', lang) }}</th></tr>
+      </thead>
+      <tbody>
+        {% for b in balances %}
+        <tr>
+          <td>{{ b.nomenklatura }}{% if b.artikul %} <span class="muted small">({{ b.artikul }})</span>{% endif %}</td>
+          <td class="muted">{{ b.sklad }}</td>
+          <td class="num">{{ b.quantity }}</td>
+          <td class="num">{{ "%.2f"|format(b.cost) }}</td>
+        </tr>
+        {% else %}<tr><td colspan="4" class="muted">Нет остатков</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

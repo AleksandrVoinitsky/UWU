@@ -42,7 +42,18 @@
   "doc.status.posted": "Проведён",
   "doc.status.deleted": "Помечен на удаление",
   "report.stock": "Остатки товаров",
+  "report.movements": "Движения товаров",
   "report.settlements": "Взаиморасчёты",
   "report.money": "Денежные средства",
-  "report.sales": "Продажи"
+  "report.sales": "Продажи",
+  "report.balance": "Остаток",
+  "report.cost": "Себестоимость",
+  "report.quantity": "Количество",
+  "report.warehouse": "Склад",
+  "report.date": "Дата",
+  "report.document": "Документ",
+  "report.period": "Период",
+  "report.amount": "Сумма",
+  "report.debt": "Задолженность",
+  "report.total": "Итого"
 }

@@ -1,43 +1,89 @@
 {% extends "base.html" %}
+{% block page_title %}{{ t('menu.documents', lang) }}{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1>{{ t('menu.documents', lang) }}</h1>
-  <div class="flex mt">
-    <a class="btn small" href="/documents/new?doc_type=rashod">{{ t('doc.rashod', lang) }}</a>
-    <a class="btn small" href="/documents/new?doc_type=prihod">{{ t('doc.prihod', lang) }}</a>
-    <a class="btn small" href="/documents/new?doc_type=peremeshenie">{{ t('doc.peremeshenie', lang) }}</a>
-    <a class="btn small" href="/documents/new?doc_type=spisanie">{{ t('doc.spisanie', lang) }}</a>
-    <a class="btn small" href="/documents/new?doc_type=oprihodovanie">{{ t('doc.oprihodovanie', lang) }}</a>
-    <a class="btn small" href="/documents/new?doc_type=pko">{{ t('doc.pko', lang) }}</a>
-    <a class="btn small" href="/documents/new?doc_type=rko">{{ t('doc.rko', lang) }}</a>
-    <a class="btn small" href="/documents/new?doc_type=vvod_ostatkov">{{ t('doc.vvod_ostatkov', lang) }}</a>
+
+<div class="card">
+  <div class="card-header">
+    <h2>{{ t('common.add', lang) }}</h2>
+  </div>
+  <div class="flex flex-wrap">
+    <a class="btn primary" href="/documents/new?doc_type=rashod">{{ t('doc.rashod', lang) }}</a>
+    <a class="btn secondary" href="/documents/new?doc_type=prihod">{{ t('doc.prihod', lang) }}</a>
+    <a class="btn secondary" href="/documents/new?doc_type=peremeshenie">{{ t('doc.peremeshenie', lang) }}</a>
+    <a class="btn secondary" href="/documents/new?doc_type=spisanie">{{ t('doc.spisanie', lang) }}</a>
+    <a class="btn secondary" href="/documents/new?doc_type=oprihodovanie">{{ t('doc.oprihodovanie', lang) }}</a>
+    <a class="btn secondary" href="/documents/new?doc_type=vvod_ostatkov">{{ t('doc.vvod_ostatkov', lang) }}</a>
+    <a class="btn secondary" href="/documents/new?doc_type=pko">{{ t('doc.pko', lang) }}</a>
+    <a class="btn secondary" href="/documents/new?doc_type=rko">{{ t('doc.rko', lang) }}</a>
+    <a class="btn secondary" href="/documents/new?doc_type=platezhnoe_poruchenie">{{ t('doc.platezhnoe_poruchenie', lang) }}</a>
   </div>
 </div>
 
 <div class="card">
-  <table class="table">
-    <thead><tr><th>№</th><th>Дата</th><th>Тип</th><th>Сумма</th><th>Статус</th><th>{{ t('common.actions', lang) }}</th></tr></thead>
-    <tbody>
-      {% for d in documents %}
-      <tr>
-        <td>{{ d.number }}</td>
-        <td>{{ d.date }}</td>
-        <td>{{ d.doc_type }}{% if d.subtype %} ({{ d.subtype }}){% endif %}</td>
-        <td>{{ d.total }}</td>
-        <td>{% if d.status == 'posted' %}<span class="badge posted">{{ t('doc.status.posted', lang) }}</span>{% elif d.status == 'deleted' %}<span class="badge deleted">{{ t('doc.status.deleted', lang) }}</span>{% else %}<span class="badge draft">{{ t('doc.status.draft', lang) }}</span>{% endif %}</td>
-        <td class="flex">
-          {% if d.status == 'draft' %}
-          <form method="post" action="/documents/{{ d.id }}/post"><button class="btn small">Провести</button></form>
-          {% elif d.status == 'posted' %}
-          <form method="post" action="/documents/{{ d.id }}/unpost"><button class="btn small secondary">Отменить</button></form>
-          {% endif %}
-          {% if d.status != 'deleted' %}
-          <form method="post" action="/documents/{{ d.id }}/delete" onsubmit="return confirm('Delete?')"><button class="btn small danger">{{ t('common.delete', lang) }}</button></form>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="card-header">
+    <h2>Журнал</h2>
+    <form method="get" action="/documents" class="flex flex-wrap" style="align-items:flex-end">
+      <div class="field" style="margin:0"><label>Тип</label>
+        <select name="doc_type">
+          <option value="">Все</option>
+          {% for key, label in DOC_LABELS.items() %}
+          <option value="{{ key }}" {% if doc_type == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field" style="margin:0"><label>Статус</label>
+        <select name="status">
+          <option value="">Все</option>
+          <option value="posted" {% if status == 'posted' %}selected{% endif %}>Проведён</option>
+          <option value="draft" {% if status == 'draft' %}selected{% endif %}>Непроведён</option>
+          <option value="deleted" {% if status == 'deleted' %}selected{% endif %}>На удаление</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0"><label>С</label><input type="date" name="start" value="{{ start or '' }}"></div>
+      <div class="field" style="margin:0"><label>По</label><input type="date" name="end" value="{{ end or '' }}"></div>
+      <button type="submit" class="btn secondary">Фильтр</button>
+    </form>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>№</th><th>Дата</th><th>Тип</th><th>Контрагент</th>
+          <th class="num">Сумма</th><th>Статус</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in documents %}
+        <tr>
+          <td><a href="/documents/{{ d.id }}">{{ d.number }}</a></td>
+          <td>{{ d.date }}</td>
+          <td>{{ DOC_LABELS.get(d.doc_type, d.doc_type) }}{% if d.subtype %} · {{ d.subtype }}{% endif %}</td>
+          <td>{{ kg_map.get(d.kontragent_id, '—') if d.kontragent_id else '—' }}</td>
+          <td class="num">{{ "%.2f"|format(d.total) }}</td>
+          <td>
+            {% if d.status == 'posted' %}<span class="badge posted">{{ t('doc.status.posted', lang) }}</span>
+            {% elif d.status == 'deleted' %}<span class="badge deleted">{{ t('doc.status.deleted', lang) }}</span>
+            {% else %}<span class="badge draft">{{ t('doc.status.draft', lang) }}</span>{% endif %}
+          </td>
+          <td>
+            <div class="flex" style="gap:4px;justify-content:flex-end">
+              {% if d.status == 'draft' %}
+              <form method="post" action="/documents/{{ d.id }}/post"><button class="btn text small">Провести</button></form>
+              {% elif d.status == 'posted' %}
+              <form method="post" action="/documents/{{ d.id }}/unpost"><button class="btn text small">Отменить</button></form>
+              {% endif %}
+              {% if d.status != 'deleted' %}
+              <form method="post" action="/documents/{{ d.id }}/delete" onsubmit="return confirm('Удалить документ?')"><button class="btn text small danger">Удалить</button></form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="muted">Нет документов</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

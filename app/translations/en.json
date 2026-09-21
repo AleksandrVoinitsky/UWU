@@ -42,7 +42,18 @@
   "doc.status.posted": "Posted",
   "doc.status.deleted": "Marked for deletion",
   "report.stock": "Stock balance",
+  "report.movements": "Stock movements",
   "report.settlements": "Settlements",
   "report.money": "Cash flow",
-  "report.sales": "Sales"
+  "report.sales": "Sales",
+  "report.balance": "Balance",
+  "report.cost": "Cost",
+  "report.quantity": "Quantity",
+  "report.warehouse": "Warehouse",
+  "report.date": "Date",
+  "report.document": "Document",
+  "report.period": "Period",
+  "report.amount": "Amount",
+  "report.debt": "Debt",
+  "report.total": "Total"
 }

@@ -1,19 +1,35 @@
 {% extends "base.html" %}
+{% block page_title %}{{ t('menu.dashboard', lang) }}{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1>{{ t('menu.dashboard', lang) }}</h1>
-</div>
-
 <div class="grid">
   <div class="card">
-    <div class="stat">{{ money }}</div>
-    <div class="muted">{{ t('report.money', lang) }}</div>
+    <div class="stat">{{ "%.2f"|format(money) }}</div>
+    <div class="stat-label">{{ t('report.money', lang) }}</div>
   </div>
   <div class="card">
-    <a class="btn" href="/documents/new?doc_type=rashod">{{ t('doc.rashod', lang) }}</a>
+    <div class="stat">{{ stock_items }}</div>
+    <div class="stat-label">{{ t('report.stock', lang) }} · позиций</div>
   </div>
   <div class="card">
+    <div class="stat">{{ "%.2f"|format(total_stock_value) }}</div>
+    <div class="stat-label">{{ t('report.cost', lang) }} склада</div>
+  </div>
+  <div class="card">
+    <div class="stat">{{ nomen_count }}</div>
+    <div class="stat-label">{{ t('catalog.nomenklatura', lang) }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2>Быстрые действия</h2>
+  </div>
+  <div class="flex flex-wrap">
+    <a class="btn primary" href="/documents/new?doc_type=rashod">{{ t('doc.rashod', lang) }}</a>
     <a class="btn secondary" href="/documents/new?doc_type=prihod">{{ t('doc.prihod', lang) }}</a>
+    <a class="btn secondary" href="/documents/new?doc_type=peremeshenie">{{ t('doc.peremeshenie', lang) }}</a>
+    <a class="btn secondary" href="/documents/new?doc_type=pko">{{ t('doc.pko', lang) }}</a>
+    <a class="btn text" href="/documents">{{ t('menu.documents', lang) }} →</a>
   </div>
 </div>
 {% endblock %}

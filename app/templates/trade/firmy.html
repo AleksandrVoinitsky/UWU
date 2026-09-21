@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block page_title %}{{ t('catalog.firmy', lang) }}{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header"><h2>{{ t('common.add', lang) }}</h2></div>
+  <form method="post" action="/catalog/firmy">
+    <div class="form-row">
+      <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+      <div class="field"><label>Полное наименование</label><input type="text" name="full_name"></div>
+      <div class="field"><label>ИНН</label><input type="text" name="inn"></div>
+    </div>
+    <div class="form-actions"><button type="submit" class="btn primary">{{ t('common.add', lang) }}</button></div>
+  </form>
+</div>
+<div class="card">
+  <div class="card-header"><h2>{{ t('catalog.firmy', lang) }}</h2><span class="muted">{{ items|length }}</span></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>{{ t('common.name', lang) }}</th><th>ИНН</th></tr></thead>
+      <tbody>
+        {% for item in items %}
+        <tr><td>{{ item.name }}</td><td class="muted">{{ item.inn or '—' }}</td></tr>
+        {% else %}<tr><td colspan="2" class="muted">Нет записей</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

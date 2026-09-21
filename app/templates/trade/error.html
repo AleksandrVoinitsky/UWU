@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{% block page_title %}Ошибка{% endblock %}
 {% block content %}
-<div class="page-header"><h1>Ошибка</h1></div>
 <div class="card">
-  <div class="error">{{ error }}</div>
-  <a class="btn" href="/documents">Назад</a>
+  <h2>Ошибка</h2>
+  <div class="error mt">{{ error }}</div>
+  <a class="btn secondary" href="{{ back or '/' }}">Назад</a>
 </div>
 {% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block page_title %}{{ document.number }}{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="card-header">
+    <h2>{{ DOC_LABELS.get(document.doc_type, document.doc_type) }} · {{ document.number }}</h2>
+    <div class="flex">
+      <a class="btn text small" href="/documents">← {{ t('menu.documents', lang) }}</a>
+      {% if document.status == 'draft' %}
+      <form method="post" action="/documents/{{ document.id }}/post"><button class="btn primary small">Провести</button></form>
+      {% elif document.status == 'posted' %}
+      <form method="post" action="/documents/{{ document.id }}/unpost"><button class="btn secondary small">Отменить проведение</button></form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="flex flex-wrap" style="gap:24px">
+    <div><div class="muted small">Дата</div><div>{{ document.date }}</div></div>
+    <div><div class="muted small">Статус</div><div>
+      {% if document.status == 'posted' %}<span class="badge posted">{{ t('doc.status.posted', lang) }}</span>
+      {% elif document.status == 'deleted' %}<span class="badge deleted">{{ t('doc.status.deleted', lang) }}</span>
+      {% else %}<span class="badge draft">{{ t('doc.status.draft', lang) }}</span>{% endif %}
+    </div></div>
+    <div><div class="muted small">{{ t('report.warehouse', lang) }}</div><div>{{ names.sklad or '—' }}</div></div>
+    {% if names.sklad_to %}<div><div class="muted small">Получатель</div><div>{{ names.sklad_to }}</div></div>{% endif %}
+    <div><div class="muted small">{{ t('catalog.kontragenty', lang) }}</div><div>{{ names.kontragent or '—' }}</div></div>
+    <div><div class="muted small">{{ t('report.total', lang) }}</div><div class="stat">{{ "%.2f"|format(document.total) }}</div></div>
+  </div>
+
+  {% if document.comment %}
+  <div class="mt"><div class="muted small">Комментарий</div><div>{{ document.comment }}</div></div>
+  {% endif %}
+</div>
+
+{% if names['items'] %}
+<div class="card">
+  <div class="card-header"><h2>Табличная часть</h2></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Номенклатура</th><th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th></tr>
+      </thead>
+      <tbody>
+        {% for i in names['items'] %}
+        <tr>
+          <td>{{ i.name }}</td>
+          <td class="num">{{ i.quantity }}</td>
+          <td class="num">{{ "%.2f"|format(i.price) }}</td>
+          <td class="num">{{ "%.2f"|format(i.amount) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block page_title %}{{ t('report.movements', lang) }}{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h2>{{ t('report.movements', lang) }}</h2>
+    <form method="get" action="/reports/movements" class="flex flex-wrap" style="align-items:flex-end">
+      <div class="field" style="margin:0"><label>С</label><input type="date" name="start" value="{{ start }}"></div>
+      <div class="field" style="margin:0"><label>По</label><input type="date" name="end" value="{{ end }}"></div>
+      <button type="submit" class="btn secondary">Применить</button>
+    </form>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>{{ t('report.date', lang) }}</th><th>{{ t('report.document', lang) }}</th><th>Номенклатура</th><th>{{ t('report.warehouse', lang) }}</th><th class="num">{{ t('report.quantity', lang) }}</th><th class="num">{{ t('report.amount', lang) }}</th></tr>
+      </thead>
+      <tbody>
+        {% for m in rows %}
+        <tr>
+          <td>{{ m.date }}</td>
+          <td class="muted">{{ m.document }}</td>
+          <td>{{ m.nomenklatura }}</td>
+          <td class="muted">{{ m.sklad }}</td>
+          <td class="num">{{ m.quantity }}</td>
+          <td class="num">{{ "%.2f"|format(m.amount) }}</td>
+        </tr>
+        {% else %}<tr><td colspan="6" class="muted">Нет движений</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

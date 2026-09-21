@@ -1,29 +1,40 @@
 {% extends "base.html" %}
+{% block page_title %}{{ t('catalog.kontragenty', lang) }}{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1>{{ t('catalog.kontragenty', lang) }}</h1>
-</div>
 
 <div class="card">
-  <h2>{{ t('common.add', lang) }}</h2>
-  <form method="post" action="/catalog/kontragenty" class="flex" style="flex-wrap:wrap;align-items:flex-end">
-    <div class="field" style="flex:2;min-width:160px"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
-    <div class="field" style="flex:2;min-width:160px"><label>Полное наименование</label><input type="text" name="full_name"></div>
-    <div class="field"><label>ИНН</label><input type="text" name="inn"></div>
-    <div class="field"><label>Телефон</label><input type="text" name="phones"></div>
-    <div class="field"><label>Вид</label><select name="vid"><option value="yur">Юр. лицо</option><option value="fiz">Физ. лицо</option></select></div>
-    <button type="submit" class="btn">{{ t('common.add', lang) }}</button>
+  <div class="card-header"><h2>{{ t('common.add', lang) }}</h2></div>
+  <form method="post" action="/catalog/kontragenty">
+    <div class="form-row">
+      <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+      <div class="field"><label>Полное наименование</label><input type="text" name="full_name"></div>
+      <div class="field"><label>ИНН</label><input type="text" name="inn"></div>
+      <div class="field"><label>Телефон</label><input type="text" name="phones"></div>
+      <div class="field"><label>Вид</label>
+        <select name="vid"><option value="yur">Юр. лицо</option><option value="fiz">Физ. лицо</option></select>
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit" class="btn primary">{{ t('common.add', lang) }}</button></div>
   </form>
 </div>
 
 <div class="card">
-  <table class="table">
-    <thead><tr><th>{{ t('common.code', lang) }}</th><th>{{ t('common.name', lang) }}</th><th>ИНН</th><th>Телефон</th></tr></thead>
-    <tbody>
-      {% for item in items %}
-      <tr><td>{{ item.code }}</td><td>{{ item.name }}</td><td>{{ item.inn or '—' }}</td><td>{{ item.phones or '—' }}</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="card-header"><h2>{{ t('catalog.kontragenty', lang) }}</h2><span class="muted">{{ items|length }}</span></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>{{ t('common.code', lang) }}</th><th>{{ t('common.name', lang) }}</th><th>ИНН</th><th>Телефон</th><th>Вид</th></tr></thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td class="muted">{{ item.code }}</td>
+          <td>{{ item.name }}</td>
+          <td class="muted">{{ item.inn or '—' }}</td>
+          <td class="muted">{{ item.phones or '—' }}</td>
+          <td>{{ 'Юр. лицо' if item.vid == 'yur' else 'Физ. лицо' }}</td>
+        </tr>
+        {% else %}<tr><td colspan="5" class="muted">Нет записей</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}
