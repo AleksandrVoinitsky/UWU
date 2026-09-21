@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block page_title %}Оборотная ведомость{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h2>Оборотная ведомость</h2>
+    <div class="flex flex-wrap" style="align-items:flex-end">
+      <form method="get" action="/reports/turnover" class="flex flex-wrap" style="align-items:flex-end;gap:8px">
+        <div class="field" style="margin:0"><label>С</label><input type="date" name="start" value="{{ start }}"></div>
+        <div class="field" style="margin:0"><label>По</label><input type="date" name="end" value="{{ end }}"></div>
+        <button type="submit" class="btn secondary">Применить</button>
+      </form>
+      <a class="btn text" href="/reports/turnover?start={{ start }}&end={{ end }}&format=csv">Экспорт CSV</a>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Номенклатура</th><th>Склад</th><th class="num">Нач. остаток</th><th class="num">Приход</th><th class="num">Расход</th><th class="num">Кон. остаток</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-row>
+          <td>{{ r.nomenklatura }}</td>
+          <td class="muted">{{ r.sklad }}</td>
+          <td class="num">{{ r.opening }}</td>
+          <td class="num">{{ r.incoming }}</td>
+          <td class="num">{{ r.outgoing }}</td>
+          <td class="num" style="font-weight:600">{{ r.closing }}</td>
+        </tr>
+        {% else %}<tr data-empty><td colspan="6" class="muted">Нет данных</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

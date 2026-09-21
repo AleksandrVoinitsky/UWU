@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block page_title %}Карточка товара{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h2>Карточка товара</h2>
+    <form method="get" action="/reports/item" class="flex" style="align-items:flex-end">
+      <div class="field" style="margin:0;min-width:260px">
+        <label>Номенклатура</label>
+        <select name="nomenklatura_id">
+          <option value="">— выберите —</option>
+          {% for n in nomenklatura %}<option value="{{ n.id }}" {% if selected_id == n.id %}selected{% endif %}>{{ n.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn secondary">Показать</button>
+    </form>
+  </div>
+  {% if selected_id %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>{{ t('report.date', lang) }}</th><th>{{ t('report.document', lang) }}</th><th>Склад</th><th class="num">{{ t('report.quantity', lang) }}</th><th class="num">{{ t('report.amount', lang) }}</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-row>
+          <td>{{ r.date }}</td>
+          <td class="muted">{{ r.document }}</td>
+          <td class="muted">{{ r.sklad }}</td>
+          <td class="num">{{ r.quantity }}</td>
+          <td class="num">{{ "%.2f"|format(r.amount) }}</td>
+        </tr>
+        {% else %}<tr data-empty><td colspan="5" class="muted">Нет движений</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="muted">Выберите номенклатуру для просмотра движений.</div>
+  {% endif %}
+</div>
+{% endblock %}

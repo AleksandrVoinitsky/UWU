@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.catalog import Kontragent, Nomenklatura, Sklad
@@ -353,4 +353,131 @@ async def open_invoices(
             }
         )
     rows.sort(key=lambda r: r["date"])
+    return rows
+
+
+async def turnover_statement(
+    session: AsyncSession, start: date, end: date
+) -> list[dict]:
+    """Оборотная ведомость: начальный остаток, приход, расход, конечный остаток."""
+    stmt = (
+        select(
+            StockMovement.nomenklatura_id,
+            StockMovement.sklad_id,
+            func.coalesce(
+                func.sum(case((StockMovement.date < start, StockMovement.quantity), else_=0)), 0
+            ),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                StockMovement.date >= start,
+                                StockMovement.date <= end,
+                                StockMovement.quantity > 0,
+                            ),
+                            StockMovement.quantity,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                StockMovement.date >= start,
+                                StockMovement.date <= end,
+                                StockMovement.quantity < 0,
+                            ),
+                            StockMovement.quantity,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ),
+        )
+        .group_by(StockMovement.nomenklatura_id, StockMovement.sklad_id)
+    )
+    result = await session.execute(stmt)
+    rows = []
+    for nomen_id, sklad_id, opening, incoming, outgoing in result.all():
+        if opening == 0 and incoming == 0 and outgoing == 0:
+            continue
+        nomen = await session.get(Nomenklatura, nomen_id)
+        sklad = await session.get(Sklad, sklad_id)
+        rows.append(
+            {
+                "nomenklatura": nomen.name if nomen else f"#{nomen_id}",
+                "sklad": sklad.name if sklad else f"#{sklad_id}",
+                "opening": opening,
+                "incoming": incoming,
+                "outgoing": outgoing,
+                "closing": opening + incoming + outgoing,
+            }
+        )
+    rows.sort(key=lambda r: r["nomenklatura"])
+    return rows
+
+
+async def item_card(
+    session: AsyncSession, nomenklatura_id: int, start: date | None = None, end: date | None = None
+) -> list[dict]:
+    """Карточка товара: движения по документам."""
+    stmt = select(StockMovement).where(StockMovement.nomenklatura_id == nomenklatura_id)
+    if start:
+        stmt = stmt.where(StockMovement.date >= start)
+    if end:
+        stmt = stmt.where(StockMovement.date <= end)
+    stmt = stmt.order_by(StockMovement.date, StockMovement.id)
+    result = await session.execute(stmt)
+    rows = []
+    for m in result.scalars():
+        doc = await session.get(Document, m.document_id)
+        sklad = await session.get(Sklad, m.sklad_id)
+        rows.append(
+            {
+                "date": m.date,
+                "document": doc.number if doc else f"#{m.document_id}",
+                "doc_type": doc.doc_type if doc else "",
+                "sklad": sklad.name if sklad else f"#{m.sklad_id}",
+                "quantity": m.quantity,
+                "amount": m.amount,
+            }
+        )
+    return rows
+
+
+async def purchase_sales_book(
+    session: AsyncSession, start: date, end: date
+) -> list[dict]:
+    """Книга покупок/продаж: приходные и расходные накладные с НДС за период."""
+    stmt = (
+        select(Document)
+        .where(
+            Document.doc_type.in_([DocType.PRIHOD.value, DocType.RASHOD.value]),
+            Document.status == DocumentStatus.POSTED.value,
+            Document.date >= start,
+            Document.date <= end,
+        )
+        .order_by(Document.date)
+    )
+    result = await session.execute(stmt)
+    rows = []
+    for doc in result.scalars():
+        kontragent = await session.get(Kontragent, doc.kontragent_id) if doc.kontragent_id else None
+        rows.append(
+            {
+                "date": doc.date,
+                "number": doc.number,
+                "doc_type": doc.doc_type,
+                "kind": "Продажа" if doc.doc_type == DocType.RASHOD.value else "Покупка",
+                "kontragent": kontragent.name if kontragent else "—",
+                "total": doc.total,
+                "nds": doc.nds_total,
+            }
+        )
     return rows

@@ -7,12 +7,14 @@
 """
 from __future__ import annotations
 
+import csv
+import io
 import json
 from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -83,6 +85,21 @@ def _month_range() -> tuple[str, str]:
     today = date.today()
     start = today.replace(day=1)
     return start.isoformat(), today.isoformat()
+
+
+def _csv_response(rows: list[dict], filename: str) -> Response:
+    """Формирует CSV-ответ для экспорта отчёта."""
+    output = io.StringIO()
+    if rows:
+        writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        for r in rows:
+            writer.writerow({k: str(v) for k, v in r.items()})
+    return Response(
+        output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 # --- Главная ---
@@ -1268,3 +1285,52 @@ async def report_invoices(
         request, user, "trade/report_invoices.html",
         rows=rows, kontragenty=kontragenty, kontragent_id=kontragent_id,
     )
+
+
+@router.get("/reports/turnover", response_class=HTMLResponse)
+async def report_turnover(
+    request: Request,
+    start: str | None = None,
+    end: str | None = None,
+    format: str | None = None,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    s, e = _month_range() if not (start and end) else (start, end)
+    rows = await report_service.turnover_statement(session, date.fromisoformat(s), date.fromisoformat(e))
+    if format == "csv":
+        return _csv_response(rows, "turnover.csv")
+    return _page(request, user, "trade/report_turnover.html", rows=rows, start=s, end=e)
+
+
+@router.get("/reports/item", response_class=HTMLResponse)
+async def report_item_card(
+    request: Request,
+    nomenklatura_id: int | None = None,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    nomenklatura = await catalog_service.list_all(session, cat.Nomenklatura)
+    rows = []
+    if nomenklatura_id:
+        rows = await report_service.item_card(session, nomenklatura_id)
+    return _page(
+        request, user, "trade/report_item_card.html",
+        rows=rows, nomenklatura=nomenklatura, selected_id=nomenklatura_id,
+    )
+
+
+@router.get("/reports/purchase-sales", response_class=HTMLResponse)
+async def report_purchase_sales(
+    request: Request,
+    start: str | None = None,
+    end: str | None = None,
+    format: str | None = None,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    s, e = _month_range() if not (start and end) else (start, end)
+    rows = await report_service.purchase_sales_book(session, date.fromisoformat(s), date.fromisoformat(e))
+    if format == "csv":
+        return _csv_response(rows, "purchase_sales.csv")
+    return _page(request, user, "trade/report_purchase_sales.html", rows=rows, start=s, end=e)
