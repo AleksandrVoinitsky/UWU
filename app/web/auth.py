@@ -58,6 +58,18 @@ async def logout():
     return response
 
 
+@router.get("/set-language/{lang}")
+async def set_language(lang: str, request: Request):
+    """Переключает язык интерфейса (cookie `lang`)."""
+    from app.core.i18n import SUPPORTED_LANGUAGES
+
+    target = lang if lang in SUPPORTED_LANGUAGES else "ru"
+    referer = request.headers.get("referer") or "/"
+    response = RedirectResponse(url=referer, status_code=303)
+    response.set_cookie("lang", target, samesite="lax")
+    return response
+
+
 def _render_login(request: Request, error: str | None) -> HTMLResponse:
     from app.core.config import settings as s
     from app.templates import render
