@@ -54,7 +54,7 @@ ZAKAZ_STATES = {
 }
 
 # Виды документов, у которых есть табличная часть.
-_ITEM_DOCS = {"prihod", "rashod", "peremeshenie", "spisanie", "oprihodovanie", "vvod_ostatkov"}
+_ITEM_DOCS = {"prihod", "rashod", "peremeshenie", "spisanie", "oprihodovanie", "vvod_ostatkov", "vozvrat"}
 # Документы прихода (для подсказки в форме).
 _MONEY_DOCS = {"pko", "rko", "platezhnoe_poruchenie", "vvod_ostatkov_deneg"}
 
@@ -601,6 +601,36 @@ async def zakaz_state(
         doc.extra = extra
         await session.commit()
     return RedirectResponse("/zakazy", status_code=303)
+
+
+# --- Договоры контрагентов ---
+
+
+@router.get("/dogovory", response_class=HTMLResponse)
+async def dogovory_list(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    dogovory = await catalog_service.list_all(session, cat.Dogovor)
+    kontragenty = await catalog_service.list_all(session, cat.Kontragent)
+    kg_map = {k.id: k.name for k in kontragenty}
+    return _page(request, user, "trade/dogovory.html", dogovory=dogovory, kontragenty=kontragenty, kg_map=kg_map)
+
+
+@router.post("/dogovory")
+async def dogovor_create(
+    kontragent_id: str = Form(...), name: str = Form(...), number: str = Form(""),
+    payment_term_days: str = Form(""),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    await catalog_service.create_one(
+        session, cat.Dogovor,
+        kontragent_id=int(kontragent_id), name=name, number=number or None,
+        payment_term_days=int(payment_term_days) if payment_term_days else None,
+    )
+    return RedirectResponse("/dogovory", status_code=303)
 
 
 # --- Документы ---

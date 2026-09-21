@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block page_title %}Договоры{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="card-header">
+    <h2>Договоры контрагентов <span class="muted">· {{ dogovory|length }}</span></h2>
+    <div class="flex flex-wrap">
+      <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#dog-table" placeholder="{{ t('common.search', lang) }}…"></div>
+      <button class="btn primary" data-modal-open="modal-dog">{{ t('common.create', lang) }}</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="table" id="dog-table">
+      <thead><tr><th>Контрагент</th><th>Договор</th><th>Номер</th><th class="num">Срок платежа (дн.)</th></tr></thead>
+      <tbody>
+        {% for d in dogovory %}
+        <tr data-row>
+          <td>{{ kg_map.get(d.kontragent_id, '—') }}</td>
+          <td>{{ d.name }}</td>
+          <td class="muted">{{ d.number or '—' }}</td>
+          <td class="num">{{ d.payment_term_days or '—' }}</td>
+        </tr>
+        {% else %}<tr data-empty><td colspan="4" class="muted">Нет договоров</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-dog">
+  <div class="modal">
+    <div class="modal-header"><h3>{{ t('common.create', lang) }} · Договор</h3><button class="modal-close" data-modal-close>✕</button></div>
+    <form method="post" action="/dogovory">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="field"><label>Контрагент</label>
+            <select name="kontragent_id">{% for k in kontragenty %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}</select>
+          </div>
+          <div class="field"><label>Наименование</label><input type="text" name="name" required></div>
+          <div class="field"><label>Номер</label><input type="text" name="number"></div>
+          <div class="field"><label>Срок платежа (дн.)</label><input type="number" name="payment_term_days"></div>
+        </div>
+      </div>
+      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
+        <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

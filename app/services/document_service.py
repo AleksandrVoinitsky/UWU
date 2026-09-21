@@ -31,10 +31,11 @@ _STOCK_DOC_TYPES = {
     DocType.SPISANIE,
     DocType.OPRIHODOVANIE,
     DocType.VVOD_OSTATKOV,
+    DocType.VOZVRAT,
 }
 
 # Документы прихода (формируют партии).
-_INCOMING = {DocType.PRIHOD, DocType.OPRIHODOVANIE, DocType.VVOD_OSTATKOV}
+_INCOMING = {DocType.PRIHOD, DocType.OPRIHODOVANIE, DocType.VVOD_OSTATKOV, DocType.VOZVRAT}
 
 
 class DocumentError(Exception):
