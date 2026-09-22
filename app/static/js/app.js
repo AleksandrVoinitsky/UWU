@@ -79,6 +79,7 @@
   /* ---------- Мессенджер (чаты + сообщения) ---------- */
   var fab = document.getElementById("chat-fab");
   var popup = document.getElementById("chat-popup");
+  var chatBackdrop = document.getElementById("chat-backdrop");
   var chatClose = document.getElementById("chat-close");
   var chatSend = document.getElementById("chat-send");
   var chatInput = document.getElementById("chat-input");
@@ -95,9 +96,11 @@
     var shouldOpen = open !== undefined ? open : !popup.classList.contains("open");
     if (shouldOpen) {
       popup.classList.add("open");
+      if (chatBackdrop) chatBackdrop.classList.add("open");
       loadChats();
     } else {
       popup.classList.remove("open");
+      if (chatBackdrop) chatBackdrop.classList.remove("open");
     }
   }
 
@@ -199,6 +202,7 @@
 
   if (fab) fab.addEventListener("click", function () { toggleChat(); });
   if (chatClose) chatClose.addEventListener("click", function () { toggleChat(false); });
+  if (chatBackdrop) chatBackdrop.addEventListener("click", function () { toggleChat(false); });
   if (chatSend) chatSend.addEventListener("click", send);
   if (chatInput) {
     chatInput.addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });

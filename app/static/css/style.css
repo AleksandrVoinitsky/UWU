@@ -328,9 +328,9 @@ input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.32);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -349,10 +349,13 @@ input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
   background: var(--surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  width: 100%;
-  max-width: 1100px;
-  max-height: 88vh;
-  overflow-y: auto;
+  width: 80vw;
+  height: 80vh;
+  max-width: 1200px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   transform: translateY(16px) scale(0.98);
   transition: transform 0.25s var(--ease);
 }
@@ -363,6 +366,7 @@ input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
 .modal-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 18px 22px 0;
+  flex-shrink: 0;
 }
 .modal-header h3 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
 .modal-close {
@@ -374,7 +378,9 @@ input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
 }
 .modal-close:hover { background: var(--surface-hover); color: var(--text); }
 
-.modal-body { padding: 16px 22px 22px; }
+.modal form { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.modal-body { padding: 16px 22px 22px; flex: 1; overflow-y: auto; }
+.modal-body:last-child { flex: 0 0 auto; overflow: visible; padding-top: 0; }
 
 /* ============================================================
    Плавающий чат (заглушка мессенджера)
@@ -400,6 +406,22 @@ input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
   position: absolute; top: 2px; right: 2px;
   width: 12px; height: 12px; border-radius: 50%;
   background: #6e9e76; border: 2px solid var(--accent);
+}
+
+.chat-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  z-index: 940;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s var(--ease), visibility 0.2s var(--ease);
+}
+.chat-backdrop.open {
+  opacity: 1;
+  visibility: visible;
 }
 
 .chat-popup {

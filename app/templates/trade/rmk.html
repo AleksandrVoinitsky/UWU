@@ -1,70 +1,70 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block page_title %}{{ t('menu.rmk', lang) }}{% endblock %}
 {% block content %}
 
-<!-- Кассовая смена -->
+<!-- РљР°СЃСЃРѕРІР°СЏ СЃРјРµРЅР° -->
 <div class="card" style="padding:14px 18px;margin-bottom:16px">
   <div class="flex-between flex-wrap">
     {% if shift %}
     <div class="flex flex-wrap" style="gap:20px">
-      <div><span class="muted small">Смена</span> <span class="badge posted">открыта</span></div>
-      <div><span class="muted small">Выручка</span> <span style="font-weight:600">{{ "%.2f"|format(revenue) }} ₽</span></div>
-      <div><span class="muted small">Расход</span> <span style="font-weight:600">{{ "%.2f"|format(expenses) }} ₽</span></div>
+      <div><span class="muted small">РЎРјРµРЅР°</span> <span class="badge posted">РѕС‚РєСЂС‹С‚Р°</span></div>
+      <div><span class="muted small">Р’С‹СЂСѓС‡РєР°</span> <span style="font-weight:600">{{ "%.2f"|format(revenue) }} в‚Ѕ</span></div>
+      <div><span class="muted small">Р Р°СЃС…РѕРґ</span> <span style="font-weight:600">{{ "%.2f"|format(expenses) }} в‚Ѕ</span></div>
     </div>
-    <button class="btn secondary" data-modal-open="modal-close-shift">Закрыть смену (Z-отчёт)</button>
+    <button class="btn secondary" data-modal-open="modal-close-shift">Р—Р°РєСЂС‹С‚СЊ СЃРјРµРЅСѓ (Z-РѕС‚С‡С‘С‚)</button>
     {% else %}
     <div class="flex" style="gap:10px">
-      <span class="badge neutral">Смена закрыта</span>
-      <button class="btn primary" data-modal-open="modal-open-shift">Открыть смену</button>
+      <span class="badge neutral">РЎРјРµРЅР° Р·Р°РєСЂС‹С‚Р°</span>
+      <button class="btn primary" data-modal-open="modal-open-shift">РћС‚РєСЂС‹С‚СЊ СЃРјРµРЅСѓ</button>
     </div>
     {% endif %}
   </div>
 </div>
 
-<!-- Модалка открытия смены -->
+<!-- РњРѕРґР°Р»РєР° РѕС‚РєСЂС‹С‚РёСЏ СЃРјРµРЅС‹ -->
 <div class="modal-backdrop" id="modal-open-shift">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-header"><h3>Открыть смену</h3><button class="modal-close" data-modal-close>✕</button></div>
+  <div class="modal">
+    <div class="modal-header"><h3>РћС‚РєСЂС‹С‚СЊ СЃРјРµРЅСѓ</h3><button class="modal-close" data-modal-close>вњ•</button></div>
     <form method="post" action="/rmk/shift/open">
       <div class="modal-body">
         <div class="form-row">
-          <div class="field"><label>Касса</label><select name="kassa_id"><option value="">—</option>{% for k in kassy %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}</select></div>
-          <div class="field"><label>Размен (начальный остаток)</label><input type="number" step="0.01" name="opening_amount" value="0"></div>
+          <div class="field"><label>РљР°СЃСЃР°</label><select name="kassa_id"><option value="">вЂ”</option>{% for k in kassy %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}</select></div>
+          <div class="field"><label>Р Р°Р·РјРµРЅ (РЅР°С‡Р°Р»СЊРЅС‹Р№ РѕСЃС‚Р°С‚РѕРє)</label><input type="number" step="0.01" name="opening_amount" value="0"></div>
         </div>
       </div>
       <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>Отмена</button>
-        <button type="submit" class="btn primary">Открыть</button>
+        <button type="button" class="btn secondary" data-modal-close>РћС‚РјРµРЅР°</button>
+        <button type="submit" class="btn primary">РћС‚РєСЂС‹С‚СЊ</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- Модалка закрытия смены -->
+<!-- РњРѕРґР°Р»РєР° Р·Р°РєСЂС‹С‚РёСЏ СЃРјРµРЅС‹ -->
 <div class="modal-backdrop" id="modal-close-shift">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-header"><h3>Закрыть смену (Z-отчёт)</h3><button class="modal-close" data-modal-close>✕</button></div>
+  <div class="modal">
+    <div class="modal-header"><h3>Р—Р°РєСЂС‹С‚СЊ СЃРјРµРЅСѓ (Z-РѕС‚С‡С‘С‚)</h3><button class="modal-close" data-modal-close>вњ•</button></div>
     <form method="post" action="/rmk/shift/close">
       <div class="modal-body">
-        <div class="muted small mb">Выручка: {{ "%.2f"|format(revenue) }} ₽ · Расход: {{ "%.2f"|format(expenses) }} ₽</div>
-        <div class="field"><label>Фактический остаток в кассе</label><input type="number" step="0.01" name="closing_amount" required></div>
+        <div class="muted small mb">Р’С‹СЂСѓС‡РєР°: {{ "%.2f"|format(revenue) }} в‚Ѕ В· Р Р°СЃС…РѕРґ: {{ "%.2f"|format(expenses) }} в‚Ѕ</div>
+        <div class="field"><label>Р¤Р°РєС‚РёС‡РµСЃРєРёР№ РѕСЃС‚Р°С‚РѕРє РІ РєР°СЃСЃРµ</label><input type="number" step="0.01" name="closing_amount" required></div>
       </div>
       <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>Отмена</button>
-        <button type="submit" class="btn primary">Закрыть</button>
+        <button type="button" class="btn secondary" data-modal-close>РћС‚РјРµРЅР°</button>
+        <button type="submit" class="btn primary">Р—Р°РєСЂС‹С‚СЊ</button>
       </div>
     </form>
   </div>
 </div>
 
 <div class="rmk-layout">
-  <!-- Товары -->
+  <!-- РўРѕРІР°СЂС‹ -->
   <div>
     <div class="card" style="margin-bottom:12px">
       <div class="card-header">
         <h2>{{ t('catalog.nomenklatura', lang) }}</h2>
         <div class="flex flex-wrap">
-          <div class="search-input"><span class="icon">⌕</span><input type="text" id="rmk-search" placeholder="{{ t('rmk.search', lang) }}…"></div>
+          <div class="search-input"><span class="icon">вЊ•</span><input type="text" id="rmk-search" placeholder="{{ t('rmk.search', lang) }}вЂ¦"></div>
           <div class="field" style="margin:0;min-width:160px">
             <label>{{ t('report.warehouse', lang) }}</label>
             <select id="rmk-sklad">
@@ -78,7 +78,7 @@
     </div>
   </div>
 
-  <!-- Накладная (корзина) -->
+  <!-- РќР°РєР»Р°РґРЅР°СЏ (РєРѕСЂР·РёРЅР°) -->
   <div class="rmk-cart">
     <div class="cart-header">{{ t('rmk.cart', lang) }}</div>
     <div class="cart-body">
@@ -88,20 +88,20 @@
     <div class="cart-footer">
       <div class="rmk-total">
         <span class="label">{{ t('rmk.total', lang) }}</span>
-        <span class="value" id="rmk-total">0.00 ₽</span>
+        <span class="value" id="rmk-total">0.00 в‚Ѕ</span>
       </div>
       <div class="form-row" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
         <div class="field" style="margin:0">
-          <label>Получено</label>
+          <label>РџРѕР»СѓС‡РµРЅРѕ</label>
           <input type="number" step="0.01" id="rmk-received" placeholder="0.00" oninput="recalcChange()">
         </div>
         <div class="field" style="margin:0">
-          <label>Сдача</label>
-          <div class="stat" id="rmk-change" style="font-size:20px">0.00 ₽</div>
+          <label>РЎРґР°С‡Р°</label>
+          <div class="stat" id="rmk-change" style="font-size:20px">0.00 в‚Ѕ</div>
         </div>
       </div>
       <button class="btn primary rmk-sell" id="rmk-sell">{{ t('rmk.sell', lang) }}</button>
-      <button class="btn secondary" id="rmk-return" style="width:100%;justify-content:center;margin-top:8px">Возврат</button>
+      <button class="btn secondary" id="rmk-return" style="width:100%;justify-content:center;margin-top:8px">Р’РѕР·РІСЂР°С‚</button>
     </div>
   </div>
 </div>
