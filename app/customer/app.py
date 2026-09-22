@@ -10,11 +10,12 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.customer import api, web
+from app.customer import api, miniapp, web
 
 
 def create_customer_app() -> FastAPI:
     application = FastAPI(title="UWU Shop", docs_url=None, openapi_url=None, redoc_url=None)
     application.include_router(api.router)
+    application.include_router(miniapp.router)
     application.include_router(web.router)
     return application

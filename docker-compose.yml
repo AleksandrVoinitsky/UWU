@@ -28,6 +28,7 @@ services:
       DEFAULT_CURRENCY: ${DEFAULT_CURRENCY:-RUB}
       DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-ru}
       UPLOADS_DIR: /app/uploads
+      MINIAPP_DEV: ${MINIAPP_DEV:-false}
     ports:
       - "8000:8000"
     volumes:

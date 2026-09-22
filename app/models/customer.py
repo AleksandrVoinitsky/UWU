@@ -57,3 +57,19 @@ class CartItem(Base, IdMixin):
 
     cart: Mapped[Cart] = relationship(back_populates="items")
     nomenklatura: Mapped["Nomenklatura"] = relationship()  # noqa: F821
+
+
+class CustomerBinding(Base, IdMixin, TimestampMixin):
+    """Привязка аккаунта мессенджера (Telegram/MAX) к покупателю.
+
+    Используется для MiniApp: пользователь мессенджера идентифицируется по
+    ``channel + external_id`` и связывается с учётной записью покупателя.
+    """
+
+    __tablename__ = "customer_bindings"
+
+    channel: Mapped[str] = mapped_column(String(30), nullable=False)  # telegram | maks
+    external_id: Mapped[str] = mapped_column(String(64), nullable=False)  # user id мессенджера
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False, index=True)
+
+    customer: Mapped[Customer] = relationship()

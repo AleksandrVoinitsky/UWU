@@ -69,3 +69,16 @@
 
 .shop-auth { padding: 40px 0; }
 .error { color: var(--bad); background: var(--bad-bg); border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+
+/* MiniApp / мобильные устройства */
+@media (max-width: 600px) {
+  .shop-header { padding: 10px 14px; gap: 8px; }
+  .shop-brand { font-size: 16px; }
+  .shop-nav { gap: 10px; font-size: 13px; }
+  .shop-main { padding: 14px; }
+  .shop-layout { grid-template-columns: 1fr; gap: 12px; }
+  .shop-sidebar { display: none; }
+  .product-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .product-img { height: 120px; }
+  .cart-footer { flex-direction: column; align-items: stretch; }
+}
