@@ -222,12 +222,15 @@
       if (e.target.closest("a, button, form, input, select, textarea")) return;
       var modal = document.getElementById(row.getAttribute("data-edit"));
       if (!modal) return;
+      // Все формы с data-action-pattern получают актуальный action (в т.ч. «Удалить»).
+      modal.querySelectorAll('form[data-action-pattern]').forEach(function (f) {
+        var pattern = f.getAttribute("data-action-pattern");
+        if (pattern && row.dataset.id) {
+          f.action = pattern.replace("{id}", row.dataset.id);
+        }
+      });
       var form = modal.querySelector("form");
       if (form) {
-        var pattern = form.getAttribute("data-action-pattern");
-        if (pattern && row.dataset.id) {
-          form.action = pattern.replace("{id}", row.dataset.id);
-        }
         Object.keys(row.dataset).forEach(function (key) {
           if (key === "edit" || key === "id") return;
           var field = form.querySelector('[name="' + key + '"]');

@@ -549,6 +549,24 @@ async def create_category(
     return RedirectResponse("/catalog/categories", status_code=303)
 
 
+@router.post("/catalog/categories/{item_id}/update")
+async def update_category(
+    item_id: int, name: str = Form(...), sort: str = Form("0"),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
+    try:
+        sort_value = int(sort)
+    except (TypeError, ValueError):
+        sort_value = 0
+    obj = await catalog_service.get_one(session, cat.Category, item_id)
+    if obj:
+        await catalog_service.update_one(session, obj, name=name, sort=sort_value)
+    return RedirectResponse("/catalog/categories", status_code=303)
+
+
 @router.post("/catalog/categories/{item_id}/delete")
 async def delete_category(
     item_id: int, session=Depends(get_session), user=Depends(get_current_user_from_cookie),

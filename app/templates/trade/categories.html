@@ -2,35 +2,64 @@
 {% block page_title %}Категории товаров{% endblock %}
 {% block content %}
 <div class="card">
-  <div class="card-header"><h2>Категории товаров <span class="muted">· {{ items|length }}</span></h2></div>
+  <div class="card-header">
+    <h2>Категории товаров <span class="muted">· {{ items|length }}</span></h2>
+    <div class="flex flex-wrap">
+      <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#cat-table" placeholder="{{ t('common.search', lang) }}…"></div>
+      <button class="btn primary" data-modal-open="modal-cat">{{ t('common.create', lang) }}</button>
+    </div>
+  </div>
   <div class="table-wrap">
-    <table class="table" data-table>
-      <thead><tr><th>Наименование</th><th class="num">Порядок</th><th></th></tr></thead>
+    <table class="table" id="cat-table">
+      <thead><tr><th>{{ t('common.name', lang) }}</th><th class="num">Порядок</th></tr></thead>
       <tbody>
         {% for c in items %}
-        <tr>
+        <tr data-row data-edit="modal-cat-edit" data-id="{{ c.id }}" data-name="{{ c.name }}" data-sort="{{ c.sort }}" style="cursor:pointer" title="Нажмите для редактирования">
           <td>{{ c.name }}</td>
           <td class="num">{{ c.sort }}</td>
-          <td class="num">
-            <form method="post" action="/catalog/categories/{{ c.id }}/delete" onsubmit="return confirm('Удалить категорию?')">
-              <button class="btn text small danger" type="submit">Удалить</button>
-            </form>
-          </td>
         </tr>
-        {% endfor %}
+        {% else %}<tr data-empty><td colspan="2" class="muted">Нет записей</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-<div class="card">
-  <div class="card-header"><h2>Добавить категорию</h2></div>
-  <form method="post" action="/catalog/categories">
-    <div class="form-row">
-      <div class="field"><label>Наименование</label><input type="text" name="name" required></div>
-      <div class="field"><label>Порядок</label><input type="number" name="sort" value="0"></div>
-    </div>
-    <div class="form-actions"><button type="submit" class="btn primary">{{ t('common.save', lang) }}</button></div>
-  </form>
+<div class="modal-backdrop" id="modal-cat">
+  <div class="modal">
+    <div class="modal-header"><h3>{{ t('common.create', lang) }} · Категория</h3><button class="modal-close" data-modal-close>✕</button></div>
+    <form method="post" action="/catalog/categories">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+          <div class="field"><label>Порядок</label><input type="number" name="sort" value="0"></div>
+        </div>
+      </div>
+      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
+        <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-cat-edit">
+  <div class="modal">
+    <div class="modal-header"><h3>{{ t('common.edit', lang) }} · Категория</h3><button class="modal-close" data-modal-close>✕</button></div>
+    <form method="post" action="" data-action-pattern="/catalog/categories/{id}/update">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="field"><label>{{ t('common.name', lang) }}</label><input type="text" name="name" required></div>
+          <div class="field"><label>Порядок</label><input type="number" name="sort" value="0"></div>
+        </div>
+      </div>
+      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
+        <button type="submit" class="btn primary">{{ t('common.save', lang) }}</button>
+      </div>
+    </form>
+    <form method="post" action="" data-action-pattern="/catalog/categories/{id}/delete" onsubmit="return confirm('Удалить категорию?')" style="padding:0 16px 16px">
+      <button type="submit" class="btn danger">{{ t('common.delete', lang) }}</button>
+    </form>
+  </div>
 </div>
 {% endblock %}

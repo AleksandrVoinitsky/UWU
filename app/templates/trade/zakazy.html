@@ -12,12 +12,12 @@
   </div>
   <div class="table-wrap">
     <table class="table" id="zakaz-table">
-      <thead><tr><th>№</th><th>Дата</th><th>Покупатель</th><th class="num">Сумма</th><th>Состояние</th><th></th></tr></thead>
+      <thead><tr><th>№</th><th>Дата</th><th>Покупатель</th><th class="num">Сумма</th><th>Состояние</th></tr></thead>
       <tbody>
         {% for z in zakazy %}
         {% set extra = z.extra or {} %}
         {% set st = extra.get('state', 'new') %}
-        <tr data-row data-toggle-detail data-target="zakaz-{{ z.id }}" style="cursor:pointer">
+        <tr data-row data-modal-open="modal-zakaz-{{ z.id }}" style="cursor:pointer" title="Открыть заявку">
           <td>{{ z.number }}</td>
           <td>{{ z.date }}</td>
           <td>
@@ -32,44 +32,68 @@
           <td>
             <span class="badge {% if st == 'done' %}posted{% elif st == 'cancelled' %}deleted{% elif st == 'in_work' %}draft{% else %}neutral{% endif %}">{{ ZAKAZ_STATES.get(st, st) }}</span>
           </td>
-          <td>
-            <div class="flex" style="gap:4px;justify-content:flex-end">
-              {% if st in ['new', 'in_work'] %}
-              <form method="post" action="/zakazy/{{ z.id }}/reserve"><button class="btn text small">Резерв</button></form>
-              <form method="post" action="/zakazy/{{ z.id }}/ship" onsubmit="return confirm('Отгрузить заявку и создать расходную накладную?')"><button class="btn text small">Отгрузить</button></form>
-              {% endif %}
-              {% if st == 'new' %}
-              <form method="post" action="/zakazy/{{ z.id }}/state"><input type="hidden" name="state" value="in_work"><button class="btn text small">В работу</button></form>
-              {% elif st == 'in_work' %}
-              <form method="post" action="/zakazy/{{ z.id }}/state"><input type="hidden" name="state" value="done"><button class="btn text small">Выполнить</button></form>
-              {% endif %}
-              {% if st in ['new', 'in_work'] %}
-              <form method="post" action="/zakazy/{{ z.id }}/state"><input type="hidden" name="state" value="cancelled"><button class="btn text small danger">Отменить</button></form>
-              {% endif %}
-            </div>
-          </td>
-        </tr>
-        <tr class="zakaz-detail" id="zakaz-{{ z.id }}" hidden>
-          <td colspan="6">
-            <table class="table">
-              <thead><tr><th>Товар</th><th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th></tr></thead>
-              <tbody>
-                {% for it in zakaz_items.get(z.id, []) %}
-                <tr><td>{{ it.name }}</td><td class="num">{{ it.quantity }}</td><td class="num">{{ "%.2f"|format(it.price) }}</td><td class="num">{{ "%.2f"|format(it.amount) }}</td></tr>
-                {% else %}
-                <tr><td colspan="4" class="muted">Нет позиций</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </td>
         </tr>
         {% else %}
-        <tr data-empty><td colspan="6" class="muted">Нет заявок</td></tr>
+        <tr data-empty><td colspan="5" class="muted">Нет заявок</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+{% for z in zakazy %}
+{% set extra = z.extra or {} %}
+{% set st = extra.get('state', 'new') %}
+<div class="modal-backdrop" id="modal-zakaz-{{ z.id }}">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header"><h3>Заявка {{ z.number }}</h3><button class="modal-close" data-modal-close>✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="field">
+          <label>Покупатель</label>
+          {% if extra.get('source') == 'customer' %}
+            <div>{{ extra.get('customer_name') or 'Покупатель' }}</div>
+            <div class="muted small">{{ extra.get('customer_phone') or '' }}</div>
+          {% else %}
+            <div>{{ kg_map.get(z.kontragent_id, '—') if z.kontragent_id else '—' }}</div>
+          {% endif %}
+        </div>
+        <div class="field"><label>{{ t('report.date', lang) }}</label><div>{{ z.date }}</div></div>
+        <div class="field"><label>Сумма</label><div style="font-weight:600">{{ "%.2f"|format(z.total) }} ₽</div></div>
+        <div class="field"><label>Состояние</label>
+          <span class="badge {% if st == 'done' %}posted{% elif st == 'cancelled' %}deleted{% elif st == 'in_work' %}draft{% else %}neutral{% endif %}">{{ ZAKAZ_STATES.get(st, st) }}</span>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:8px">
+        <table class="table">
+          <thead><tr><th>Товар</th><th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th></tr></thead>
+          <tbody>
+            {% for it in zakaz_items.get(z.id, []) %}
+            <tr><td>{{ it.name }}</td><td class="num">{{ it.quantity }}</td><td class="num">{{ "%.2f"|format(it.price) }}</td><td class="num">{{ "%.2f"|format(it.amount) }}</td></tr>
+            {% else %}
+            <tr><td colspan="4" class="muted">Нет позиций</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-body" style="padding-top:0;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      {% if st in ['new', 'in_work'] %}
+      <form method="post" action="/zakazy/{{ z.id }}/reserve"><button class="btn secondary">Резерв</button></form>
+      <form method="post" action="/zakazy/{{ z.id }}/ship" onsubmit="return confirm('Отгрузить заявку и создать расходную накладную?')"><button class="btn secondary">Отгрузить</button></form>
+      {% endif %}
+      {% if st == 'new' %}
+      <form method="post" action="/zakazy/{{ z.id }}/state"><input type="hidden" name="state" value="in_work"><button class="btn primary">В работу</button></form>
+      {% elif st == 'in_work' %}
+      <form method="post" action="/zakazy/{{ z.id }}/state"><input type="hidden" name="state" value="done"><button class="btn primary">Выполнить</button></form>
+      {% endif %}
+      {% if st in ['new', 'in_work'] %}
+      <form method="post" action="/zakazy/{{ z.id }}/state"><input type="hidden" name="state" value="cancelled"><button class="btn danger">Отменить</button></form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endfor %}
 
 <div class="modal-backdrop" id="modal-zakaz">
   <div class="modal">
@@ -110,14 +134,5 @@ function addZakazRow() {
   clone.querySelectorAll('input').forEach(i => i.value = '');
   document.getElementById('zakaz-items').appendChild(clone);
 }
-
-/* Раскрытие позиций заявки по клику на строку (игнорируем кнопки/формы). */
-document.querySelectorAll('tr[data-toggle-detail]').forEach(function (row) {
-  row.addEventListener('click', function (e) {
-    if (e.target.closest('a, button, form, input, select, textarea')) return;
-    var target = document.getElementById(row.getAttribute('data-target'));
-    if (target) target.hidden = !target.hidden;
-  });
-});
 </script>
 {% endblock %}
