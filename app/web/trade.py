@@ -97,14 +97,30 @@ def _deny(user: User, perm: str) -> Response | None:
     return None
 
 
+# Символы, с которых Excel/Google Sheets трактуют ячейку как формулу.
+# Экранируем их, чтобы пользовательские данные не превращались в формулы
+# (CSV/формульная инъекция). Минус не экранируем — отрицательные суммы легитимны.
+_CSV_FORMULA_PREFIXES = ("=", "+", "@", "\t", "\r")
+
+
+def _sanitize_csv_cell(value: object) -> str:
+    """Экранирует значение ячейки CSV от формульной инъекции."""
+    text = str(value)
+    stripped = text.lstrip()
+    if stripped.startswith(_CSV_FORMULA_PREFIXES):
+        return "'" + text
+    return text
+
+
 def _csv_response(rows: list[dict], filename: str) -> Response:
-    """Формирует CSV-ответ для экспорта отчёта."""
+    """Формирует CSV-ответ для экспорта отчёта (с UTF-8 BOM для Excel)."""
     output = io.StringIO()
+    output.write("\ufeff")  # BOM: корректная кириллица при открытии в Excel.
     if rows:
         writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         for r in rows:
-            writer.writerow({k: str(v) for k, v in r.items()})
+            writer.writerow({k: _sanitize_csv_cell(v) for k, v in r.items()})
     return Response(
         output.getvalue(),
         media_type="text/csv",

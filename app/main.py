@@ -32,8 +32,11 @@ _SKIP_REQUEST_LOG_PREFIXES = ("/static", "/uploads", "/healthz")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Инициализация при старте: сид начальных данных."""
+    """Инициализация при старте: проверка настроек и сид начальных данных."""
     logger.info("Starting application '%s'", settings.app_name)
+    from app.core.security import validate_security_settings
+
+    validate_security_settings()
     async with async_session_factory() as session:
         await seed_service.seed_all(session)
     logger.info("Application started")

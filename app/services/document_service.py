@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -55,13 +55,36 @@ class DocumentError(Exception):
     """Ошибка валидации документа."""
 
 
+# Пространство advisory-lock PostgreSQL для нумерации документов.
+# Защищает от гонок при одновременном создании документов одного вида.
+_DOCNUM_LOCK_NAMESPACE = 42
+
+
 async def next_document_number(session: AsyncSession, doc_type: DocType) -> str:
-    """Генерирует следующий номер документа (с префиксом ИБ)."""
+    """Генерирует следующий номер документа (с префиксом ИБ).
+
+    Номер считается от максимального существующего (а не от количества строк),
+    чтобы после удаления документов не возникало дублей. Конкурентные вызовы
+    сериализуются advisory-lock'ом PostgreSQL, удерживаемым до конца транзакции.
+    """
     prefix = await _get_prefix(session)
     base = f"{prefix}{doc_type.value[:2].upper()}"
-    stmt = select(func.count(Document.id)).where(Document.doc_type == doc_type.value)
-    count = (await session.execute(stmt)).scalar() or 0
-    return f"{base}-{count + 1:05d}"
+
+    # Сериализуем генерацию номера на время транзакции.
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(:ns, hashtext(:key))"),
+        {"ns": _DOCNUM_LOCK_NAMESPACE, "key": f"uwu_docnum_{doc_type.value}"},
+    )
+
+    stmt = select(func.max(Document.number)).where(Document.doc_type == doc_type.value)
+    max_number = (await session.execute(stmt)).scalar()
+    last = 0
+    if max_number:
+        try:
+            last = int(str(max_number).rsplit("-", 1)[1])
+        except (ValueError, IndexError):
+            last = 0
+    return f"{base}-{last + 1:05d}"
 
 
 async def _get_prefix(session: AsyncSession) -> str:

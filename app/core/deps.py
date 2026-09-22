@@ -38,10 +38,10 @@ async def get_current_user(
     """Возвращает текущего пользователя из Bearer-токена."""
     if not token:
         raise _CREDENTIALS_ERROR
-    subject = decode_access_token(token)
-    if subject is None:
+    user_id = decode_access_token(token)
+    if user_id is None:
         raise _CREDENTIALS_ERROR
-    user = await _load_user(session, int(subject))
+    user = await _load_user(session, user_id)
     if user is None or not user.is_active:
         raise _CREDENTIALS_ERROR
     return user
@@ -83,10 +83,10 @@ async def get_current_user_optional(
     token = request.cookies.get("access_token")
     if not token:
         return None
-    subject = decode_access_token(token)
-    if subject is None:
+    user_id = decode_access_token(token)
+    if user_id is None:
         return None
-    user = await _load_user(session, int(subject))
+    user = await _load_user(session, user_id)
     if user is None or not user.is_active:
         return None
     return user
