@@ -76,37 +76,29 @@
 
   document.querySelectorAll("input[data-search]").forEach(initSearch);
 
-  /* ---------- Плавающий чат (заглушка мессенджера) ---------- */
+  /* ---------- Мессенджер (чаты + сообщения) ---------- */
   var fab = document.getElementById("chat-fab");
   var popup = document.getElementById("chat-popup");
   var chatClose = document.getElementById("chat-close");
   var chatSend = document.getElementById("chat-send");
   var chatInput = document.getElementById("chat-input");
   var chatMessages = document.getElementById("chat-messages");
+  var chatList = document.getElementById("chat-list");
+  var chatSearch = document.getElementById("chat-search");
+  var chatCurrentName = document.getElementById("chat-current-name");
+
+  var allChats = [];
+  var currentChatId = null;
 
   function toggleChat(open) {
     if (!popup) return;
     var shouldOpen = open !== undefined ? open : !popup.classList.contains("open");
     if (shouldOpen) {
       popup.classList.add("open");
-      if (chatInput) setTimeout(function () { chatInput.focus(); }, 120);
+      loadChats();
     } else {
       popup.classList.remove("open");
     }
-  }
-
-  if (fab) fab.addEventListener("click", function () { toggleChat(); });
-  if (chatClose) chatClose.addEventListener("click", function () { toggleChat(false); });
-
-  function addMessage(text, kind) {
-    if (!chatMessages) return;
-    var el = document.createElement("div");
-    el.className = "msg " + (kind || "incoming");
-    var now = new Date();
-    var time = now.getHours() + ":" + String(now.getMinutes()).padStart(2, "0");
-    el.innerHTML = '<span>' + escapeHtml(text) + '</span><span class="time">' + time + "</span>";
-    chatMessages.appendChild(el);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
   function escapeHtml(s) {
@@ -115,22 +107,103 @@
     });
   }
 
-  function send() {
-    if (!chatInput || !chatInput.value.trim()) return;
-    addMessage(chatInput.value.trim(), "outgoing");
-    chatInput.value = "";
-    // Заглушка ответа (пока мессенджер не подключён к реальному бэкенду).
-    setTimeout(function () {
-      addMessage("Сообщение получено. Мессенджер находится в разработке.", "incoming");
-    }, 600);
+  function fmtTime(iso) {
+    if (!iso) return "";
+    var d = new Date(iso);
+    return d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0");
   }
 
-  if (chatSend) chatSend.addEventListener("click", send);
-  if (chatInput) {
-    chatInput.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") send();
+  function channelLabel(channel) {
+    return { internal: "Клиент", telegram: "Telegram", maks: "Макс" }[channel] || channel;
+  }
+
+  function loadChats() {
+    fetch("/api/chats")
+      .catch(function () { return { json: function () { return []; } }; })
+      .then(function (r) { return r.json(); })
+      .then(function (chats) {
+        allChats = chats || [];
+        renderChatList();
+      })
+      .catch(function () {});
+  }
+
+  function renderChatList() {
+    if (!chatList) return;
+    var q = (chatSearch && chatSearch.value || "").toLowerCase().trim();
+    chatList.innerHTML = "";
+    allChats.forEach(function (c) {
+      if (q && c.name.toLowerCase().indexOf(q) === -1) return;
+      var el = document.createElement("div");
+      el.className = "chat-item" + (c.id === currentChatId ? " active" : "");
+      el.innerHTML =
+        '<div class="chat-avatar"></div>' +
+        '<div class="chat-info"><div class="chat-name"></div><div class="chat-last"></div></div>' +
+        '<span class="chat-badge"></span>';
+      el.querySelector(".chat-avatar").textContent = (c.name[0] || "?").toUpperCase();
+      el.querySelector(".chat-name").textContent = c.name;
+      el.querySelector(".chat-last").textContent = channelLabel(c.channel);
+      el.querySelector(".chat-badge").textContent = channelLabel(c.channel);
+      el.addEventListener("click", function () { openChat(c); });
+      chatList.appendChild(el);
     });
   }
+
+  function openChat(c) {
+    currentChatId = c.id;
+    if (chatCurrentName) chatCurrentName.textContent = c.name;
+    renderChatList();
+    fetch("/api/chats/" + c.id + "/messages")
+      .then(function (r) { return r.json(); })
+      .then(function (msgs) { renderMessages(msgs || []); })
+      .catch(function () {});
+  }
+
+  function renderMessages(msgs) {
+    if (!chatMessages) return;
+    chatMessages.innerHTML = "";
+    if (!msgs.length) {
+      chatMessages.innerHTML = '<div class="messenger-empty">Нет сообщений</div>';
+      return;
+    }
+    msgs.forEach(function (m) {
+      var el = document.createElement("div");
+      el.className = "msg " + (m.direction === "in" ? "incoming" : "outgoing");
+      el.innerHTML = '<span></span><span class="time">' + fmtTime(m.created_at) + "</span>";
+      el.querySelector("span").textContent = m.text;
+      chatMessages.appendChild(el);
+    });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function send() {
+    if (!chatInput || !chatInput.value.trim() || !currentChatId) return;
+    var text = chatInput.value.trim();
+    chatInput.value = "";
+    fetch("/api/chats/" + currentChatId + "/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (m) {
+        var el = document.createElement("div");
+        el.className = "msg outgoing";
+        el.innerHTML = '<span></span><span class="time">' + fmtTime(m.created_at) + "</span>";
+        el.querySelector("span").textContent = m.text;
+        chatMessages.appendChild(el);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      })
+      .catch(function () {});
+  }
+
+  if (fab) fab.addEventListener("click", function () { toggleChat(); });
+  if (chatClose) chatClose.addEventListener("click", function () { toggleChat(false); });
+  if (chatSend) chatSend.addEventListener("click", send);
+  if (chatInput) {
+    chatInput.addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
+  }
+  if (chatSearch) chatSearch.addEventListener("input", renderChatList);
 
   /* ---------- Боковое меню: клик-переключатель (для тач-устройств) ---------- */
   document.querySelectorAll(".nav-group-header").forEach(function (header) {

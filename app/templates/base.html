@@ -116,19 +116,25 @@
   </button>
 
   <div id="chat-popup" class="chat-popup">
-    <div class="chat-header">
-      <div>
-        <div class="title">{{ t('chat.title', lang) }}</div>
-        <div class="status">{{ t('chat.status', lang) }}</div>
+    <div class="messenger">
+      <div class="messenger-sidebar">
+        <div class="messenger-sidebar-header">
+          <span>{{ t('chat.title', lang) }}</span>
+          <button id="chat-close" class="modal-close" aria-label="Закрыть">✕</button>
+        </div>
+        <div class="messenger-search"><input id="chat-search" type="text" placeholder="{{ t('common.search', lang) }}…"></div>
+        <div class="messenger-chat-list" id="chat-list"></div>
       </div>
-      <button id="chat-close" class="modal-close" aria-label="Закрыть">✕</button>
-    </div>
-    <div id="chat-messages" class="chat-messages">
-      <div class="msg incoming"><span>{{ t('chat.greeting', lang) }}</span><span class="time">—</span></div>
-    </div>
-    <div class="chat-input">
-      <input id="chat-input" type="text" placeholder="{{ t('chat.placeholder', lang) }}">
-      <button id="chat-send" class="btn primary small">➤</button>
+      <div class="messenger-main">
+        <div class="messenger-main-header" id="chat-current-name">Выберите чат</div>
+        <div class="messenger-messages" id="chat-messages">
+          <div class="messenger-empty">Выберите чат для просмотра сообщений</div>
+        </div>
+        <div class="messenger-input">
+          <input id="chat-input" type="text" placeholder="{{ t('chat.placeholder', lang) }}">
+          <button id="chat-send" class="btn primary">➤</button>
+        </div>
+      </div>
     </div>
   </div>
   {% endif %}

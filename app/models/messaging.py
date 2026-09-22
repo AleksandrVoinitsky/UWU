@@ -1,0 +1,46 @@
+"""Мессенджер: чаты и сообщения (основа для интеграции с ботами).
+
+Чаты привязаны к клиентам (контрагентам) и к каналам (Макс, Telegram и т.д.).
+Сама интеграция с ботами пока не реализована — заложена модель и API.
+
+См. также: :mod:`app.models.base`.
+"""
+from __future__ import annotations
+
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.database import Base
+from app.models.base import IdMixin, TimestampMixin
+
+
+class Chat(Base, IdMixin, TimestampMixin):
+    """Чат с клиентом или ботом."""
+
+    __tablename__ = "chats"
+
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    channel: Mapped[str] = mapped_column(String(30), default="internal", nullable=False)  # internal | telegram | maks
+    kontragent_id: Mapped[int | None] = mapped_column(ForeignKey("kontragenty.id"), nullable=True)
+    last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    messages: Mapped[list["Message"]] = relationship(
+        back_populates="chat", cascade="all, delete-orphan", order_by="Message.id"
+    )
+
+
+class Message(Base, IdMixin):
+    """Сообщение в чате."""
+
+    __tablename__ = "messages"
+
+    chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id"), nullable=False, index=True)
+    direction: Mapped[str] = mapped_column(String(10), default="out", nullable=False)  # in | out
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    chat: Mapped[Chat] = relationship(back_populates="messages")

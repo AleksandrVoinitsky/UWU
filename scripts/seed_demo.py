@@ -21,6 +21,7 @@ from app.core.database import async_session_factory  # noqa: E402
 from app.models import catalog as cat  # noqa: E402
 from app.models.enums import DocSubtype, DocType  # noqa: E402
 from app.services import catalog_service, document_service  # noqa: E402
+from sqlalchemy import func, select  # noqa: E402
 
 # (наименование, закупочная, розничная)
 NOMENKLATURA = [
@@ -104,8 +105,26 @@ async def main() -> None:
                 await catalog_service.create_one(session, cat.Kontragent, code=code, name=name, inn=str(random.randint(7700000000, 7799999999)))
             kontragenty = await catalog_service.list_all(session, cat.Kontragent)
 
+        # Чаты мессенджера (клиенты + боты).
+        from app.models.messaging import Chat, Message
+        chat_count = (await session.execute(select(func.count(Chat.id)))).scalar()
+        if not chat_count:
+            for kg in kontragenty[:3]:
+                chat = Chat(name=kg.name, channel="client", kontragent_id=kg.id)
+                session.add(chat)
+                await session.flush()
+                session.add(Message(chat_id=chat.id, direction="in", text="Здравствуйте! Интересует наличие товара на складе."))
+            maks = Chat(name="Макс (бот)", channel="maks")
+            session.add(maks)
+            await session.flush()
+            session.add(Message(chat_id=maks.id, direction="in", text="Привет! Я бот Макс — помогу с заказами и статусами."))
+            tg = Chat(name="Telegram (бот)", channel="telegram")
+            session.add(tg)
+            await session.flush()
+            session.add(Message(chat_id=tg.id, direction="in", text="Подключение к Telegram настраивается."))
+            await session.commit()
+
         # Проверяем, есть ли уже документы (идемпотентность).
-        from sqlalchemy import select, func
         from app.models.document.base_document import Document
         count = (await session.execute(select(func.count(Document.id)))).scalar()
         if count:
