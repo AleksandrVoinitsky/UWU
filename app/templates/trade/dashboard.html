@@ -1,29 +1,170 @@
 {% extends "base.html" %}
 {% block page_title %}{{ t('menu.dashboard', lang) }}{% endblock %}
+
+{% macro delta(value) -%}
+  {% if value is not none %}
+    {% if value > 0 %}<span class="delta up">▲ {{ "%.1f"|format(value) }}%</span>
+    {% elif value < 0 %}<span class="delta down">▼ {{ "%.1f"|format(value|abs) }}%</span>
+    {% else %}<span class="delta neutral">±0%</span>{% endif %}
+  {% else %}<span class="delta neutral">—</span>{% endif %}
+{%- endmacro %}
+
 {% block content %}
-<div class="grid">
-  <div class="card">
-    <div class="stat">{{ "%.2f"|format(money) }}</div>
-    <div class="stat-label">{{ t('report.money', lang) }}</div>
+
+<!-- Период -->
+<div class="card" style="padding:12px 18px;margin-bottom:16px">
+  <div class="flex-between flex-wrap" style="gap:12px">
+    <div class="period-pills">
+      {% for key, label in periods.items() %}
+      <a class="pill {% if period == key %}active{% endif %}" href="/?period={{ key }}">{{ t(label, lang) }}</a>
+      {% endfor %}
+    </div>
+    <form class="flex" method="get" action="/" style="gap:8px;align-items:center">
+      <input type="date" name="start" value="{{ start.isoformat() }}">
+      <span class="muted">—</span>
+      <input type="date" name="end" value="{{ end.isoformat() }}">
+      <button class="btn secondary small" type="submit">OK</button>
+    </form>
   </div>
-  <div class="card">
-    <div class="stat">{{ stock_items }}</div>
-    <div class="stat-label">{{ t('report.stock', lang) }} · позиций</div>
+  <div class="muted small" style="margin-top:6px">{{ start }} — {{ end }} · {{ t('dashboard.vs_prev', lang) }}</div>
+</div>
+
+<!-- KPI -->
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-label">{{ t('dashboard.revenue', lang) }}</div>
+    <div class="kpi-value">{{ "%.2f"|format(cur.revenue) }} ₽</div>
+    {{ delta(deltas.revenue) }}
   </div>
-  <div class="card">
-    <div class="stat">{{ "%.2f"|format(total_stock_value) }}</div>
-    <div class="stat-label">{{ t('report.cost', lang) }} склада</div>
+  <div class="kpi-card">
+    <div class="kpi-label">{{ t('dashboard.profit', lang) }}</div>
+    <div class="kpi-value">{{ "%.2f"|format(cur.profit) }} ₽</div>
+    {{ delta(deltas.profit) }}
   </div>
-  <div class="card">
-    <div class="stat">{{ nomen_count }}</div>
-    <div class="stat-label">{{ t('catalog.nomenklatura', lang) }}</div>
+  <div class="kpi-card">
+    <div class="kpi-label">{{ t('dashboard.avg_check', lang) }}</div>
+    <div class="kpi-value">{{ "%.2f"|format(cur.avg_check) }} ₽</div>
+    {{ delta(deltas.avg_check) }}
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">{{ t('dashboard.sales_count', lang) }}</div>
+    <div class="kpi-value">{{ cur.orders_count }}</div>
+    {{ delta(deltas.orders_count) }}
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">{{ t('dashboard.purchases', lang) }}</div>
+    <div class="kpi-value">{{ "%.2f"|format(cur.purchases) }} ₽</div>
+    {{ delta(deltas.purchases) }}
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">{{ t('dashboard.money_balance', lang) }}</div>
+    <div class="kpi-value">{{ "%.2f"|format(money) }} ₽</div>
+    <span class="delta neutral">{{ t('dashboard.period', lang) }}: сейчас</span>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">{{ t('dashboard.stock_value', lang) }}</div>
+    <div class="kpi-value">{{ "%.2f"|format(stock_value) }} ₽</div>
+    <span class="delta neutral">{{ stock_items }} {{ t('dashboard.units', lang) }}</span>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">{{ t('dashboard.receivable', lang) }}</div>
+    <div class="kpi-value">{{ "%.2f"|format(receivable) }} ₽</div>
+    <span class="delta neutral">—</span>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">{{ t('dashboard.payable', lang) }}</div>
+    <div class="kpi-value">{{ "%.2f"|format(payable) }} ₽</div>
+    <span class="delta neutral">—</span>
   </div>
 </div>
 
-<div class="card">
+<!-- График по дням -->
+<div class="card" style="margin-top:16px">
   <div class="card-header">
-    <h2>Быстрые действия</h2>
+    <h2>{{ t('dashboard.by_day', lang) }}</h2>
+    <span class="muted small">{{ start }} — {{ end }}</span>
   </div>
+  <div class="chart-box"><canvas id="daily-chart"></canvas></div>
+</div>
+
+<!-- Топы -->
+<div class="dash-grid">
+  <div class="card">
+    <div class="card-header"><h2>{{ t('dashboard.top_items', lang) }}</h2></div>
+    {% if top_items %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>{{ t('common.name', lang) }}</th><th class="num">{{ t('dashboard.units', lang) }}</th><th class="num">{{ t('dashboard.amount', lang) }}</th></tr></thead>
+        <tbody>
+          {% for r in top_items %}
+          <tr><td>{{ r.name }}</td><td class="num">{{ r.quantity }}</td><td class="num">{{ "%.2f"|format(r.amount) }} ₽</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}<div class="muted small" style="padding:8px 0">{{ t('rmk.empty', lang) }}</div>{% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h2>{{ t('dashboard.top_clients', lang) }}</h2></div>
+    {% if top_clients %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>{{ t('common.name', lang) }}</th><th class="num">{{ t('dashboard.amount', lang) }}</th></tr></thead>
+        <tbody>
+          {% for r in top_clients %}
+          <tr><td>{{ r.name }}</td><td class="num">{{ "%.2f"|format(r.amount) }} ₽</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}<div class="muted small" style="padding:8px 0">{{ t('rmk.empty', lang) }}</div>{% endif %}
+  </div>
+</div>
+
+<!-- Последние продажи -->
+<div class="card">
+  <div class="card-header"><h2>{{ t('dashboard.recent_sales', lang) }}</h2><a class="btn text small" href="/documents">{{ t('menu.documents', lang) }} →</a></div>
+  {% if recent_sales %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>{{ t('report.date', lang) }}</th><th>№</th><th>{{ t('catalog.kontragenty', lang) }}</th><th class="num">{{ t('dashboard.amount', lang) }}</th><th class="num">{{ t('dashboard.profit', lang) }}</th></tr></thead>
+      <tbody>
+        {% for r in recent_sales %}
+        <tr>
+          <td>{{ r.date }}</td>
+          <td>{{ r.number }}</td>
+          <td>{{ r.kontragent or '—' }}</td>
+          <td class="num">{{ "%.2f"|format(r.total) }} ₽</td>
+          <td class="num">{{ "%.2f"|format(r.profit) }} ₽</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<div class="muted small" style="padding:8px 0">{{ t('rmk.empty', lang) }}</div>{% endif %}
+</div>
+
+<!-- Низкие остатки -->
+<div class="card">
+  <div class="card-header"><h2>{{ t('dashboard.low_stock', lang) }}</h2><a class="btn text small" href="/reports/stock">{{ t('report.stock', lang) }} →</a></div>
+  {% if low_stock %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>{{ t('common.name', lang) }}</th><th class="num">{{ t('report.quantity', lang) }}</th></tr></thead>
+      <tbody>
+        {% for r in low_stock %}
+        <tr><td>{{ r.name }}</td><td class="num {% if r.quantity <= 0 %}muted{% endif %}">{{ r.quantity }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<div class="muted small" style="padding:8px 0">{{ t('rmk.empty', lang) }}</div>{% endif %}
+</div>
+
+<!-- Быстрые действия -->
+<div class="card">
+  <div class="card-header"><h2>{{ t('dashboard.quick_actions', lang) }}</h2></div>
   <div class="flex flex-wrap">
     <a class="btn primary" href="/documents/new?doc_type=rashod">{{ t('doc.rashod', lang) }}</a>
     <a class="btn secondary" href="/documents/new?doc_type=prihod">{{ t('doc.prihod', lang) }}</a>
@@ -32,4 +173,33 @@
     <a class="btn text" href="/documents">{{ t('menu.documents', lang) }} →</a>
   </div>
 </div>
+
+<script src="/static/js/chart.umd.min.js"></script>
+<script>
+(function () {
+  var labels = {{ chart_labels_json | safe }};
+  var revenue = {{ chart_revenue_json | safe }};
+  var profit = {{ chart_profit_json | safe }};
+  new Chart(document.getElementById('daily-chart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: {{ t('dashboard.revenue', lang) | tojson }}, data: revenue, borderColor: '#0a84ff', backgroundColor: 'rgba(10,132,255,0.08)', tension: 0.3, fill: true },
+        { label: {{ t('dashboard.profit', lang) | tojson }}, data: profit, borderColor: '#30d158', backgroundColor: 'rgba(48,209,88,0.08)', tension: 0.3, fill: true }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { color: '#8e8e93' } } },
+      scales: {
+        x: { ticks: { color: '#8e8e93', maxTicksLimit: 12 } },
+        y: { ticks: { color: '#8e8e93' }, grid: { color: 'rgba(120,120,128,0.12)' } }
+      }
+    }
+  });
+})();
+</script>
 {% endblock %}

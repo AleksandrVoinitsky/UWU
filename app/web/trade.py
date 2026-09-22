@@ -11,7 +11,7 @@ import csv
 import io
 import json
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -90,6 +90,67 @@ def _month_range() -> tuple[str, str]:
     return start.isoformat(), today.isoformat()
 
 
+# --- Периоды дашборда ---
+
+DASHBOARD_PERIODS = {
+    "today": "period.today",
+    "7d": "period.7d",
+    "30d": "period.30d",
+    "this_month": "period.this_month",
+    "last_month": "period.last_month",
+    "quarter": "period.quarter",
+}
+
+
+def _period_range(period: str, today: date) -> tuple[date, date]:
+    """Возвращает (start, end) для предустановленного периода."""
+    if period == "today":
+        return today, today
+    if period == "7d":
+        return today - timedelta(days=6), today
+    if period == "30d":
+        return today - timedelta(days=29), today
+    if period == "last_month":
+        first_this = today.replace(day=1)
+        last_prev = first_this - timedelta(days=1)
+        return last_prev.replace(day=1), last_prev
+    if period == "quarter":
+        quarter_start_month = ((today.month - 1) // 3) * 3 + 1
+        return today.replace(month=quarter_start_month, day=1), today
+    # По умолчанию — текущий месяц.
+    return today.replace(day=1), today
+
+
+def _resolve_period(
+    period: str | None, start: str | None, end: str | None, today: date
+) -> tuple[date, date, date, date]:
+    """Возвращает (start, end, prev_start, prev_end) для выбранного периода.
+
+    Предыдущий период — той же длины, непосредственно перед текущим.
+    """
+    if start and end:
+        try:
+            s = date.fromisoformat(start)
+            e = date.fromisoformat(end)
+        except ValueError:
+            s, e = _period_range("this_month", today)
+    else:
+        s, e = _period_range(period or "this_month", today)
+    if s > e:
+        s, e = e, s
+    length = (e - s).days + 1
+    prev_end = s - timedelta(days=1)
+    prev_start = prev_end - timedelta(days=length - 1)
+    return s, e, prev_start, prev_end
+
+
+def _pct_change(current: Decimal, previous: Decimal) -> float | None:
+    """Процентное изменение current к previous; None, если база нулевая."""
+    if previous is None or previous == 0:
+        return None
+    return float((current - previous) / previous * 100)
+
+
 def _deny(user: User, perm: str) -> Response | None:
     """Возвращает редирект, если у пользователя нет права (иначе None)."""
     if not user.has_permission(perm):
@@ -139,21 +200,65 @@ async def dashboard(
 ):
     if user.is_admin:
         return RedirectResponse("/admin", status_code=303)
+
+    today = date.today()
+    period = request.query_params.get("period")
+    start_s = request.query_params.get("start")
+    end_s = request.query_params.get("end")
+    start, end, prev_start, prev_end = _resolve_period(period, start_s, end_s, today)
+
+    cur = await report_service.sales_summary(session, start, end)
+    prev = await report_service.sales_summary(session, prev_start, prev_end)
+
+    # Текущие (мгновенные) показатели.
     money = await report_service.money_balance(session)
     balances = await report_service.stock_balances(session)
-    nomen_count = len(await catalog_service.list_all(session, cat.Nomenklatura))
-    kg_count = len(await catalog_service.list_all(session, cat.Kontragent))
+    stock_value = sum((b["cost"] for b in balances), Decimal("0"))
     stock_items = len(balances)
-    total_stock_value = sum((b["cost"] for b in balances), Decimal("0"))
+
+    settlements = await report_service.settlement_balances(session)
+    receivable = sum((s["debt"] for s in settlements if s["debt"] > 0), Decimal("0"))
+    payable = -sum((s["debt"] for s in settlements if s["debt"] < 0), Decimal("0"))
+
+    daily = await report_service.daily_sales(session, start, end)
+    top_items = await report_service.top_items(session, start, end)
+    top_clients = await report_service.top_counterparties(session, start, end)
+    low = await report_service.low_stock(session)
+    recent = await report_service.recent_sales(session)
+
+    deltas = {
+        "revenue": _pct_change(cur["revenue"], prev["revenue"]),
+        "profit": _pct_change(cur["profit"], prev["profit"]),
+        "avg_check": _pct_change(cur["avg_check"], prev["avg_check"]),
+        "orders_count": _pct_change(
+            Decimal(cur["orders_count"]), Decimal(prev["orders_count"])
+        ),
+        "purchases": _pct_change(cur["purchases"], prev["purchases"]),
+    }
+
     return _page(
         request,
         user,
         "trade/dashboard.html",
+        period=period or "this_month",
+        periods=DASHBOARD_PERIODS,
+        start=start,
+        end=end,
+        cur=cur,
+        deltas=deltas,
         money=money,
+        stock_value=stock_value,
         stock_items=stock_items,
-        total_stock_value=total_stock_value,
-        nomen_count=nomen_count,
-        kg_count=kg_count,
+        receivable=receivable,
+        payable=payable,
+        daily=daily,
+        top_items=top_items,
+        top_clients=top_clients,
+        low_stock=low,
+        recent_sales=recent,
+        chart_labels_json=json.dumps([r["date"] for r in daily]),
+        chart_revenue_json=json.dumps([float(r["revenue"]) for r in daily]),
+        chart_profit_json=json.dumps([float(r["profit"]) for r in daily]),
     )
 
 

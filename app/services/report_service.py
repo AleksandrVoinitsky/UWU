@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import and_, case, func, select
@@ -539,6 +539,231 @@ async def purchase_sales_book(
                 "kontragent": kontragent.name if kontragent else "—",
                 "total": doc.total,
                 "nds": doc.nds_total,
+            }
+        )
+    return rows
+
+
+# --- Сводные показатели для дашборда ---
+
+
+async def sales_summary(session: AsyncSession, start: date, end: date) -> dict:
+    """Сводные показатели продаж за период.
+
+    Возвращает выручку, прибыль, себестоимость, количество продаж, средний чек и
+    сумму закупок по проведённым накладным за период.
+    """
+    revenue = (
+        (await session.execute(
+            select(func.coalesce(func.sum(Document.total), 0)).where(
+                Document.doc_type == DocType.RASHOD.value,
+                Document.status == DocumentStatus.POSTED.value,
+                Document.date >= start,
+                Document.date <= end,
+            )
+        )).scalar()
+        or Decimal("0")
+    )
+
+    orders_count = (
+        (await session.execute(
+            select(func.count(Document.id)).where(
+                Document.doc_type == DocType.RASHOD.value,
+                Document.status == DocumentStatus.POSTED.value,
+                Document.date >= start,
+                Document.date <= end,
+            )
+        )).scalar()
+        or 0
+    )
+
+    # Себестоимость = сумма расходных движений по проведённым расходным накладным.
+    cost = -(
+        (await session.execute(
+            select(func.coalesce(func.sum(StockMovement.amount), 0))
+            .join(Document, Document.id == StockMovement.document_id)
+            .where(
+                Document.doc_type == DocType.RASHOD.value,
+                Document.status == DocumentStatus.POSTED.value,
+                Document.date >= start,
+                Document.date <= end,
+                StockMovement.quantity < 0,
+            )
+        )).scalar()
+        or Decimal("0")
+    )
+
+    purchases = (
+        (await session.execute(
+            select(func.coalesce(func.sum(Document.total), 0)).where(
+                Document.doc_type == DocType.PRIHOD.value,
+                Document.status == DocumentStatus.POSTED.value,
+                Document.date >= start,
+                Document.date <= end,
+            )
+        )).scalar()
+        or Decimal("0")
+    )
+
+    profit = revenue - cost
+    avg_check = (
+        (revenue / orders_count).quantize(Decimal("0.01")) if orders_count else Decimal("0")
+    )
+    return {
+        "revenue": revenue,
+        "profit": profit,
+        "cost": cost,
+        "orders_count": orders_count,
+        "avg_check": avg_check,
+        "purchases": purchases,
+    }
+
+
+async def daily_sales(session: AsyncSession, start: date, end: date) -> list[dict]:
+    """Выручка и прибыль по дням за период (дни без продаж — нулями)."""
+    revenue_by_day = {
+        d: total
+        for d, total in (
+            await session.execute(
+                select(Document.date, func.sum(Document.total))
+                .where(
+                    Document.doc_type == DocType.RASHOD.value,
+                    Document.status == DocumentStatus.POSTED.value,
+                    Document.date >= start,
+                    Document.date <= end,
+                )
+                .group_by(Document.date)
+            )
+        ).all()
+    }
+    cost_by_day = {
+        d: -(amount or Decimal("0"))
+        for d, amount in (
+            await session.execute(
+                select(StockMovement.date, func.sum(StockMovement.amount))
+                .join(Document, Document.id == StockMovement.document_id)
+                .where(
+                    Document.doc_type == DocType.RASHOD.value,
+                    Document.status == DocumentStatus.POSTED.value,
+                    StockMovement.quantity < 0,
+                    StockMovement.date >= start,
+                    StockMovement.date <= end,
+                )
+                .group_by(StockMovement.date)
+            )
+        ).all()
+    }
+
+    rows: list[dict] = []
+    current = start
+    while current <= end:
+        revenue = revenue_by_day.get(current, Decimal("0"))
+        rows.append(
+            {
+                "date": current.isoformat(),
+                "revenue": revenue,
+                "profit": revenue - cost_by_day.get(current, Decimal("0")),
+            }
+        )
+        current += timedelta(days=1)
+    return rows
+
+
+async def top_items(
+    session: AsyncSession, start: date, end: date, limit: int = 10
+) -> list[dict]:
+    """Топ товаров по выручке за период."""
+    result = await session.execute(
+        select(
+            Nomenklatura.name,
+            func.sum(DocumentItem.quantity),
+            func.sum(DocumentItem.amount),
+        )
+        .join(Document, Document.id == DocumentItem.document_id)
+        .join(Nomenklatura, Nomenklatura.id == DocumentItem.nomenklatura_id)
+        .where(
+            Document.doc_type == DocType.RASHOD.value,
+            Document.status == DocumentStatus.POSTED.value,
+            Document.date >= start,
+            Document.date <= end,
+        )
+        .group_by(Nomenklatura.name)
+        .order_by(func.sum(DocumentItem.amount).desc())
+        .limit(limit)
+    )
+    return [
+        {"name": name, "quantity": qty, "amount": amount}
+        for name, qty, amount in result.all()
+    ]
+
+
+async def top_counterparties(
+    session: AsyncSession, start: date, end: date, limit: int = 10
+) -> list[dict]:
+    """Топ клиентов по выручке за период."""
+    result = await session.execute(
+        select(Kontragent.name, func.sum(Document.total))
+        .join(Document, Document.kontragent_id == Kontragent.id)
+        .where(
+            Document.doc_type == DocType.RASHOD.value,
+            Document.status == DocumentStatus.POSTED.value,
+            Document.date >= start,
+            Document.date <= end,
+        )
+        .group_by(Kontragent.name)
+        .order_by(func.sum(Document.total).desc())
+        .limit(limit)
+    )
+    return [{"name": name, "amount": amount} for name, amount in result.all()]
+
+
+async def low_stock(
+    session: AsyncSession, threshold: int = 5, limit: int = 10
+) -> list[dict]:
+    """Товары с низким/нулевым остатком (суммарно по всем складам)."""
+    result = await session.execute(
+        select(
+            Nomenklatura.name,
+            func.coalesce(func.sum(StockBatch.quantity), 0),
+        )
+        .outerjoin(StockBatch, StockBatch.nomenklatura_id == Nomenklatura.id)
+        .group_by(Nomenklatura.id, Nomenklatura.name)
+        .having(func.coalesce(func.sum(StockBatch.quantity), 0) <= threshold)
+        .order_by(func.coalesce(func.sum(StockBatch.quantity), 0))
+        .limit(limit)
+    )
+    return [{"name": name, "quantity": qty} for name, qty in result.all()]
+
+
+async def recent_sales(session: AsyncSession, limit: int = 10) -> list[dict]:
+    """Последние проведённые расходные накладные (продажи)."""
+    result = await session.execute(
+        select(Document)
+        .where(
+            Document.doc_type == DocType.RASHOD.value,
+            Document.status == DocumentStatus.POSTED.value,
+        )
+        .order_by(Document.date.desc(), Document.id.desc())
+        .limit(limit)
+    )
+    rows = []
+    for doc in result.scalars():
+        kontragent = await session.get(Kontragent, doc.kontragent_id) if doc.kontragent_id else None
+        cost = -(
+            (await session.execute(
+                select(func.coalesce(func.sum(StockMovement.amount), 0)).where(
+                    StockMovement.document_id == doc.id, StockMovement.quantity < 0
+                )
+            )).scalar()
+            or Decimal("0")
+        )
+        rows.append(
+            {
+                "date": doc.date,
+                "number": doc.number,
+                "kontragent": kontragent.name if kontragent else None,
+                "total": doc.total,
+                "profit": doc.total - cost,
             }
         )
     return rows
