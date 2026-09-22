@@ -12,21 +12,28 @@
   </div>
   <div class="table-wrap">
     <table class="table" id="zakaz-table">
-      <thead><tr><th>№</th><th>Дата</th><th>Контрагент</th><th class="num">Сумма</th><th>Состояние</th><th></th></tr></thead>
+      <thead><tr><th>№</th><th>Дата</th><th>Покупатель</th><th class="num">Сумма</th><th>Состояние</th><th></th></tr></thead>
       <tbody>
         {% for z in zakazy %}
-        <tr data-row>
+        {% set extra = z.extra or {} %}
+        {% set st = extra.get('state', 'new') %}
+        <tr data-row data-toggle-detail data-target="zakaz-{{ z.id }}" style="cursor:pointer">
           <td>{{ z.number }}</td>
           <td>{{ z.date }}</td>
-          <td>{{ kg_map.get(z.kontragent_id, '—') if z.kontragent_id else '—' }}</td>
+          <td>
+            {% if extra.get('source') == 'customer' %}
+              <div>{{ extra.get('customer_name') or 'Покупатель' }}</div>
+              <div class="muted small">{{ extra.get('customer_phone') or '' }}</div>
+            {% else %}
+              {{ kg_map.get(z.kontragent_id, '—') if z.kontragent_id else '—' }}
+            {% endif %}
+          </td>
           <td class="num">{{ "%.2f"|format(z.total) }}</td>
           <td>
-            {% set st = z.extra.get('state', 'new') if z.extra else 'new' %}
             <span class="badge {% if st == 'done' %}posted{% elif st == 'cancelled' %}deleted{% elif st == 'in_work' %}draft{% else %}neutral{% endif %}">{{ ZAKAZ_STATES.get(st, st) }}</span>
           </td>
           <td>
             <div class="flex" style="gap:4px;justify-content:flex-end">
-              {% set st = z.extra.get('state', 'new') if z.extra else 'new' %}
               {% if st in ['new', 'in_work'] %}
               <form method="post" action="/zakazy/{{ z.id }}/reserve"><button class="btn text small">Резерв</button></form>
               <form method="post" action="/zakazy/{{ z.id }}/ship" onsubmit="return confirm('Отгрузить заявку и создать расходную накладную?')"><button class="btn text small">Отгрузить</button></form>
@@ -40,6 +47,20 @@
               <form method="post" action="/zakazy/{{ z.id }}/state"><input type="hidden" name="state" value="cancelled"><button class="btn text small danger">Отменить</button></form>
               {% endif %}
             </div>
+          </td>
+        </tr>
+        <tr class="zakaz-detail" id="zakaz-{{ z.id }}" hidden>
+          <td colspan="6">
+            <table class="table">
+              <thead><tr><th>Товар</th><th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th></tr></thead>
+              <tbody>
+                {% for it in zakaz_items.get(z.id, []) %}
+                <tr><td>{{ it.name }}</td><td class="num">{{ it.quantity }}</td><td class="num">{{ "%.2f"|format(it.price) }}</td><td class="num">{{ "%.2f"|format(it.amount) }}</td></tr>
+                {% else %}
+                <tr><td colspan="4" class="muted">Нет позиций</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </td>
         </tr>
         {% else %}
@@ -89,5 +110,14 @@ function addZakazRow() {
   clone.querySelectorAll('input').forEach(i => i.value = '');
   document.getElementById('zakaz-items').appendChild(clone);
 }
+
+/* Раскрытие позиций заявки по клику на строку (игнорируем кнопки/формы). */
+document.querySelectorAll('tr[data-toggle-detail]').forEach(function (row) {
+  row.addEventListener('click', function (e) {
+    if (e.target.closest('a, button, form, input, select, textarea')) return;
+    var target = document.getElementById(row.getAttribute('data-target'));
+    if (target) target.hidden = !target.hidden;
+  });
+});
 </script>
 {% endblock %}

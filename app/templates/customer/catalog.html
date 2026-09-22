@@ -23,7 +23,7 @@
     {% if products %}
     <div class="product-grid">
       {% for p in products %}
-      <div class="product-card">
+      <div class="product-card" data-nomenklatura-id="{{ p.id }}" onclick="addToCart(this, {{ p.id }})" role="button" tabindex="0" title="Добавить в корзину">
         <div class="product-img">
           {% if p.image_path %}<img src="/uploads/{{ p.image_path }}" alt="{{ p.name }}">{% else %}<div class="product-img-empty">⌕</div>{% endif %}
         </div>
@@ -32,11 +32,7 @@
           {% if p.full_name %}<div class="product-desc">{{ p.full_name }}</div>{% endif %}
           <div class="product-foot">
             <span class="product-price">{{ "%.2f"|format(p.price) }} ₽</span>
-            <form method="post" action="{{ prefix }}/cart/add">
-              <input type="hidden" name="nomenklatura_id" value="{{ p.id }}">
-              <input type="hidden" name="quantity" value="1">
-              <button class="btn primary small" type="submit">В корзину</button>
-            </form>
+            <span class="product-add">+</span>
           </div>
         </div>
       </div>

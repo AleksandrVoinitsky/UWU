@@ -13,7 +13,7 @@
     <nav class="shop-nav">
       <a href="{{ prefix }}/">Каталог</a>
       {% if customer %}
-        <a href="{{ prefix }}/cart">Корзина</a>
+        <a class="shop-cart" id="cart-anchor" href="{{ prefix }}/cart">Корзина <span class="cart-badge" id="cart-badge" hidden>0</span></a>
         <a href="{{ prefix }}/orders">Заказы</a>
         <span class="shop-user">{{ customer.name or customer.phone }}</span>
         <a href="{{ prefix }}/logout">Выйти</a>
@@ -26,5 +26,6 @@
   <main class="shop-main">
     {% block content %}{% endblock %}
   </main>
+  <script src="/static/js/customer.js"></script>
 </body>
 </html>

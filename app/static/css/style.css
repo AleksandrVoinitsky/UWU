@@ -991,3 +991,6 @@ input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
   margin-bottom: 14px;
   background: var(--surface-2);
 }
+
+/* Раскрываемая детализация заявки (журнал заявок) */
+tr.zakaz-detail > td { background: var(--surface-2); padding: 10px 14px; }

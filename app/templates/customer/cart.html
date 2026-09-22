@@ -10,17 +10,17 @@
       <thead><tr><th>Товар</th><th class="num">Цена</th><th class="num">Кол-во</th><th class="num">Сумма</th><th></th></tr></thead>
       <tbody>
         {% for i in items %}
-        <tr>
+        <tr data-cart-row="{{ i.id }}">
           <td>{{ i.name }}</td>
           <td class="num">{{ "%.2f"|format(i.price) }} ₽</td>
           <td class="num">
-            <form method="post" action="{{ prefix }}/cart/update" style="display:inline-flex;gap:6px;align-items:center">
-              <input type="hidden" name="item_id" value="{{ i.id }}">
-              <input type="number" name="quantity" value="{{ i.quantity }}" min="0" step="1" style="width:70px">
-              <button class="btn secondary small" type="submit">Обновить</button>
-            </form>
+            <div class="qty-stepper">
+              <button type="button" class="qty-btn" onclick="stepQty({{ i.id }}, -1)">−</button>
+              <input type="number" class="qty-input" data-qty-input="{{ i.id }}" value="{{ i.quantity }}" min="0" step="1">
+              <button type="button" class="qty-btn" onclick="stepQty({{ i.id }}, 1)">+</button>
+            </div>
           </td>
-          <td class="num">{{ "%.2f"|format(i.amount) }} ₽</td>
+          <td class="num cart-amount">{{ "%.2f"|format(i.amount) }} ₽</td>
           <td class="num">
             <form method="post" action="{{ prefix }}/cart/update">
               <input type="hidden" name="item_id" value="{{ i.id }}">
@@ -34,7 +34,7 @@
     </table>
   </div>
   <div class="cart-footer">
-    <div class="cart-total">Итого: <strong>{{ "%.2f"|format(total) }} ₽</strong></div>
+    <div class="cart-total">Итого: <strong id="cart-total">{{ "%.2f"|format(total) }} ₽</strong></div>
     <form method="post" action="{{ prefix }}/checkout">
       <button class="btn primary" type="submit">Подтвердить заказ</button>
     </form>

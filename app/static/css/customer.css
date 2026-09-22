@@ -70,6 +70,39 @@
 .shop-auth { padding: 40px 0; }
 .error { color: var(--bad); background: var(--bad-bg); border-radius: 6px; padding: 8px 12px; font-size: 13px; }
 
+/* Корзина: клик по карточке, анимация, степпер */
+.product-card { cursor: pointer; }
+.product-add {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent); color: var(--accent-text);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 500;
+}
+.shop-cart { position: relative; display: inline-flex; align-items: center; gap: 4px; }
+.cart-badge {
+  background: var(--accent); color: var(--accent-text);
+  border-radius: 999px; font-size: 11px; font-weight: 600;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.fly-clone {
+  position: fixed; z-index: 9999; pointer-events: none;
+  border-radius: 8px; overflow: hidden; box-shadow: var(--shadow-md);
+}
+.fly-clone img { width: 100%; height: 100%; object-fit: cover; }
+
+.qty-stepper { display: inline-flex; align-items: center; gap: 6px; }
+.qty-btn {
+  width: 28px; height: 28px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: 15px; cursor: pointer; color: var(--text);
+}
+.qty-btn:hover { background: var(--surface-hover); }
+.qty-input {
+  width: 56px; height: 28px; text-align: center;
+  border: 1px solid var(--border); border-radius: 6px; font-size: 14px;
+}
+
 /* MiniApp / мобильные устройства */
 @media (max-width: 600px) {
   .shop-header { padding: 10px 14px; gap: 8px; }

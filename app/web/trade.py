@@ -1036,6 +1036,7 @@ async def zakazy_list(
 ):
     stmt = (
         select(Document)
+        .options(selectinload(Document.items))
         .where(Document.doc_type == DocType.ZAKAZ.value)
         .order_by(Document.date.desc(), Document.id.desc())
     )
@@ -1044,9 +1045,23 @@ async def zakazy_list(
     kontragenty = await catalog_service.list_all(session, cat.Kontragent)
     nomen = await catalog_service.list_all(session, cat.Nomenklatura)
     kg_map = {k.id: k.name for k in kontragenty}
+    nomen_map = {n.id: n.name for n in nomen}
+    # Позиции каждой заявки (для раскрытия по клику на строку).
+    zakaz_items: dict[int, list[dict]] = {}
+    for z in zakazy:
+        zakaz_items[z.id] = [
+            {
+                "name": nomen_map.get(it.nomenklatura_id, f"#{it.nomenklatura_id}"),
+                "quantity": it.quantity,
+                "price": it.price,
+                "amount": it.amount,
+            }
+            for it in z.items
+        ]
     return _page(
         request, user, "trade/zakazy.html",
         zakazy=zakazy, kontragenty=kontragenty, nomen=nomen, kg_map=kg_map,
+        zakaz_items=zakaz_items,
         ZAKAZ_STATES=ZAKAZ_STATES, today=date.today().isoformat(),
     )
 
