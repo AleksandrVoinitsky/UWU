@@ -85,6 +85,13 @@ async def send_message(
     session.add(message)
     chat.last_message_at = datetime.now(timezone.utc)
     await session.commit()
+
+    # Если чат внешний (Telegram/MAX) — отправляем ответ через адаптер бота.
+    if chat.channel != "internal":
+        from app.bots.service import deliver_outgoing
+
+        await deliver_outgoing(chat, payload.text)
+
     return {
         "id": message.id,
         "direction": "out",

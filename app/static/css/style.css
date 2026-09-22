@@ -894,3 +894,12 @@ input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
 @media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
 
 .chart-box { position: relative; height: 300px; margin-top: 8px; }
+
+/* ---------- Настройки ботов (админка) ---------- */
+.bot-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  background: var(--surface-2);
+}

@@ -32,15 +32,23 @@ _SKIP_REQUEST_LOG_PREFIXES = ("/static", "/uploads", "/healthz")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Инициализация при старте: проверка настроек и сид начальных данных."""
+    """Инициализация при старте: проверка настроек, сид, запуск ботов."""
     logger.info("Starting application '%s'", settings.app_name)
     from app.core.security import validate_security_settings
 
     validate_security_settings()
     async with async_session_factory() as session:
         await seed_service.seed_all(session)
+
+    # Запуск ботов мессенджеров (Telegram/MAX) в фоновых задачах.
+    from app.bots.service import start_bots, stop_bots
+
+    await start_bots(async_session_factory)
+
     logger.info("Application started")
     yield
+
+    await stop_bots()
     logger.info("Application shutting down")
 
 

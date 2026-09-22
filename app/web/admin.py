@@ -202,3 +202,46 @@ async def admin_audit(
     # Имена пользователей.
     user_map = {u.id: u.login for u in await user_service.list_users(session)}
     return _page(request, user, "admin/audit.html", logs=logs, user_map=user_map)
+
+
+@router.get("/admin/bots", response_class=HTMLResponse)
+async def admin_bots(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    if not user.is_admin:
+        return RedirectResponse("/", status_code=303)
+    from app.bots.service import BOT_CHANNELS, bot_manager, get_configs
+
+    configs = {c.channel: c for c in await get_configs(session)}
+    status = {ch: bot_manager.get(ch) is not None for ch in BOT_CHANNELS}
+    return _page(
+        request,
+        user,
+        "admin/bots.html",
+        channels=BOT_CHANNELS,
+        configs=configs,
+        status=status,
+    )
+
+
+@router.post("/admin/bots", response_class=HTMLResponse)
+async def admin_save_bots(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    if not user.is_admin:
+        return RedirectResponse("/", status_code=303)
+    from app.bots.service import BOT_CHANNELS, upsert_config
+
+    form = await request.form()
+    for channel in BOT_CHANNELS:
+        enabled = form.get(f"{channel}_enabled") == "on"
+        token = (form.get(f"{channel}_token") or "").strip() or None
+        name = (form.get(f"{channel}_name") or "").strip() or None
+        await upsert_config(
+            session, channel, enabled=enabled, token=token, name=name
+        )
+    return RedirectResponse("/admin/bots", status_code=303)

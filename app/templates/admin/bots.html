@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block page_title %}Боты{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h2>Боты мессенджеров</h2>
+    <span class="muted small">Входящие сообщения попадают в чат, ответы оператора уходят обратно</span>
+  </div>
+  <form method="post" action="/admin/bots">
+    {% for channel, label in channels.items() %}
+    {% set cfg = configs.get(channel) %}
+    <div class="bot-card">
+      <div class="flex-between flex-wrap">
+        <div class="flex" style="gap:10px;align-items:center">
+          <h3 style="font-size:15px;font-weight:600">{{ label }}</h3>
+          {% if status[channel] %}
+            <span class="badge posted">активен</span>
+          {% elif cfg and cfg.enabled %}
+            <span class="badge draft">включён (нужен перезапуск)</span>
+          {% else %}
+            <span class="badge neutral">выключен</span>
+          {% endif %}
+        </div>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px">
+          <input type="checkbox" name="{{ channel }}_enabled" {% if cfg and cfg.enabled %}checked{% endif %} style="width:auto"> Включить бота
+        </label>
+      </div>
+      <div class="form-row" style="grid-template-columns:1fr 1fr;margin-top:10px">
+        <div class="field" style="margin:0">
+          <label>Токен</label>
+          <input type="password" name="{{ channel }}_token" value="" placeholder="{% if cfg and cfg.token %}•••••••• (оставьте пустым, чтобы не менять){% else %}Введите токен{% endif %}" autocomplete="off">
+        </div>
+        <div class="field" style="margin:0">
+          <label>Название (необязательно)</label>
+          <input type="text" name="{{ channel }}_name" value="{{ cfg.name if cfg and cfg.name else '' }}">
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    <div class="muted small mb">Изменения применяются после перезапуска сервиса.</div>
+    <div class="form-actions"><button type="submit" class="btn primary">{{ t('common.save', lang) }}</button></div>
+  </form>
+</div>
+{% endblock %}

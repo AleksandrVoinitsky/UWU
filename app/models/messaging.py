@@ -23,6 +23,9 @@ class Chat(Base, IdMixin, TimestampMixin):
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     channel: Mapped[str] = mapped_column(String(30), default="internal", nullable=False)  # internal | telegram | maks
+    # Внешний идентификатор чата в мессенджере (chat_id Telegram, user_id MAX) —
+    # нужен для отправки ответа оператора обратно в мессенджер.
+    external_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     kontragent_id: Mapped[int | None] = mapped_column(ForeignKey("kontragenty.id"), nullable=True)
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

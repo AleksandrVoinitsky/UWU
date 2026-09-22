@@ -45,6 +45,7 @@ from app.models.registry import (  # noqa: F401
 )
 from app.models.users import PERMISSIONS, Role, User  # noqa: F401
 from app.models.messaging import Chat, Message  # noqa: F401
+from app.models.bot import BotConfig  # noqa: F401
 
 __all__ = [
     "Base",
