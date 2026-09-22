@@ -277,20 +277,47 @@
 | --- | --- |
 | `customer/api.py` | REST API `/shop/api/*` (auth, каталог, корзина, заказ, PDF) |
 | `customer/web.py` | серверные страницы `/shop/*` |
+| `customer/miniapp.py` | вход MiniApp `GET /shop/mini` (initData → cookie покупателя) |
 | `customer/deps.py` | `get_current_customer` (JWT покупателя из cookie/Bearer) |
 | `customer/app.py` | `create_customer_app()` (монтируется в main по `/shop`) |
 
 См. также [customer](customer.md).
+
+## app/services/miniapp_service.py — MiniApp
+
+### `validate_init_data(channel, init_data, secret) -> dict | None`
+**Назначение:** проверяет подпись initData мессенджера (Telegram `hash` —
+HMAC_SHA256(bot_token, "WebAppData"); MAX `sign` — HMAC_SHA256 со секретом).
+Возвращает `{channel, external_id, name}` или `None`.
+
+### `make_test_init_data(channel, secret, user_id, name)` — собирает валидный
+initData (для тестов и локальной проверки).
+
+### `find_or_create_customer(session, channel, external_id, name) -> Customer`
+**Назначение:** находит покупателя по привязке или создаёт нового (синтетический
+логин) и создаёт `CustomerBinding`.
 
 ## app/models/customer.py
 
 ### `class Customer`, `class Cart`, `class CartItem`
 **Назначение:** учётные записи покупателей и корзина (отдельные от сотрудников).
 
+### `class CustomerBinding`
+**Назначение:** привязка аккаунта мессенджера (`channel + external_id`) к
+покупателю — для MiniApp.
+
 ## app/models/catalog/category.py
 
 ### `class Category`
 **Назначение:** иерархический справочник категорий товаров (привязка
 `Nomenklatura.category_id`).
+
+## app/static/js/app.js — фронтенд-диалоги
+
+### `confirmDialog(message, opts) -> Promise<boolean>`
+### `notify(message, opts)`
+### `confirmSubmit(form, message, opts)`
+**Назначение:** стилизованные модальные окна (с размытием фона) для
+уведомлений и подтверждений — вместо системных `alert()`/`confirm()`.
 
 См. также [api](api.md) и [security](security.md).

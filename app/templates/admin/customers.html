@@ -13,8 +13,8 @@
           <td>{{ c.name or '—' }}</td>
           <td class="muted">{{ c.created_at.date() if c.created_at else '—' }}</td>
           <td class="num">
-            <form method="post" action="/admin/customers/{{ c.id }}/delete" onsubmit="return confirm('Удалить покупателя и его заказы?')">
-              <button class="btn text small danger" type="submit">Удалить</button>
+            <form method="post" action="/admin/customers/{{ c.id }}/delete">
+              <button class="btn text small danger" type="button" onclick="confirmSubmit(this.form, 'Удалить покупателя и его заказы?', {danger:true})">Удалить</button>
             </form>
           </td>
         </tr>

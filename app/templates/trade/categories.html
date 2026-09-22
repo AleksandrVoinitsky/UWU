@@ -57,8 +57,8 @@
         <button type="submit" class="btn primary">{{ t('common.save', lang) }}</button>
       </div>
     </form>
-    <form method="post" action="" data-action-pattern="/catalog/categories/{id}/delete" onsubmit="return confirm('Удалить категорию?')" style="padding:0 16px 16px">
-      <button type="submit" class="btn danger">{{ t('common.delete', lang) }}</button>
+    <form method="post" action="" data-action-pattern="/catalog/categories/{id}/delete" style="padding:0 16px 16px">
+      <button type="button" class="btn danger" onclick="confirmSubmit(this.form, 'Удалить категорию?', {danger:true})">{{ t('common.delete', lang) }}</button>
     </form>
   </div>
 </div>

@@ -23,6 +23,72 @@
     });
   }
 
+  /* ---------- Стилизованные диалоги (уведомления и подтверждения) ---------- */
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function _dialog(html) {
+    var backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.innerHTML = html;
+    document.body.appendChild(backdrop);
+    requestAnimationFrame(function () { backdrop.classList.add("open"); });
+    return backdrop;
+  }
+
+  function confirmDialog(message, opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+      var backdrop = _dialog(
+        '<div class="modal" style="max-width:380px">' +
+        '<div class="modal-header"><h3>' + escapeHtml(opts.title || "Подтверждение") + '</h3></div>' +
+        '<div class="modal-body">' + escapeHtml(message) + '</div>' +
+        '<div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">' +
+        '<button type="button" class="btn secondary" data-dlg-cancel>' + escapeHtml(opts.cancelText || "Отмена") + '</button>' +
+        '<button type="button" class="btn ' + (opts.danger ? "danger" : "primary") + '" data-dlg-ok>' + escapeHtml(opts.okText || "Подтвердить") + '</button>' +
+        '</div></div>'
+      );
+      function done(val) { backdrop.remove(); resolve(val); }
+      backdrop.querySelector("[data-dlg-ok]").addEventListener("click", function () { done(true); });
+      backdrop.querySelector("[data-dlg-cancel]").addEventListener("click", function () { done(false); });
+      backdrop.addEventListener("click", function (e) { if (e.target === backdrop) done(false); });
+      var esc = function (e) {
+        if (e.key === "Escape") { document.removeEventListener("keydown", esc); done(false); }
+      };
+      document.addEventListener("keydown", esc);
+    });
+  }
+
+  function notify(message, opts) {
+    opts = opts || {};
+    var backdrop = _dialog(
+      '<div class="modal" style="max-width:380px">' +
+      '<div class="modal-header"><h3>' + escapeHtml(opts.title || "Уведомление") + '</h3></div>' +
+      '<div class="modal-body">' + escapeHtml(message) + '</div>' +
+      '<div class="modal-body" style="padding-top:0;display:flex;justify-content:flex-end">' +
+      '<button type="button" class="btn primary" data-dlg-ok>OK</button>' +
+      '</div></div>'
+    );
+    function done() { backdrop.remove(); }
+    backdrop.querySelector("[data-dlg-ok]").addEventListener("click", done);
+    backdrop.addEventListener("click", function (e) { if (e.target === backdrop) done(); });
+    var esc = function (e) {
+      if (e.key === "Escape") { document.removeEventListener("keydown", esc); done(); }
+    };
+    document.addEventListener("keydown", esc);
+  }
+
+  function confirmSubmit(form, message, opts) {
+    confirmDialog(message, opts).then(function (ok) { if (ok) form.submit(); });
+  }
+
+  window.confirmSubmit = confirmSubmit;
+  window.confirmDialog = confirmDialog;
+  window.notify = notify;
+
   document.addEventListener("click", function (e) {
     var opener = e.target.closest("[data-modal-open]");
     if (opener) {
@@ -461,7 +527,7 @@
       var skladId = skladSelect ? skladSelect.value : "";
       var received = parseFloat(receivedInput ? receivedInput.value : 0) || 0;
       if (!isReturn && received < currentTotal) {
-        alert("Сумма оплаты меньше итога на " + money(currentTotal - received) + " ₽");
+        notify("Сумма оплаты меньше итога на " + money(currentTotal - received) + " ₽");
         return;
       }
       if (sellBtn) sellBtn.disabled = true;
@@ -479,7 +545,7 @@
           window.location.href = "/documents/" + data.id + "/print";
         })
         .catch(function (err) {
-          alert("Ошибка: " + err.message);
+          notify("Ошибка: " + err.message, { title: "Ошибка" });
           if (sellBtn) sellBtn.disabled = false;
           if (returnBtn) returnBtn.disabled = false;
         });

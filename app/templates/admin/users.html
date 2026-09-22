@@ -26,7 +26,7 @@
             {% if u.id != user.id %}
             <div class="flex" style="gap:4px;justify-content:flex-end">
               <form method="post" action="/admin/users/{{ u.id }}/toggle"><button class="btn text small">{% if u.is_active %}Отключить{% else %}Включить{% endif %}</button></form>
-              <form method="post" action="/admin/users/{{ u.id }}/delete" onsubmit="return confirm('Удалить пользователя?')"><button class="btn text small danger">{{ t('common.delete', lang) }}</button></form>
+              <form method="post" action="/admin/users/{{ u.id }}/delete"><button class="btn text small danger" type="button" onclick="confirmSubmit(this.form, 'Удалить пользователя?', {danger:true})">{{ t('common.delete', lang) }}</button></form>
             </div>
             {% endif %}
           </td>
