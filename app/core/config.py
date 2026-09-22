@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     app_name: str = "UWU"
     debug: bool = False
     uploads_dir: str = "./uploads"  # каталог для загружаемых изображений
+    log_level: str = "INFO"  # DEBUG | INFO | WARNING | ERROR | CRITICAL
 
 
 @lru_cache

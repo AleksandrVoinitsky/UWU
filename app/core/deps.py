@@ -57,6 +57,24 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     return user
 
 
+def require_permission(perm: str):
+    """Фабрика зависимости: пропускает только пользователей с правом ``perm``.
+
+    Пример: ``user: User = Depends(require_permission("catalog.write"))``.
+    Администратор проходит всегда (см. :meth:`User.has_permission`).
+    """
+
+    async def _checker(user: User = Depends(get_current_user)) -> User:
+        if not user.has_permission(perm):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden",
+            )
+        return user
+
+    return _checker
+
+
 async def get_current_user_optional(
     request: Request,
     session: AsyncSession = Depends(get_session),
