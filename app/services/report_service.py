@@ -620,22 +620,27 @@ async def sales_summary(session: AsyncSession, start: date, end: date) -> dict:
 
 
 async def daily_sales(session: AsyncSession, start: date, end: date) -> list[dict]:
-    """Выручка и прибыль по дням за период (дни без продаж — нулями)."""
-    revenue_by_day = {
-        d: total
-        for d, total in (
-            await session.execute(
-                select(Document.date, func.sum(Document.total))
-                .where(
-                    Document.doc_type == DocType.RASHOD.value,
-                    Document.status == DocumentStatus.POSTED.value,
-                    Document.date >= start,
-                    Document.date <= end,
-                )
-                .group_by(Document.date)
+    """Выручка, прибыль и количество продаж по дням за период.
+
+    Дни без продаж заполняются нулями (для непрерывного графика).
+    """
+    revenue_by_day: dict[date, Decimal] = {}
+    orders_by_day: dict[date, int] = {}
+    for d, total, cnt in (
+        await session.execute(
+            select(Document.date, func.sum(Document.total), func.count(Document.id))
+            .where(
+                Document.doc_type == DocType.RASHOD.value,
+                Document.status == DocumentStatus.POSTED.value,
+                Document.date >= start,
+                Document.date <= end,
             )
-        ).all()
-    }
+            .group_by(Document.date)
+        )
+    ).all():
+        revenue_by_day[d] = total
+        orders_by_day[d] = cnt
+
     cost_by_day = {
         d: -(amount or Decimal("0"))
         for d, amount in (
@@ -663,6 +668,45 @@ async def daily_sales(session: AsyncSession, start: date, end: date) -> list[dic
                 "date": current.isoformat(),
                 "revenue": revenue,
                 "profit": revenue - cost_by_day.get(current, Decimal("0")),
+                "orders": orders_by_day.get(current, 0),
+            }
+        )
+        current += timedelta(days=1)
+    return rows
+
+
+async def daily_money_flow(
+    session: AsyncSession, start: date, end: date
+) -> list[dict]:
+    """Приход и расход денежных средств по дням за период (нули в пустые дни)."""
+    income_by_day: dict[date, Decimal] = {}
+    expense_by_day: dict[date, Decimal] = {}
+    for d, income, expense in (
+        await session.execute(
+            select(
+                MoneyMovement.date,
+                func.coalesce(
+                    func.sum(case((MoneyMovement.amount > 0, MoneyMovement.amount), else_=0)), 0
+                ),
+                func.coalesce(
+                    func.sum(case((MoneyMovement.amount < 0, MoneyMovement.amount), else_=0)), 0
+                ),
+            )
+            .where(MoneyMovement.date >= start, MoneyMovement.date <= end)
+            .group_by(MoneyMovement.date)
+        )
+    ).all():
+        income_by_day[d] = income
+        expense_by_day[d] = expense
+
+    rows: list[dict] = []
+    current = start
+    while current <= end:
+        rows.append(
+            {
+                "date": current.isoformat(),
+                "income": income_by_day.get(current, Decimal("0")),
+                "expense": expense_by_day.get(current, Decimal("0")),
             }
         )
         current += timedelta(days=1)

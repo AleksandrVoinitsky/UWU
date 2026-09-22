@@ -74,6 +74,26 @@ async def test_daily_sales_fills_zero_days(seeded_session):
     assert by_date["2025-01-03"]["revenue"] == Decimal("0")
 
 
+async def test_daily_sales_orders_count(seeded_session):
+    await _seed_sale(seeded_session)
+    rows = await report_service.daily_sales(
+        seeded_session, date(2025, 1, 1), date(2025, 1, 5)
+    )
+    by_date = {r["date"]: r for r in rows}
+    assert by_date["2025-01-02"]["orders"] == 1
+    assert by_date["2025-01-01"]["orders"] == 0
+
+
+async def test_daily_money_flow_shape(seeded_session):
+    await _seed_sale(seeded_session)
+    rows = await report_service.daily_money_flow(
+        seeded_session, date(2025, 1, 1), date(2025, 1, 5)
+    )
+    assert len(rows) == 5
+    for r in rows:
+        assert set(r.keys()) == {"date", "income", "expense"}
+
+
 async def test_top_items(seeded_session):
     await _seed_sale(seeded_session)
     rows = await report_service.top_items(seeded_session, date(2025, 1, 1), date(2025, 1, 31))

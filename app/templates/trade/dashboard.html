@@ -9,10 +9,22 @@
   {% else %}<span class="delta neutral">—</span>{% endif %}
 {%- endmacro %}
 
+{% macro kpi(label, value, suffix, delta_val, accent='') -%}
+  <div class="kpi-card {{ accent }}">
+    <div class="kpi-label">{{ label }}</div>
+    <div class="kpi-value">{{ value }}{% if suffix %} <span class="kpi-suffix">{{ suffix }}</span>{% endif %}</div>
+    <div class="kpi-foot">{{ delta(delta_val) }}</div>
+  </div>
+{%- endmacro %}
+
+{% macro section(title) -%}
+  <div class="dash-section"><h2>{{ title }}</h2><span class="rule"></span></div>
+{%- endmacro %}
+
 {% block content %}
 
 <!-- Период -->
-<div class="card" style="padding:12px 18px;margin-bottom:16px">
+<div class="card dash-period">
   <div class="flex-between flex-wrap" style="gap:12px">
     <div class="period-pills">
       {% for key, label in periods.items() %}
@@ -26,99 +38,77 @@
       <button class="btn secondary small" type="submit">OK</button>
     </form>
   </div>
-  <div class="muted small" style="margin-top:6px">{{ start }} — {{ end }} · {{ t('dashboard.vs_prev', lang) }}</div>
+  <div class="muted small" style="margin-top:8px">{{ start }} — {{ end }} · {{ t('dashboard.vs_prev', lang) }}</div>
 </div>
 
-<!-- KPI -->
+<!-- Быстрые действия -->
+<div class="card">
+  <div class="card-header"><h2>{{ t('dashboard.quick_actions', lang) }}</h2></div>
+  <div class="quick-actions">
+    <a class="qa qa-primary" href="/documents/new?doc_type=rashod">
+      <span class="qa-icon">➜</span><span>{{ t('doc.rashod', lang) }}</span>
+    </a>
+    <a class="qa" href="/documents/new?doc_type=prihod">
+      <span class="qa-icon">↓</span><span>{{ t('doc.prihod', lang) }}</span>
+    </a>
+    <a class="qa" href="/documents/new?doc_type=peremeshenie">
+      <span class="qa-icon">⇄</span><span>{{ t('doc.peremeshenie', lang) }}</span>
+    </a>
+    <a class="qa" href="/documents/new?doc_type=pko">
+      <span class="qa-icon">+</span><span>{{ t('doc.pko', lang) }}</span>
+    </a>
+    <a class="qa" href="/documents/new?doc_type=rko">
+      <span class="qa-icon">−</span><span>{{ t('doc.rko', lang) }}</span>
+    </a>
+    <a class="qa qa-ghost" href="/rmk"><span class="qa-icon">🛒</span><span>{{ t('menu.rmk', lang) }}</span></a>
+    <a class="qa qa-ghost" href="/documents"><span class="qa-icon">☰</span><span>{{ t('menu.documents', lang) }}</span></a>
+  </div>
+</div>
+
+<!-- Торговля за период -->
+{{ section(t('dashboard.period_trade', lang)) }}
 <div class="kpi-grid">
-  <div class="kpi-card">
-    <div class="kpi-label">{{ t('dashboard.revenue', lang) }}</div>
-    <div class="kpi-value">{{ "%.2f"|format(cur.revenue) }} ₽</div>
-    {{ delta(deltas.revenue) }}
+  {{ kpi(t('dashboard.revenue', lang), "%.2f"|format(cur.revenue), '₽', deltas.revenue, 'accent-blue') }}
+  {{ kpi(t('dashboard.profit', lang), "%.2f"|format(cur.profit), '₽', deltas.profit, 'accent-green') }}
+  {{ kpi(t('dashboard.avg_check', lang), "%.2f"|format(cur.avg_check), '₽', deltas.avg_check, '') }}
+  {{ kpi(t('dashboard.sales_count', lang), cur.orders_count, '', deltas.orders_count, '') }}
+  {{ kpi(t('dashboard.purchases', lang), "%.2f"|format(cur.purchases), '₽', deltas.purchases, '') }}
+</div>
+
+<!-- Текущее состояние -->
+{{ section(t('dashboard.current_state', lang)) }}
+<div class="kpi-grid">
+  {{ kpi(t('dashboard.money_balance', lang), "%.2f"|format(money), '₽', none, 'accent-blue') }}
+  {{ kpi(t('dashboard.stock_value', lang), "%.2f"|format(stock_value), '₽', none, '') }}
+  {{ kpi(t('dashboard.receivable', lang), "%.2f"|format(receivable), '₽', none, 'accent-green') }}
+  {{ kpi(t('dashboard.payable', lang), "%.2f"|format(payable), '₽', none, 'accent-red') }}
+</div>
+
+<!-- Графики -->
+{{ section(t('dashboard.by_day', lang)) }}
+<div class="card chart-card">
+  <div class="chart-box tall"><canvas id="daily-chart"></canvas></div>
+</div>
+
+<div class="charts-grid">
+  <div class="card chart-card">
+    <div class="card-header"><h2>{{ t('dashboard.orders_by_day', lang) }}</h2></div>
+    <div class="chart-box"><canvas id="orders-chart"></canvas></div>
   </div>
-  <div class="kpi-card">
-    <div class="kpi-label">{{ t('dashboard.profit', lang) }}</div>
-    <div class="kpi-value">{{ "%.2f"|format(cur.profit) }} ₽</div>
-    {{ delta(deltas.profit) }}
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-label">{{ t('dashboard.avg_check', lang) }}</div>
-    <div class="kpi-value">{{ "%.2f"|format(cur.avg_check) }} ₽</div>
-    {{ delta(deltas.avg_check) }}
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-label">{{ t('dashboard.sales_count', lang) }}</div>
-    <div class="kpi-value">{{ cur.orders_count }}</div>
-    {{ delta(deltas.orders_count) }}
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-label">{{ t('dashboard.purchases', lang) }}</div>
-    <div class="kpi-value">{{ "%.2f"|format(cur.purchases) }} ₽</div>
-    {{ delta(deltas.purchases) }}
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-label">{{ t('dashboard.money_balance', lang) }}</div>
-    <div class="kpi-value">{{ "%.2f"|format(money) }} ₽</div>
-    <span class="delta neutral">{{ t('dashboard.period', lang) }}: сейчас</span>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-label">{{ t('dashboard.stock_value', lang) }}</div>
-    <div class="kpi-value">{{ "%.2f"|format(stock_value) }} ₽</div>
-    <span class="delta neutral">{{ stock_items }} {{ t('dashboard.units', lang) }}</span>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-label">{{ t('dashboard.receivable', lang) }}</div>
-    <div class="kpi-value">{{ "%.2f"|format(receivable) }} ₽</div>
-    <span class="delta neutral">—</span>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-label">{{ t('dashboard.payable', lang) }}</div>
-    <div class="kpi-value">{{ "%.2f"|format(payable) }} ₽</div>
-    <span class="delta neutral">—</span>
+  <div class="card chart-card">
+    <div class="card-header"><h2>{{ t('dashboard.money_flow', lang) }}</h2></div>
+    <div class="chart-box"><canvas id="money-chart"></canvas></div>
   </div>
 </div>
 
-<!-- График по дням -->
-<div class="card" style="margin-top:16px">
-  <div class="card-header">
-    <h2>{{ t('dashboard.by_day', lang) }}</h2>
-    <span class="muted small">{{ start }} — {{ end }}</span>
-  </div>
-  <div class="chart-box"><canvas id="daily-chart"></canvas></div>
-</div>
-
-<!-- Топы -->
-<div class="dash-grid">
-  <div class="card">
+<div class="charts-grid">
+  <div class="card chart-card">
     <div class="card-header"><h2>{{ t('dashboard.top_items', lang) }}</h2></div>
-    {% if top_items %}
-    <div class="table-wrap">
-      <table class="table">
-        <thead><tr><th>{{ t('common.name', lang) }}</th><th class="num">{{ t('dashboard.units', lang) }}</th><th class="num">{{ t('dashboard.amount', lang) }}</th></tr></thead>
-        <tbody>
-          {% for r in top_items %}
-          <tr><td>{{ r.name }}</td><td class="num">{{ r.quantity }}</td><td class="num">{{ "%.2f"|format(r.amount) }} ₽</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}<div class="muted small" style="padding:8px 0">{{ t('rmk.empty', lang) }}</div>{% endif %}
+    <div class="chart-box"><canvas id="items-chart"></canvas></div>
   </div>
-
-  <div class="card">
+  <div class="card chart-card">
     <div class="card-header"><h2>{{ t('dashboard.top_clients', lang) }}</h2></div>
-    {% if top_clients %}
-    <div class="table-wrap">
-      <table class="table">
-        <thead><tr><th>{{ t('common.name', lang) }}</th><th class="num">{{ t('dashboard.amount', lang) }}</th></tr></thead>
-        <tbody>
-          {% for r in top_clients %}
-          <tr><td>{{ r.name }}</td><td class="num">{{ "%.2f"|format(r.amount) }} ₽</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}<div class="muted small" style="padding:8px 0">{{ t('rmk.empty', lang) }}</div>{% endif %}
+    <div class="chart-box"><canvas id="clients-chart"></canvas></div>
   </div>
 </div>
 
@@ -162,44 +152,67 @@
   {% else %}<div class="muted small" style="padding:8px 0">{{ t('rmk.empty', lang) }}</div>{% endif %}
 </div>
 
-<!-- Быстрые действия -->
-<div class="card">
-  <div class="card-header"><h2>{{ t('dashboard.quick_actions', lang) }}</h2></div>
-  <div class="flex flex-wrap">
-    <a class="btn primary" href="/documents/new?doc_type=rashod">{{ t('doc.rashod', lang) }}</a>
-    <a class="btn secondary" href="/documents/new?doc_type=prihod">{{ t('doc.prihod', lang) }}</a>
-    <a class="btn secondary" href="/documents/new?doc_type=peremeshenie">{{ t('doc.peremeshenie', lang) }}</a>
-    <a class="btn secondary" href="/documents/new?doc_type=pko">{{ t('doc.pko', lang) }}</a>
-    <a class="btn text" href="/documents">{{ t('menu.documents', lang) }} →</a>
-  </div>
-</div>
-
 <script src="/static/js/chart.umd.min.js"></script>
 <script>
 (function () {
   var labels = {{ chart_labels_json | safe }};
   var revenue = {{ chart_revenue_json | safe }};
   var profit = {{ chart_profit_json | safe }};
-  new Chart(document.getElementById('daily-chart'), {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [
-        { label: {{ t('dashboard.revenue', lang) | tojson }}, data: revenue, borderColor: '#0a84ff', backgroundColor: 'rgba(10,132,255,0.08)', tension: 0.3, fill: true },
-        { label: {{ t('dashboard.profit', lang) | tojson }}, data: profit, borderColor: '#30d158', backgroundColor: 'rgba(48,209,88,0.08)', tension: 0.3, fill: true }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { labels: { color: '#8e8e93' } } },
-      scales: {
-        x: { ticks: { color: '#8e8e93', maxTicksLimit: 12 } },
-        y: { ticks: { color: '#8e8e93' }, grid: { color: 'rgba(120,120,128,0.12)' } }
-      }
-    }
-  });
+  var orders = {{ chart_orders_json | safe }};
+  var moneyLabels = {{ chart_money_labels_json | safe }};
+  var income = {{ chart_income_json | safe }};
+  var expense = {{ chart_expense_json | safe }};
+  var topItems = {{ top_items_json | safe }};
+  var topClients = {{ top_clients_json | safe }};
+
+  var grid = { color: 'rgba(120,120,128,0.12)' };
+  var tick = { color: '#8e8e93' };
+  var legend = { labels: { color: '#8e8e93', boxWidth: 10, boxHeight: 10 } };
+
+  function line(id, labels, datasets) {
+    return new Chart(document.getElementById(id), {
+      type: 'line',
+      data: { labels: labels, datasets: datasets },
+      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: { legend: legend },
+        scales: { x: { ticks: { ...tick, maxTicksLimit: 12 }, grid: { display: false } }, y: { ticks: tick, grid: grid } } }
+    });
+  }
+  function bar(id, labels, datasets) {
+    return new Chart(document.getElementById(id), {
+      type: 'bar',
+      data: { labels: labels, datasets: datasets },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: legend },
+        scales: { x: { ticks: { ...tick, maxTicksLimit: 12 }, grid: { display: false } }, y: { ticks: tick, grid: grid } } }
+    });
+  }
+  function hbar(id, labels, data, color) {
+    return new Chart(document.getElementById(id), {
+      type: 'bar',
+      data: { labels: labels, datasets: [{ data: data, backgroundColor: color, borderRadius: 4 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { ticks: tick, grid: grid }, y: { ticks: { ...tick, autoSkip: false }, grid: { display: false } } } }
+    });
+  }
+
+  line('daily-chart', labels, [
+    { label: {{ t('dashboard.revenue', lang) | tojson }}, data: revenue, borderColor: '#0a84ff', backgroundColor: 'rgba(10,132,255,0.08)', tension: 0.3, fill: true, pointRadius: 0 },
+    { label: {{ t('dashboard.profit', lang) | tojson }}, data: profit, borderColor: '#30d158', backgroundColor: 'rgba(48,209,88,0.08)', tension: 0.3, fill: true, pointRadius: 0 }
+  ]);
+
+  bar('orders-chart', labels, [
+    { label: {{ t('dashboard.sales_count', lang) | tojson }}, data: orders, backgroundColor: '#5e5ce6', borderRadius: 3 }
+  ]);
+
+  bar('money-chart', moneyLabels, [
+    { label: {{ t('dashboard.income', lang) | tojson }}, data: income, backgroundColor: '#30d158', borderRadius: 3 },
+    { label: {{ t('dashboard.expense', lang) | tojson }}, data: expense, backgroundColor: '#ff9f0a', borderRadius: 3 }
+  ]);
+
+  if (topItems.length) hbar('items-chart', topItems.map(function (r) { return r.name; }), topItems.map(function (r) { return r.amount; }), '#0a84ff');
+  if (topClients.length) hbar('clients-chart', topClients.map(function (r) { return r.name; }), topClients.map(function (r) { return r.amount; }), '#30d158');
 })();
 </script>
 {% endblock %}

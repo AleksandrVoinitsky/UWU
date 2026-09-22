@@ -221,6 +221,7 @@ async def dashboard(
     payable = -sum((s["debt"] for s in settlements if s["debt"] < 0), Decimal("0"))
 
     daily = await report_service.daily_sales(session, start, end)
+    daily_money = await report_service.daily_money_flow(session, start, end)
     top_items = await report_service.top_items(session, start, end)
     top_clients = await report_service.top_counterparties(session, start, end)
     low = await report_service.low_stock(session)
@@ -259,6 +260,16 @@ async def dashboard(
         chart_labels_json=json.dumps([r["date"] for r in daily]),
         chart_revenue_json=json.dumps([float(r["revenue"]) for r in daily]),
         chart_profit_json=json.dumps([float(r["profit"]) for r in daily]),
+        chart_orders_json=json.dumps([r["orders"] for r in daily]),
+        chart_money_labels_json=json.dumps([r["date"] for r in daily_money]),
+        chart_income_json=json.dumps([float(r["income"]) for r in daily_money]),
+        chart_expense_json=json.dumps([float(r["expense"]) for r in daily_money]),
+        top_items_json=json.dumps(
+            [{"name": r["name"], "amount": float(r["amount"])} for r in top_items]
+        ),
+        top_clients_json=json.dumps(
+            [{"name": r["name"], "amount": float(r["amount"])} for r in top_clients]
+        ),
     )
 
 
