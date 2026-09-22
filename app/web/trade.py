@@ -227,6 +227,37 @@ async def dashboard(
     low = await report_service.low_stock(session)
     recent = await report_service.recent_sales(session)
 
+    # Рекомендации к заказу у поставщика (с пагинацией по всей номенклатуре).
+    constants = await catalog_service.get_constants(session)
+    reorder_lookback = int(constants.get("reorder_lookback_days") or 30)
+    reorder_lead = int(constants.get("reorder_lead_days") or 7)
+    reorder_safety = int(constants.get("reorder_safety_days") or 3)
+    replenish = await report_service.replenishment_recommendations(
+        session,
+        lookback_days=reorder_lookback,
+        lead_days=reorder_lead,
+        safety_days=reorder_safety,
+    )
+
+    replenish_page_size = 20
+    try:
+        replenish_page = max(1, int(request.query_params.get("repl_page", "1")))
+    except (TypeError, ValueError):
+        replenish_page = 1
+    replenish_total = len(replenish)
+    replenish_total_pages = max(
+        1, (replenish_total + replenish_page_size - 1) // replenish_page_size
+    )
+    replenish_page = min(replenish_page, replenish_total_pages)
+    replenish_offset = (replenish_page - 1) * replenish_page_size
+    replenish_items = replenish[replenish_offset : replenish_offset + replenish_page_size]
+
+    # Базовый query для ссылок пагинации (сохраняет выбранный период).
+    if period:
+        repl_qs = f"?period={period}"
+    else:
+        repl_qs = f"?start={start.isoformat()}&end={end.isoformat()}"
+
     deltas = {
         "revenue": _pct_change(cur["revenue"], prev["revenue"]),
         "profit": _pct_change(cur["profit"], prev["profit"]),
@@ -257,6 +288,14 @@ async def dashboard(
         top_clients=top_clients,
         low_stock=low,
         recent_sales=recent,
+        replenish=replenish_items,
+        replenish_total=replenish_total,
+        replenish_page=replenish_page,
+        replenish_total_pages=replenish_total_pages,
+        repl_qs=repl_qs,
+        reorder_lookback=reorder_lookback,
+        reorder_lead=reorder_lead,
+        reorder_safety=reorder_safety,
         chart_labels_json=json.dumps([r["date"] for r in daily]),
         chart_revenue_json=json.dumps([float(r["revenue"]) for r in daily]),
         chart_profit_json=json.dumps([float(r["profit"]) for r in daily]),

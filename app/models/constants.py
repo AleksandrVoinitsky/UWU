@@ -28,6 +28,10 @@ DEFAULT_CONSTANTS: dict[str, Any] = {
     "cost_method": "fifo",          # Метод списания себестоимости
     "prefix_ib": "",                # Префикс информационной базы
     "enforce_min_price": False,     # Контроль минимальной цены (не ниже закупочной)
+    # Рекомендации к заказу у поставщика (расчёт оптимального остатка).
+    "reorder_lookback_days": 30,    # Период анализа продаж, дней
+    "reorder_lead_days": 7,         # Срок поставки, дней
+    "reorder_safety_days": 3,       # Страховой запас, дней
     # Шапка печатной формы накладной.
     "invoice_company_name": "",     # Название организации
     "invoice_company_inn": "",      # ИНН

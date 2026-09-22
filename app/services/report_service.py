@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal
 
 from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -810,4 +810,95 @@ async def recent_sales(session: AsyncSession, limit: int = 10) -> list[dict]:
                 "profit": doc.total - cost,
             }
         )
+    return rows
+
+
+async def replenishment_recommendations(
+    session: AsyncSession,
+    *,
+    lookback_days: int = 30,
+    lead_days: int = 7,
+    safety_days: int = 3,
+) -> list[dict]:
+    """Рекомендации к заказу у поставщика (по всей номенклатуре).
+
+    Для каждой позиции рассчитывает средние продажи за ``lookback_days`` дней и
+    оптимальный остаток (спрос за время поставки + страховой запас), затем —
+    рекомендуемое количество к заказу ``to_order = target - stock``.
+
+    Возвращает список, отсортированный по убыванию количества к заказу
+    (позиции, требующие закупки, — сверху). Позиции без продаж помечаются
+    ``status="no_sales"``.
+    """
+    today = date.today()
+    start = today - timedelta(days=lookback_days)
+
+    stock_rows = (
+        await session.execute(
+            select(
+                Nomenklatura.id,
+                Nomenklatura.name,
+                func.coalesce(func.sum(StockBatch.quantity), 0),
+            )
+            .outerjoin(StockBatch, StockBatch.nomenklatura_id == Nomenklatura.id)
+            .group_by(Nomenklatura.id, Nomenklatura.name)
+        )
+    ).all()
+
+    sold_map = {
+        nid: qty
+        for nid, qty in (
+            await session.execute(
+                select(DocumentItem.nomenklatura_id, func.sum(DocumentItem.quantity))
+                .join(Document, Document.id == DocumentItem.document_id)
+                .where(
+                    Document.doc_type == DocType.RASHOD.value,
+                    Document.status == DocumentStatus.POSTED.value,
+                    Document.date >= start,
+                )
+                .group_by(DocumentItem.nomenklatura_id)
+            )
+        ).all()
+    }
+
+    rows: list[dict] = []
+    for nid, name, stock in stock_rows:
+        stock_qty = stock or Decimal("0")
+        sold = sold_map.get(nid, Decimal("0")) or Decimal("0")
+
+        if sold > 0:
+            avg_daily = sold / Decimal(lookback_days)
+            reorder_point = (avg_daily * lead_days).to_integral_value(
+                rounding=ROUND_CEILING
+            )
+            target = (avg_daily * (lead_days + safety_days)).to_integral_value(
+                rounding=ROUND_CEILING
+            )
+        else:
+            avg_daily = Decimal("0")
+            reorder_point = Decimal("0")
+            target = Decimal("0")
+
+        to_order = max(Decimal("0"), target - stock_qty)
+        if sold == 0:
+            status = "no_sales"
+        elif stock_qty <= reorder_point:
+            status = "order"
+        else:
+            status = "ok"
+
+        rows.append(
+            {
+                "nomenklatura": name,
+                "stock": stock_qty,
+                "sold": sold,
+                "avg_daily": avg_daily,
+                "reorder_point": reorder_point,
+                "target": target,
+                "to_order": to_order,
+                "status": status,
+            }
+        )
+
+    rows.sort(key=lambda r: (-float(r["to_order"]), r["nomenklatura"]))
     return rows

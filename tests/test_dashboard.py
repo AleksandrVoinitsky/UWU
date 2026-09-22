@@ -94,6 +94,67 @@ async def test_daily_money_flow_shape(seeded_session):
         assert set(r.keys()) == {"date", "income", "expense"}
 
 
+async def test_replenishment_recommendations_orders(seeded_session):
+    """Позиция с низким остатком относительно продаж попадает в «заказать»."""
+    item = await catalog_service.create_one(
+        seeded_session, Nomenklatura, code="001", name="Товар", vid="tovar"
+    )
+    sklad = await catalog_service.create_one(
+        seeded_session, Sklad, code="001", name="Склад", tip="optovy"
+    )
+    prihod = await document_service.create_document(
+        seeded_session,
+        doc_type=DocType.PRIHOD,
+        doc_date=date.today(),
+        sklad_id=sklad.id,
+        items=[{"nomenklatura_id": item.id, "quantity": Decimal("10"), "price": Decimal("100")}],
+    )
+    await document_service.post_document(seeded_session, prihod)
+    rashod = await document_service.create_document(
+        seeded_session,
+        doc_type=DocType.RASHOD,
+        doc_date=date.today(),
+        sklad_id=sklad.id,
+        items=[{"nomenklatura_id": item.id, "quantity": Decimal("9"), "price": Decimal("300")}],
+    )
+    await document_service.post_document(seeded_session, rashod)
+
+    rows = await report_service.replenishment_recommendations(
+        seeded_session, lookback_days=10, lead_days=7, safety_days=3
+    )
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["nomenklatura"] == "Товар"
+    assert r["stock"] == Decimal("1")
+    assert r["sold"] == Decimal("9")
+    assert r["status"] == "order"
+    # avg = 9/10 = 0.9; target = ceil(0.9 * 10) = 9; to_order = 9 - 1 = 8.
+    assert r["to_order"] == Decimal("8")
+
+
+async def test_replenishment_no_sales(seeded_session):
+    """Товар без продаж помечается «нет продаж» и не рекомендуется к заказу."""
+    await catalog_service.create_one(
+        seeded_session, Nomenklatura, code="001", name="Новичок", vid="tovar"
+    )
+    rows = await report_service.replenishment_recommendations(seeded_session)
+    assert len(rows) == 1
+    assert rows[0]["status"] == "no_sales"
+    assert rows[0]["to_order"] == Decimal("0")
+
+
+async def test_dashboard_route_has_reorder_section(client, seeded_session):
+    await _seed_sale(seeded_session)
+    user = await user_service.create_user(
+        seeded_session, login="operator3", password="secret123"
+    )
+    client.cookies.set("access_token", create_access_token(str(user.id)))
+    resp = await client.get("/")
+    assert resp.status_code == 200
+    assert "Рекомендации к заказу" in resp.text
+    assert "repl_page" in resp.text or "К заказу" in resp.text
+
+
 async def test_top_items(seeded_session):
     await _seed_sale(seeded_session)
     rows = await report_service.top_items(seeded_session, date(2025, 1, 1), date(2025, 1, 31))

@@ -229,6 +229,7 @@ a:hover { text-decoration: underline; }
 .badge.draft  { background: var(--warn-bg); color: var(--warn); }
 .badge.deleted { background: var(--bad-bg); color: var(--bad); }
 .badge.neutral { background: var(--surface-hover); color: var(--text-secondary); }
+.badge.order { background: var(--warn-bg); color: var(--warn); }
 
 /* ---------- Search ---------- */
 .search-input {
@@ -973,6 +974,14 @@ input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
 .chart-card { padding: 16px 18px; }
 .chart-box { position: relative; height: 260px; margin-top: 8px; }
 .chart-box.tall { height: 320px; }
+
+/* Пагинация списка рекомендаций */
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
 
 /* ---------- Настройки ботов (админка) ---------- */
 .bot-card {

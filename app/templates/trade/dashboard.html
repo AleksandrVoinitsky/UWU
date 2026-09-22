@@ -152,6 +152,65 @@
   {% else %}<div class="muted small" style="padding:8px 0">{{ t('rmk.empty', lang) }}</div>{% endif %}
 </div>
 
+<!-- Рекомендации к заказу -->
+{{ section(t('dashboard.reorder', lang)) }}
+<div class="card">
+  <div class="card-header">
+    <h2>{{ t('dashboard.reorder', lang) }}</h2>
+    <span class="muted small">{{ t('dashboard.reorder_pages', lang, page=replenish_page, total=replenish_total_pages) }} · {{ replenish_total }} {{ t('dashboard.units', lang) }}</span>
+  </div>
+  <div class="muted small mb">{{ t('dashboard.reorder_hint', lang, days=reorder_lookback, lead=reorder_lead, safety=reorder_safety) }}</div>
+  {% if replenish %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>{{ t('catalog.nomenklatura', lang) }}</th>
+          <th class="num">{{ t('dashboard.reorder_stock', lang) }}</th>
+          <th class="num">{{ t('dashboard.reorder_sold', lang, days=reorder_lookback) }}</th>
+          <th class="num">{{ t('dashboard.reorder_avg', lang) }}</th>
+          <th class="num">{{ t('dashboard.reorder_target', lang) }}</th>
+          <th class="num">{{ t('dashboard.reorder_to_order', lang) }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in replenish %}
+        <tr>
+          <td>{{ r.nomenklatura }}</td>
+          <td class="num">{{ "%.0f"|format(r.stock) }}</td>
+          <td class="num">{{ "%.0f"|format(r.sold) }}</td>
+          <td class="num muted">{{ "%.2f"|format(r.avg_daily) }}</td>
+          <td class="num">{{ "%.0f"|format(r.target) }}</td>
+          <td class="num" style="font-weight:600">{% if r.to_order > 0 %}{{ "%.0f"|format(r.to_order) }}{% else %}—{% endif %}</td>
+          <td class="num">
+            {% if r.status == 'order' %}<span class="badge order">{{ t('dashboard.reorder_order', lang) }}</span>
+            {% elif r.status == 'ok' %}<span class="badge posted">{{ t('dashboard.reorder_ok', lang) }}</span>
+            {% else %}<span class="badge neutral">{{ t('dashboard.reorder_no_sales', lang) }}</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="pagination">
+    {% if replenish_page > 1 %}
+    <a class="btn secondary small" href="{{ repl_qs }}&repl_page={{ replenish_page - 1 }}">‹</a>
+    {% else %}
+    <span class="btn secondary small" style="opacity:.4">‹</span>
+    {% endif %}
+    <span class="muted small">{{ t('dashboard.reorder_pages', lang, page=replenish_page, total=replenish_total_pages) }}</span>
+    {% if replenish_page < replenish_total_pages %}
+    <a class="btn secondary small" href="{{ repl_qs }}&repl_page={{ replenish_page + 1 }}">›</a>
+    {% else %}
+    <span class="btn secondary small" style="opacity:.4">›</span>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="muted small" style="padding:8px 0">{{ t('rmk.empty', lang) }}</div>
+  {% endif %}
+</div>
+
 <script src="/static/js/chart.umd.min.js"></script>
 <script>
 (function () {
