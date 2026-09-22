@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: A4; margin: 24mm 20mm; }
+    body { font-family: "DejaVu Sans", "Segoe UI", Arial, sans-serif; color: #1d1d1f; font-size: 12px; line-height: 1.5; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .muted { color: #6e6e73; font-size: 11px; }
+    .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+    .meta { text-align: right; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    th, td { border-bottom: 1px solid #e3e3e8; padding: 8px 10px; text-align: left; }
+    th { font-size: 11px; text-transform: uppercase; color: #6e6e73; border-bottom: 2px solid #d2d2d7; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .total { display: flex; justify-content: flex-end; font-size: 15px; font-weight: 600; margin-top: 8px; }
+    .footer { margin-top: 32px; font-size: 10px; color: #8e8e93; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>Заказ №{{ order.number }}</h1>
+      <div class="muted">от {{ order.date }}</div>
+    </div>
+    <div class="meta">
+      <div>{{ order.customer_name or 'Покупатель' }}</div>
+      <div class="muted">{{ order.customer_phone }}</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Товар</th><th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th></tr>
+    </thead>
+    <tbody>
+      {% for i in order['items'] %}
+      <tr>
+        <td>{{ i.name }}</td>
+        <td class="num">{{ i.quantity }}</td>
+        <td class="num">{{ "%.2f"|format(i.price) }}</td>
+        <td class="num">{{ "%.2f"|format(i.amount) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="total">Итого: {{ "%.2f"|format(order.total) }} ₽</div>
+
+  <div class="footer">Заказ создан в системе UWU. Благодарим за покупку!</div>
+</body>
+</html>

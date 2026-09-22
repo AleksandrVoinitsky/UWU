@@ -64,6 +64,11 @@ def create_app() -> FastAPI:
     application.include_router(api_router)
     application.include_router(web_router)
 
+    # Клиентский сайт покупателя (отдельная ветвь процесса, свой домен).
+    from app.customer import create_customer_app
+
+    application.mount("/shop", create_customer_app())
+
     application.mount(
         "/static", StaticFiles(directory="app/static"), name="static"
     )

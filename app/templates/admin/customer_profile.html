@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block page_title %}Покупатель {{ customer.phone }}{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header"><h2>{{ customer.name or 'Покупатель' }}</h2><a class="btn text" href="/admin/customers">← Назад</a></div>
+  <div class="form-row">
+    <div class="field"><label>Телефон</label><div>{{ customer.phone }}</div></div>
+    <div class="field"><label>Имя</label><div>{{ customer.name or '—' }}</div></div>
+    <div class="field"><label>Создан</label><div class="muted">{{ customer.created_at.date() if customer.created_at else '—' }}</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><h2>Заказы ({{ orders|length }})</h2></div>
+  {% if orders %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>№</th><th>Дата</th><th class="num">Сумма</th><th>Статус</th></tr></thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td>{{ o.number }}</td>
+          <td>{{ o.date }}</td>
+          <td class="num">{{ "%.2f"|format(o.total) }} ₽</td>
+          <td>{% if (o.extra or {}).get('state') == 'new' %}<span class="badge draft">Новая</span>{% else %}<span class="badge neutral">{{ (o.extra or {}).get('state') or '—' }}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<div class="muted">Заказов нет.</div>{% endif %}
+</div>
+{% endblock %}

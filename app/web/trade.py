@@ -336,6 +336,7 @@ async def catalog_nomenklatura(request: Request, session=Depends(get_session), u
     nds = await catalog_service.list_all(session, cat.StavkaNDS)
     tipy = await catalog_service.list_all(session, cat.TipTsen)
     tipy_map = {t.id: t for t in tipy}
+    categories = await catalog_service.list_all(session, cat.Category)
 
     # Итоговая цена для таблицы.
     eff_prices = {
@@ -344,7 +345,8 @@ async def catalog_nomenklatura(request: Request, session=Depends(get_session), u
 
     return _page(
         request, user, "trade/nomenklatura.html",
-        items=items, units=units, nds=nds, tipy=tipy, eff_prices=eff_prices,
+        items=items, units=units, nds=nds, tipy=tipy, categories=categories,
+        eff_prices=eff_prices,
     )
 
 
@@ -354,6 +356,7 @@ async def create_nomenklatura(
     artikul: str = Form(""), base_unit_id: str = Form(""), nds_rate_id: str = Form(""),
     purchase_price: str = Form(""), retail_price: str = Form(""),
     price_mode: str = Form("free"), tip_tsen_id: str = Form(""),
+    category_id: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
     denied = _deny(user, "catalog.write")
@@ -369,6 +372,7 @@ async def create_nomenklatura(
         retail_price=_or_decimal(retail_price),
         price_mode=price_mode if price_mode in ("free", "by_type") else "free",
         tip_tsen_id=int(tip_tsen_id) if (price_mode == "by_type" and tip_tsen_id) else None,
+        category_id=int(category_id) if category_id else None,
     )
     return RedirectResponse("/catalog/nomenklatura", status_code=303)
 
@@ -524,6 +528,40 @@ async def create_tip_tsen(
     return RedirectResponse("/catalog/tipy_tsen", status_code=303)
 
 
+@router.get("/catalog/categories", response_class=HTMLResponse)
+async def catalog_categories(request: Request, session=Depends(get_session), user=Depends(get_current_user_from_cookie)):
+    return await _catalog_page(request, user, session, cat.Category, "trade/categories.html", "Категории товаров")
+
+
+@router.post("/catalog/categories")
+async def create_category(
+    name: str = Form(...), sort: str = Form("0"),
+    session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
+    try:
+        sort_value = int(sort)
+    except (TypeError, ValueError):
+        sort_value = 0
+    await catalog_service.create_one(session, cat.Category, name=name, sort=sort_value)
+    return RedirectResponse("/catalog/categories", status_code=303)
+
+
+@router.post("/catalog/categories/{item_id}/delete")
+async def delete_category(
+    item_id: int, session=Depends(get_session), user=Depends(get_current_user_from_cookie),
+):
+    denied = _deny(user, "catalog.write")
+    if denied:
+        return denied
+    obj = await catalog_service.get_one(session, cat.Category, item_id)
+    if obj:
+        await catalog_service.delete_one(session, obj)
+    return RedirectResponse("/catalog/categories", status_code=303)
+
+
 # --- Редактирование справочников (по клику на строку) ---
 
 
@@ -540,7 +578,7 @@ def _or_decimal(value: str) -> Decimal | None:
 async def update_nomenklatura(
     item_id: int, name: str = Form(...), full_name: str = Form(""), vid: str = Form("tovar"),
     artikul: str = Form(""), purchase_price: str = Form(""), retail_price: str = Form(""),
-    price_mode: str = Form("free"), tip_tsen_id: str = Form(""),
+    price_mode: str = Form("free"), tip_tsen_id: str = Form(""), category_id: str = Form(""),
     session=Depends(get_session), user=Depends(get_current_user_from_cookie),
 ):
     denied = _deny(user, "catalog.write")
@@ -557,6 +595,7 @@ async def update_nomenklatura(
         obj.retail_price = _or_decimal(retail_price)
         obj.price_mode = price_mode if price_mode in ("free", "by_type") else "free"
         obj.tip_tsen_id = int(tip_tsen_id) if (price_mode == "by_type" and tip_tsen_id) else None
+        obj.category_id = int(category_id) if category_id else None
         await session.commit()
     return RedirectResponse("/catalog/nomenklatura", status_code=303)
 

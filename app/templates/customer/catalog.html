@@ -1,0 +1,51 @@
+{% extends "customer/base.html" %}
+{% block title %}Каталог · UWU Shop{% endblock %}
+{% block content %}
+
+<div class="shop-layout">
+  <aside class="shop-sidebar">
+    <h3>Категории</h3>
+    <ul class="shop-cats">
+      <li><a class="{% if not category_id %}active{% endif %}" href="{{ prefix }}/">Все товары</a></li>
+      {% for c in categories %}
+      <li><a class="{% if category_id == c.id %}active{% endif %}" href="{{ prefix }}/catalog?category_id={{ c.id }}">{{ c.name }}</a></li>
+      {% endfor %}
+    </ul>
+  </aside>
+
+  <div class="shop-content">
+    <form class="shop-search" method="get" action="{{ prefix }}/catalog">
+      <input type="text" name="search" value="{{ search or '' }}" placeholder="Поиск товара…">
+      {% if category_id %}<input type="hidden" name="category_id" value="{{ category_id }}">{% endif %}
+      <button class="btn primary" type="submit">Найти</button>
+    </form>
+
+    {% if products %}
+    <div class="product-grid">
+      {% for p in products %}
+      <div class="product-card">
+        <div class="product-img">
+          {% if p.image_path %}<img src="/uploads/{{ p.image_path }}" alt="{{ p.name }}">{% else %}<div class="product-img-empty">⌕</div>{% endif %}
+        </div>
+        <div class="product-body">
+          <div class="product-name">{{ p.name }}</div>
+          {% if p.full_name %}<div class="product-desc">{{ p.full_name }}</div>{% endif %}
+          <div class="product-foot">
+            <span class="product-price">{{ "%.2f"|format(p.price) }} ₽</span>
+            <form method="post" action="{{ prefix }}/cart/add">
+              <input type="hidden" name="nomenklatura_id" value="{{ p.id }}">
+              <input type="hidden" name="quantity" value="1">
+              <button class="btn primary small" type="submit">В корзину</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card"><div class="muted">Нет доступных товаров.</div></div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

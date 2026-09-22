@@ -1,0 +1,26 @@
+{% extends "customer/base.html" %}
+{% block title %}Мои заказы · UWU Shop{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header"><h2>Мои заказы</h2></div>
+  {% if orders %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>№</th><th>Дата</th><th class="num">Сумма</th><th></th></tr></thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td>{{ o.number }}</td>
+          <td>{{ o.date }}</td>
+          <td class="num">{{ "%.2f"|format(o.total) }} ₽</td>
+          <td class="num"><a class="btn text small" href="{{ prefix }}/orders/{{ o.id }}">Открыть</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="muted">Заказов пока нет.</div>
+  {% endif %}
+</div>
+{% endblock %}

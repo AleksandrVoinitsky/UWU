@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}UWU Shop{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/customer.css">
+</head>
+<body>
+  <header class="shop-header">
+    <a class="shop-brand" href="{{ prefix }}/">UWU Shop</a>
+    <nav class="shop-nav">
+      <a href="{{ prefix }}/">Каталог</a>
+      {% if customer %}
+        <a href="{{ prefix }}/cart">Корзина</a>
+        <a href="{{ prefix }}/orders">Заказы</a>
+        <span class="shop-user">{{ customer.name or customer.phone }}</span>
+        <a href="{{ prefix }}/logout">Выйти</a>
+      {% else %}
+        <a href="{{ prefix }}/login">Войти</a>
+        <a href="{{ prefix }}/register">Регистрация</a>
+      {% endif %}
+    </nav>
+  </header>
+  <main class="shop-main">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

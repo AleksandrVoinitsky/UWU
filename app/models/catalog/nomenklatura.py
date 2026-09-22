@@ -41,6 +41,8 @@ class Nomenklatura(Base, IdMixin, TimestampMixin):
     properties: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     # Путь к изображению товара (относительно /uploads).
     image_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Категория для каталога покупателя.
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"), nullable=True)
 
     # Цены: закупочная (база для наценки) и свободная розничная (без видов цен).
     purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
@@ -56,6 +58,7 @@ class Nomenklatura(Base, IdMixin, TimestampMixin):
     base_unit: Mapped["Edinitsa | None"] = relationship(foreign_keys=[base_unit_id])  # noqa: F821
     main_unit: Mapped["Edinitsa | None"] = relationship(foreign_keys=[main_unit_id])  # noqa: F821
     nds_rate: Mapped["StavkaNDS | None"] = relationship()  # noqa: F821
+    category: Mapped["Category | None"] = relationship()  # noqa: F821
 
 
 class TipTsen(Base, IdMixin, TimestampMixin):

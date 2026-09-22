@@ -245,3 +245,51 @@ async def admin_save_bots(
             session, channel, enabled=enabled, token=token, name=name
         )
     return RedirectResponse("/admin/bots", status_code=303)
+
+
+@router.get("/admin/customers", response_class=HTMLResponse)
+async def admin_customers(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    if not user.is_admin:
+        return RedirectResponse("/", status_code=303)
+    from app.services import customer_service
+
+    customers = await customer_service.list_customers(session)
+    return _page(request, user, "admin/customers.html", customers=customers)
+
+
+@router.get("/admin/customers/{customer_id}", response_class=HTMLResponse)
+async def admin_customer_profile(
+    customer_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    if not user.is_admin:
+        return RedirectResponse("/", status_code=303)
+    from app.services import customer_service
+
+    customer = await customer_service.get_customer(session, customer_id)
+    if customer is None:
+        return HTMLResponse("Покупатель не найден", status_code=404)
+    orders = await customer_service.list_customer_orders(session, customer_id)
+    return _page(request, user, "admin/customer_profile.html", customer=customer, orders=orders)
+
+
+@router.post("/admin/customers/{customer_id}/delete")
+async def admin_delete_customer(
+    customer_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    if not user.is_admin:
+        return RedirectResponse("/", status_code=303)
+    from app.services import customer_service
+
+    customer = await customer_service.get_customer(session, customer_id)
+    if customer:
+        await customer_service.delete_customer(session, customer)
+    return RedirectResponse("/admin/customers", status_code=303)

@@ -1,0 +1,27 @@
+{% extends "customer/base.html" %}
+{% block title %}{% if mode == 'register' %}Регистрация{% else %}Вход{% endif %} · UWU Shop{% endblock %}
+{% block content %}
+<div class="shop-auth">
+  <div class="card" style="max-width:400px;margin:0 auto">
+    <h2 style="margin-bottom:16px">{% if mode == 'register' %}Регистрация{% else %}Вход{% endif %}</h2>
+    {% if error %}<div class="error mb">{{ error }}</div>{% endif %}
+    {% if mode == 'register' %}
+    <form method="post" action="{{ prefix }}/register">
+      <div class="field"><label>Имя (необязательно)</label><input type="text" name="name"></div>
+      <div class="field"><label>Телефон</label><input type="text" name="phone" required></div>
+      <div class="field"><label>Пароль</label><input type="password" name="password" required></div>
+      <div class="field"><label>Повторите пароль</label><input type="password" name="password2" required></div>
+      <button class="btn primary" type="submit" style="width:100%">Создать аккаунт</button>
+    </form>
+    <div class="muted small" style="margin-top:12px">Уже есть аккаунт? <a href="{{ prefix }}/login">Войти</a></div>
+    {% else %}
+    <form method="post" action="{{ prefix }}/login">
+      <div class="field"><label>Телефон</label><input type="text" name="phone" required></div>
+      <div class="field"><label>Пароль</label><input type="password" name="password" required></div>
+      <button class="btn primary" type="submit" style="width:100%">Войти</button>
+    </form>
+    <div class="muted small" style="margin-top:12px">Нет аккаунта? <a href="{{ prefix }}/register">Регистрация</a></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

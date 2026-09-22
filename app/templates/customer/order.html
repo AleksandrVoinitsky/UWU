@@ -1,0 +1,28 @@
+{% extends "customer/base.html" %}
+{% block title %}Заказ {{ order.number }} · UWU Shop{% endblock %}
+{% block content %}
+<div class="card" style="max-width:640px;margin:0 auto">
+  <div class="card-header">
+    <h2>Заказ №{{ order.number }}</h2>
+    <a class="btn secondary small" href="{{ prefix }}/orders/{{ order.id }}/pdf">Скачать PDF</a>
+  </div>
+  <div class="muted small mb">от {{ order.date }} · {{ order.customer_phone }}</div>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Товар</th><th class="num">Кол-во</th><th class="num">Цена</th><th class="num">Сумма</th></tr></thead>
+      <tbody>
+        {% for i in order['items'] %}
+        <tr><td>{{ i.name }}</td><td class="num">{{ i.quantity }}</td><td class="num">{{ "%.2f"|format(i.price) }} ₽</td><td class="num">{{ "%.2f"|format(i.amount) }} ₽</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="cart-total">Итого: <strong>{{ "%.2f"|format(order.total) }} ₽</strong></div>
+
+  <div style="margin-top:20px;display:flex;gap:10px">
+    <a class="btn secondary" href="{{ prefix }}/">Продолжить покупки</a>
+    <a class="btn text" href="{{ prefix }}/orders">Мои заказы</a>
+  </div>
+</div>
+{% endblock %}

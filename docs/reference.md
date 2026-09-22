@@ -247,8 +247,50 @@
 | Модуль | Страницы |
 | --- | --- |
 | `web/auth.py` | `/login`, `/logout` |
-| `web/admin.py` | `/admin`, `/admin/users`, `/admin/roles`, `/admin/settings`, `/admin/audit`, `/admin/bots` |
-| `web/trade.py` | `/`, справочники `/catalog/*`, документы `/documents`, отчёты `/reports/*` |
+| `web/admin.py` | `/admin`, `/admin/users`, `/admin/roles`, `/admin/settings`, `/admin/audit`, `/admin/bots`, `/admin/customers` |
+| `web/trade.py` | `/`, справочники `/catalog/*` (в т.ч. `/catalog/categories`), документы `/documents`, отчёты `/reports/*` |
 | `web/docs.py` | `/admin/docs` (встроенная Markdown-документация) |
+
+## app/services/customer_service.py — клиентский сайт
+
+| Функция | Назначение |
+| --- | --- |
+| `register(session, phone, password, name)` | регистрация покупателя (телефон — логин) |
+| `authenticate(session, phone, password)` | вход покупателя |
+| `list_customers`, `get_customer`, `delete_customer` | управление покупателями (админка) |
+| `available_products(session, category_id, search)` | товары в наличии (с остатком) |
+| `get_cart`, `get_cart_items`, `cart_total`, `add_to_cart`, `set_cart_quantity`, `clear_cart` | корзина |
+| `checkout(session, customer)` | подтверждение → создание `ZAKAZ` + очистка корзины |
+| `match_kontragent_by_phone(session, phone)` | привязка к контрагенту по телефону |
+| `order_context(session, doc)` | контекст заказа для отображения/PDF |
+
+## app/services/pdf_service.py
+
+### `render_order_pdf(order) -> bytes`
+**Назначение:** PDF заказа покупателя (WeasyPrint, HTML → PDF).
+**Технически:** рендерит шаблон `customer/order_pdf.html` и конвертирует
+`HTML(string=...).write_pdf()`. WeasyPrint импортируется лениво.
+
+## app/customer/* — клиентское приложение
+
+| Модуль | Назначение |
+| --- | --- |
+| `customer/api.py` | REST API `/shop/api/*` (auth, каталог, корзина, заказ, PDF) |
+| `customer/web.py` | серверные страницы `/shop/*` |
+| `customer/deps.py` | `get_current_customer` (JWT покупателя из cookie/Bearer) |
+| `customer/app.py` | `create_customer_app()` (монтируется в main по `/shop`) |
+
+См. также [customer](customer.md).
+
+## app/models/customer.py
+
+### `class Customer`, `class Cart`, `class CartItem`
+**Назначение:** учётные записи покупателей и корзина (отдельные от сотрудников).
+
+## app/models/catalog/category.py
+
+### `class Category`
+**Назначение:** иерархический справочник категорий товаров (привязка
+`Nomenklatura.category_id`).
 
 См. также [api](api.md) и [security](security.md).

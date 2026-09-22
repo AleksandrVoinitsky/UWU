@@ -67,24 +67,67 @@ def verify_password(password: str, hashed: str) -> bool:
 
 
 def create_access_token(subject: str, expires_minutes: int | None = None) -> str:
-    """Создаёт JWT для пользователя (``subject`` — id пользователя)."""
+    """Создаёт JWT для пользователя-сотрудника (``subject`` — id пользователя).
+
+    В payload добавляется ``type="user"``, чтобы токены сотрудников и
+    покупателей не могли использоваться взаимозаменяемо.
+    """
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=expires_minutes or settings.access_token_expire_minutes
     )
-    payload = {"sub": subject, "exp": expire, "iat": datetime.now(timezone.utc)}
+    payload = {
+        "sub": subject,
+        "type": "user",
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+    }
     return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
 
 
+def create_customer_token(customer_id: int, expires_minutes: int | None = None) -> str:
+    """Создаёт JWT для покупателя (``customer_id``) с ``type="customer"``."""
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=expires_minutes or settings.access_token_expire_minutes
+    )
+    payload = {
+        "sub": str(customer_id),
+        "type": "customer",
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
+
+
+def _decode(token: str) -> dict | None:
+    """Декодирует JWT без проверки типа субъекта."""
+    try:
+        return jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
+    except jwt.PyJWTError:
+        return None
+
+
 def decode_access_token(token: str) -> int | None:
-    """Декодирует токен и возвращает ``sub`` как ``int`` либо ``None`` при ошибке.
+    """Декодирует токен сотрудника и возвращает ``sub`` как ``int``.
 
     Возвращает ``None`` в любом некорректном случае (неверная подпись, истёкший
-    срок, нечисловой ``sub``), чтобы вызывающий код не падал с ``ValueError``.
+    срок, нечисловой ``sub``) или если токен не помечен ``type="user"`` — это
+    не даёт токену покупателя аутентифицироваться как сотрудник.
     """
+    payload = _decode(token)
+    if payload is None or payload.get("type") != "user":
+        return None
     try:
-        payload = jwt.decode(
-            token, settings.secret_key, algorithms=[settings.jwt_algorithm]
-        )
         return int(payload.get("sub"))
-    except (jwt.PyJWTError, TypeError, ValueError):
+    except (TypeError, ValueError):
+        return None
+
+
+def decode_customer_token(token: str) -> int | None:
+    """Декодирует токен покупателя (``type="customer"``) и возвращает id."""
+    payload = _decode(token)
+    if payload is None or payload.get("type") != "customer":
+        return None
+    try:
+        return int(payload.get("sub"))
+    except (TypeError, ValueError):
         return None

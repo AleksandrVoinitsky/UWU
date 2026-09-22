@@ -1,0 +1,46 @@
+{% extends "customer/base.html" %}
+{% block title %}Корзина · UWU Shop{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header"><h2>Корзина</h2></div>
+  {% if error %}<div class="error mb">{{ error }}</div>{% endif %}
+  {% if items %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Товар</th><th class="num">Цена</th><th class="num">Кол-во</th><th class="num">Сумма</th><th></th></tr></thead>
+      <tbody>
+        {% for i in items %}
+        <tr>
+          <td>{{ i.name }}</td>
+          <td class="num">{{ "%.2f"|format(i.price) }} ₽</td>
+          <td class="num">
+            <form method="post" action="{{ prefix }}/cart/update" style="display:inline-flex;gap:6px;align-items:center">
+              <input type="hidden" name="item_id" value="{{ i.id }}">
+              <input type="number" name="quantity" value="{{ i.quantity }}" min="0" step="1" style="width:70px">
+              <button class="btn secondary small" type="submit">Обновить</button>
+            </form>
+          </td>
+          <td class="num">{{ "%.2f"|format(i.amount) }} ₽</td>
+          <td class="num">
+            <form method="post" action="{{ prefix }}/cart/update">
+              <input type="hidden" name="item_id" value="{{ i.id }}">
+              <input type="hidden" name="quantity" value="0">
+              <button class="btn text small danger" type="submit">Удалить</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="cart-footer">
+    <div class="cart-total">Итого: <strong>{{ "%.2f"|format(total) }} ₽</strong></div>
+    <form method="post" action="{{ prefix }}/checkout">
+      <button class="btn primary" type="submit">Подтвердить заказ</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="muted">Корзина пуста. <a href="{{ prefix }}/">Перейти к каталогу</a></div>
+  {% endif %}
+</div>
+{% endblock %}

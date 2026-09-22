@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block page_title %}Покупатели{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header"><h2>Покупатели <span class="muted">· {{ customers|length }}</span></h2></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Телефон</th><th>Имя</th><th>Создан</th><th></th></tr></thead>
+      <tbody>
+        {% for c in customers %}
+        <tr>
+          <td><a href="/admin/customers/{{ c.id }}">{{ c.phone }}</a></td>
+          <td>{{ c.name or '—' }}</td>
+          <td class="muted">{{ c.created_at.date() if c.created_at else '—' }}</td>
+          <td class="num">
+            <form method="post" action="/admin/customers/{{ c.id }}/delete" onsubmit="return confirm('Удалить покупателя и его заказы?')">
+              <button class="btn text small danger" type="submit">Удалить</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

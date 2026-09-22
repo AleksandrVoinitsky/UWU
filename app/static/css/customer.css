@@ -1,0 +1,71 @@
+/* UWU Shop — клиентский сайт покупателя (минимализм Apple). */
+
+.shop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.shop-brand { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+.shop-brand:hover { text-decoration: none; }
+.shop-nav { display: flex; align-items: center; gap: 18px; font-size: 14px; }
+.shop-nav a { color: var(--text-secondary); }
+.shop-nav a:hover { color: var(--text); }
+.shop-user { color: var(--text); font-weight: 500; }
+
+.shop-main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+.shop-layout { display: grid; grid-template-columns: 220px 1fr; gap: 24px; }
+@media (max-width: 760px) { .shop-layout { grid-template-columns: 1fr; } }
+
+.shop-sidebar h3 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-tertiary); margin-bottom: 10px;
+}
+.shop-cats { list-style: none; }
+.shop-cats li { margin-bottom: 4px; }
+.shop-cats a {
+  display: block; padding: 6px 10px; border-radius: 6px;
+  color: var(--text-secondary); font-size: 14px;
+}
+.shop-cats a:hover { background: var(--surface-hover); text-decoration: none; color: var(--text); }
+.shop-cats a.active { background: var(--surface-2); color: var(--text); font-weight: 500; }
+
+.shop-search { display: flex; gap: 8px; margin-bottom: 20px; }
+.shop-search input { flex: 1; }
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+.product-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.product-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.product-img { height: 160px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.product-img img { width: 100%; height: 100%; object-fit: cover; }
+.product-img-empty { font-size: 40px; color: var(--text-tertiary); }
+.product-body { padding: 14px 16px; }
+.product-name { font-weight: 600; font-size: 14px; }
+.product-desc { color: var(--text-secondary); font-size: 12px; margin-top: 4px; min-height: 32px; }
+.product-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.product-price { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.cart-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px; }
+.cart-total { font-size: 16px; }
+.cart-total strong { font-variant-numeric: tabular-nums; }
+
+.shop-auth { padding: 40px 0; }
+.error { color: var(--bad); background: var(--bad-bg); border-radius: 6px; padding: 8px 12px; font-size: 13px; }

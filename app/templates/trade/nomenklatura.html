@@ -27,7 +27,7 @@
       </thead>
       <tbody>
         {% for item in items %}
-        <tr data-row data-edit="modal-nomen-edit" data-id="{{ item.id }}" data-name="{{ item.name }}" data-full_name="{{ item.full_name or '' }}" data-vid="{{ item.vid }}" data-artikul="{{ item.artikul or '' }}" data-purchase_price="{{ item.purchase_price or '' }}" data-retail_price="{{ item.retail_price or '' }}" data-price_mode="{{ item.price_mode }}" data-tip_tsen_id="{{ item.tip_tsen_id or '' }}" data-image_path="{{ item.image_path or '' }}" style="cursor:pointer" title="Нажмите для редактирования">
+        <tr data-row data-edit="modal-nomen-edit" data-id="{{ item.id }}" data-name="{{ item.name }}" data-full_name="{{ item.full_name or '' }}" data-vid="{{ item.vid }}" data-artikul="{{ item.artikul or '' }}" data-purchase_price="{{ item.purchase_price or '' }}" data-retail_price="{{ item.retail_price or '' }}" data-price_mode="{{ item.price_mode }}" data-tip_tsen_id="{{ item.tip_tsen_id or '' }}" data-category_id="{{ item.category_id or '' }}" data-image_path="{{ item.image_path or '' }}" style="cursor:pointer" title="Нажмите для редактирования">
           <td class="muted">{{ item.code }}</td>
           <td>
             <div class="flex" style="gap:10px;align-items:center">
@@ -73,6 +73,11 @@
             </select>
           </div>
           <div class="field"><label>Артикул</label><input type="text" name="artikul"></div>
+          <div class="field"><label>Категория</label>
+            <select name="category_id"><option value="">—</option>
+              {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+          </div>
           <div class="field"><label>Закупочная цена</label><input type="number" step="0.01" name="purchase_price"></div>
         </div>
 
@@ -117,6 +122,11 @@
             </select>
           </div>
           <div class="field"><label>Артикул</label><input type="text" name="artikul"></div>
+          <div class="field"><label>Категория</label>
+            <select name="category_id"><option value="">—</option>
+              {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+          </div>
           <div class="field"><label>Закупочная цена</label><input type="number" step="0.01" name="purchase_price"></div>
         </div>
 
