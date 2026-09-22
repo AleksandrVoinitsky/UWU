@@ -181,6 +181,51 @@
 ### `money_balance(session) -> Decimal`, `money_movements(session, start, end)`
 **Назначение:** отчёты по денежным средствам.
 
+### Сводные показатели дашборда
+
+- `sales_summary(session, start, end) -> dict` — выручка, прибыль, себестоимость,
+  количество продаж, средний чек, закупки за период.
+- `daily_sales(session, start, end) -> list[dict]` — выручка/прибыль по дням
+  (нули в дни без продаж).
+- `top_items(session, start, end, limit=10)` — топ товаров по выручке.
+- `top_counterparties(session, start, end, limit=10)` — топ клиентов.
+- `low_stock(session, threshold=5, limit=10)` — товары с низким/нулевым остатком.
+- `recent_sales(session, limit=10)` — последние проведённые продажи.
+
+См. [dashboard](dashboard.md).
+
+## app/core/logging.py
+
+### `setup_logging(level=logging.INFO)`
+**Назначение:** единая идемпотентная настройка корневого логгера (stdout).
+**Технически:** уровень из настройки `LOG_LEVEL`, замена обработчиков без дублей.
+
+### `get_logger(name) -> Logger`
+**Назначение:** логгер модуля с гарантией инициализации логирования.
+
+В `app/main.py` зарегистрированы middleware логирования запросов и единый
+обработчик необработанных исключений (логирует traceback, отдаёт 500 без утечки).
+
+## app/bots/* — интеграция ботов
+
+| Модуль | Назначение |
+| --- | --- |
+| `bots/base.py` | `BotAdapter` (интерфейс), `IncomingMessage` |
+| `bots/telegram.py` | `TelegramAdapter` (aiogram 3.x, long polling) |
+| `bots/max.py` | `MaxAdapter` (maxapi, long polling) |
+| `bots/service.py` | `BotManager`, `store_incoming`, `deliver_outgoing`, `upsert_config` |
+
+**Назначение:** приём сообщений из мессенджеров в чат оператора и отправка
+ответов обратно. Настройки (токен, включение) — в админке `/admin/bots`.
+
+См. [bots](bots.md).
+
+## app/models/bot.py
+
+### `class BotConfig`
+**Назначение:** конфигурация бота (одна запись на канал: `channel`, `enabled`,
+`token`, `name`). Токен — секрет, маскируется в UI.
+
 ## app/services/seed_service.py
 
 ### `seed_all(session)`
@@ -202,7 +247,7 @@
 | Модуль | Страницы |
 | --- | --- |
 | `web/auth.py` | `/login`, `/logout` |
-| `web/admin.py` | `/admin`, `/admin/users`, `/admin/roles`, `/admin/settings` |
+| `web/admin.py` | `/admin`, `/admin/users`, `/admin/roles`, `/admin/settings`, `/admin/audit`, `/admin/bots` |
 | `web/trade.py` | `/`, справочники `/catalog/*`, документы `/documents`, отчёты `/reports/*` |
 | `web/docs.py` | `/admin/docs` (встроенная Markdown-документация) |
 
