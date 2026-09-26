@@ -46,7 +46,15 @@ async def seed_all(session: AsyncSession) -> None:
     await seed_nds(session)
     await seed_units(session)
     await seed_admin(session)
+    await seed_agent_defaults(session)
     await session.commit()
+
+
+async def seed_agent_defaults(session: AsyncSession) -> None:
+    """Дефолтные промпты и инструменты AI-агента (ленивый импорт — избегаем циклов)."""
+    from app.services.agent_service import seed_agent
+
+    await seed_agent(session)
 
 
 async def seed_roles(session: AsyncSession) -> None:

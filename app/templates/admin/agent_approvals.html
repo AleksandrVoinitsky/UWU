@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_components.html" import badge, empty_state with context %}
+{% block page_title %}AI-агент · Одобрения{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="card-header">
+    <h2>Одобрения действий</h2>
+    <span class="muted small">Human-in-the-loop: действия выше порога требуют решения оператора</span>
+  </div>
+  {% if approvals %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Действие</th><th>Детали</th><th>Статус</th><th>Решил</th><th>{{ t('report.date', lang) }}</th><th></th></tr></thead>
+      <tbody>
+        {% for a in approvals %}
+        <tr>
+          <td><strong>{{ a.tool_key }}</strong></td>
+          <td class="muted"><code style="font-size:11px">{{ a.payload }}</code></td>
+          <td>
+            {% if a.status == 'pending' %}{{ badge('draft', 'ожидает') }}
+            {% elif a.status == 'approved' %}{{ badge('posted', 'одобрено') }}
+            {% else %}{{ badge('deleted', 'отклонено') }}{% endif %}
+          </td>
+          <td class="muted">{{ a.decided_by or '—' }}</td>
+          <td class="muted">{{ a.created_at.strftime('%d.%m %H:%M') if a.created_at else '—' }}</td>
+          <td>
+            {% if a.status == 'pending' %}
+            <div class="flex" style="gap:6px;justify-content:flex-end">
+              <form method="post" action="/admin/agent/approvals/{{ a.id }}/decide"><input type="hidden" name="approve" value="approve"><button class="btn small primary" type="submit">Одобрить</button></form>
+              <form method="post" action="/admin/agent/approvals/{{ a.id }}/decide"><input type="hidden" name="approve" value="reject"><button class="btn small danger" type="submit">Отклонить</button></form>
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ empty_state('check', 'Одобрений нет') }}
+  {% endif %}
+</div>
+
+{% endblock %}

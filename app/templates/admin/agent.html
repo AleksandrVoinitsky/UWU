@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% from "_components.html" import badge, empty_state with context %}
+{% block page_title %}AI-агент{% endblock %}
+{% block content %}
+
+<!-- Сводка -->
+<div class="kpi-grid">
+  <div class="kpi-card accent-blue">
+    <div class="kpi-top"><span class="kpi-label">Промпты</span><span class="kpi-icon">{{ icon('file-text') }}</span></div>
+    <div class="kpi-value">{{ prompts|length }}</div>
+  </div>
+  <div class="kpi-card accent-green">
+    <div class="kpi-top"><span class="kpi-label">Инструменты</span><span class="kpi-icon">{{ icon('settings') }}</span></div>
+    <div class="kpi-value">{{ tools|length }}</div>
+  </div>
+  <div class="kpi-card accent-purple">
+    <div class="kpi-top"><span class="kpi-label">API-ключи</span><span class="kpi-icon">{{ icon('shield') }}</span></div>
+    <div class="kpi-value">{{ keys|length }}</div>
+  </div>
+  <div class="kpi-card {% if pending %}accent-orange{% endif %}">
+    <div class="kpi-top"><span class="kpi-label">Ожидают одобрения</span><span class="kpi-icon">{{ icon('alert') }}</span></div>
+    <div class="kpi-value">{{ pending|length }}</div>
+  </div>
+</div>
+
+<!-- Навигация -->
+<div class="card">
+  <div class="quick-actions">
+    <a class="qa qa-primary" href="/admin/agent/prompts"><span class="qa-icon">{{ icon('file-text') }}</span><span>Промпты</span></a>
+    <a class="qa" href="/admin/agent/tools"><span class="qa-icon">{{ icon('settings') }}</span><span>Инструменты</span></a>
+    <a class="qa" href="/admin/agent/keys"><span class="qa-icon">{{ icon('shield') }}</span><span>API-ключи</span></a>
+    <a class="qa" href="/admin/agent/runs"><span class="qa-icon">{{ icon('clock') }}</span><span>Журнал запусков</span></a>
+    <a class="qa" href="/admin/agent/approvals"><span class="qa-icon">{{ icon('alert') }}</span><span>Одобрения</span></a>
+  </div>
+</div>
+
+<!-- Конфигурация -->
+<div class="card">
+  <div class="card-header">
+    <h2>Конфигурация агента</h2>
+    <span class="muted small">Глобальные настройки модели и надзора</span>
+  </div>
+  <form method="post" action="/admin/agent/config">
+    <div class="form-row">
+      <div class="field"><label>Модель (пусто = провайдер по умолчанию)</label><input type="text" name="model" value="{{ config.get('model', '') }}" placeholder="например gpt-4o-mini"></div>
+      <div class="field"><label>Temperature</label><input type="number" step="0.1" name="temperature" value="{{ config.get('temperature', '0.3') }}"></div>
+      <div class="field"><label>История диалога (сообщений)</label><input type="number" name="max_history" value="{{ config.get('max_history', '20') }}"></div>
+      <div class="field"><label>Max tokens</label><input type="number" name="max_tokens" value="{{ config.get('max_tokens', '1024') }}"></div>
+      <div class="field"><label>Отвечает по умолчанию</label>
+        <select name="default_responder">
+          <option value="agent" {% if config.get('default_responder') == 'agent' %}selected{% endif %}>Агент (оператор перехватывает)</option>
+          <option value="operator" {% if config.get('default_responder') == 'operator' %}selected{% endif %}>Оператор (агент по требованию)</option>
+        </select>
+      </div>
+      <div class="field"><label>Порог одобрения суммы, ₽</label><input type="number" name="approval_threshold_amount" value="{{ config.get('approval_threshold_amount', '5000') }}"></div>
+    </div>
+    <div class="field"><label>Сообщение-заглушка при ошибке</label><textarea name="fallback_message" rows="2">{{ config.get('fallback_message', '') }}</textarea></div>
+    <div class="form-actions"><button type="submit" class="btn primary">{{ t('common.save', lang) }}</button></div>
+  </form>
+</div>
+
+<!-- Последние запуски -->
+<div class="card">
+  <div class="card-header"><h2>Последние запуски</h2><a class="btn text small" href="/admin/agent/runs">Все →</a></div>
+  {% if runs %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Намерение</th><th>Модель</th><th>Токены (в/из)</th><th class="num">Задержка</th><th>Статус</th><th>{{ t('report.date', lang) }}</th></tr></thead>
+      <tbody>
+        {% for r in runs %}
+        <tr>
+          <td>{{ r.intent or '—' }}</td>
+          <td class="muted">{{ r.model or '—' }}</td>
+          <td class="muted">{{ r.tokens_in }}/{{ r.tokens_out }}</td>
+          <td class="num muted">{{ r.latency_ms }} мс</td>
+          <td>
+            {% if r.status == 'ok' %}{{ badge('posted', 'ok') }}
+            {% elif r.status == 'approval_pending' %}{{ badge('draft', 'одобрение') }}
+            {% elif r.status == 'rejected' %}{{ badge('deleted', 'отклонено') }}
+            {% else %}{{ badge('deleted', 'ошибка') }}{% endif %}
+          </td>
+          <td class="muted">{{ r.created_at.strftime('%d.%m %H:%M') if r.created_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}{{ empty_state('inbox', 'Запусков пока нет') }}{% endif %}
+</div>
+
+<!-- Ожидают одобрения -->
+<div class="card">
+  <div class="card-header"><h2>Ожидают одобрения</h2><a class="btn text small" href="/admin/agent/approvals">Все →</a></div>
+  {% if pending %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Действие</th><th>Детали</th><th>{{ t('report.date', lang) }}</th><th></th></tr></thead>
+      <tbody>
+        {% for a in pending %}
+        <tr>
+          <td><strong>{{ a.tool_key }}</strong></td>
+          <td class="muted"><code style="font-size:11px">{{ a.payload }}</code></td>
+          <td class="muted">{{ a.created_at.strftime('%d.%m %H:%M') if a.created_at else '—' }}</td>
+          <td><a class="btn small secondary" href="/admin/agent/approvals">Решить</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}{{ empty_state('check', 'Нет ожидающих одобрения') }}{% endif %}
+</div>
+{% endblock %}

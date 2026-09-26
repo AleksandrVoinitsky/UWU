@@ -348,6 +348,49 @@ initData (для тестов и локальной проверки).
 **Назначение:** иерархический справочник категорий товаров (привязка
 `Nomenklatura.category_id`).
 
+## app/models/agent.py — управление AI-агентом
+
+Плоскость управления агентом (сам агент — отдельный контейнер).
+
+| Модель | Таблица | Назначение |
+| --- | --- | --- |
+| `AgentConfig` | `agent_configs` | глобальные настройки (модель, temperature, пороги) |
+| `AgentPrompt` / `AgentPromptVersion` | `agent_prompts` / `agent_prompt_versions` | версионируемые промпты |
+| `AgentTool` | `agent_tools` | реестр инструментов (эндпоинт, права, политика одобрения) |
+| `AgentApiKey` | `agent_api_keys` | API-ключи (хранится только SHA-256 хеш) |
+| `AgentRun` | `agent_runs` | журнал запусков (аудит/трассировка) |
+| `AgentApproval` | `agent_approvals` | очередь одобрений (human-in-the-loop) |
+
+Константы: `DEFAULT_AGENT_CONFIG`, `DEFAULT_PROMPTS`, `DEFAULT_TOOLS`,
+`APPROVAL_POLICIES` (`auto`/`threshold`/`always`).
+
+## app/services/agent_service.py
+
+| Функция | Назначение |
+| --- | --- |
+| `get_configs` / `set_config` / `set_configs` | настройки агента |
+| `list_prompts` / `get_prompt` / `create_prompt` | промпты (с eager-load версий) |
+| `add_prompt_version` / `activate_prompt_version` | версионирование + откат |
+| `list_tools` / `get_tool` / `update_tool` | инструменты |
+| `list_keys` / `create_key` / `set_key_enabled` / `delete_key` / `verify_key` | API-ключи (SHA-256) |
+| `list_runs` / `list_approvals` / `get_approval` / `decide_approval` | журнал и одобрения |
+| `seed_agent` | идемпотентный сид дефолтных промптов/инструментов |
+
+## app/web/agent_admin.py — админка AI-агента
+
+Маршруты (доступны только администратору):
+
+| Маршрут | Назначение |
+| --- | --- |
+| `GET/POST /admin/agent` | обзор + конфигурация |
+| `/admin/agent/prompts` (+ `/{id}/version`, `/{id}/activate`) | промпты и версии |
+| `/admin/agent/tools` (+ `/{id}`) | инструменты |
+| `/admin/agent/keys` (+ `/{id}/toggle`, `/{id}/delete`) | API-ключи |
+| `/admin/agent/runs` | журнал запусков |
+| `/admin/agent/approvals` (+ `/{id}/decide`) | одобрения |
+
+См. [ai-agent](ai-agent.md).
+
 ## app/static/js/app.js — фронтенд-диалоги
 
 ### `confirmDialog(message, opts) -> Promise<boolean>`

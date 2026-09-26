@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_components.html" import badge, empty_state with context %}
+{% block page_title %}AI-агент · Промпты{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="card-header">
+    <h2>Создать промпт</h2>
+  </div>
+  <form method="post" action="/admin/agent/prompts">
+    <div class="form-row">
+      <div class="field"><label>Ключ (системный id)</label><input type="text" name="key" required placeholder="например my_prompt"></div>
+      <div class="field"><label>Название</label><input type="text" name="name" required></div>
+      <div class="field"><label>Переменные (через запятую)</label><input type="text" name="variables" placeholder="customer, context, history"></div>
+    </div>
+    <div class="field"><label>Описание</label><input type="text" name="description"></div>
+    <div class="field"><label>Шаблон промпта</label><textarea name="template" rows="5" required></textarea></div>
+    <div class="form-actions"><button type="submit" class="btn primary">{{ t('common.create', lang) }}</button></div>
+  </form>
+</div>
+
+{% for p in prompts %}
+<div class="card">
+  <div class="card-header">
+    <h2>{{ p.name }} <span class="muted small">({{ p.key }})</span></h2>
+    {{ badge('blue', 'v' ~ p.active_version) }}
+  </div>
+  {% if p.description %}<div class="muted small mb">{{ p.description }}</div>{% endif %}
+
+  {% set active = p.versions | selectattr('version', 'equalto', p.active_version) | list | first %}
+  <form method="post" action="/admin/agent/prompts/{{ p.id }}/version">
+    <div class="field"><label>Шаблон (правка создаст новую версию)</label><textarea name="template" rows="6" required>{{ active.template if active else '' }}</textarea></div>
+    <div class="form-row">
+      <div class="field"><label>Переменные (через запятую)</label><input type="text" name="variables" value="{{ (active.variables if active else []) | join(', ') }}"></div>
+      <div class="field"><label>Модель</label><input type="text" name="model" value="{{ active.model or '' }}"></div>
+      <div class="field"><label>Temperature</label><input type="number" step="0.1" name="temperature" value="{{ active.temperature if active and active.temperature is not none else '' }}"></div>
+      <div class="field"><label>Max tokens</label><input type="number" name="max_tokens" value="{{ active.max_tokens if active and active.max_tokens is not none else '' }}"></div>
+    </div>
+    <div class="form-actions"><button type="submit" class="btn primary">Сохранить новую версию</button></div>
+  </form>
+
+  {% if p.versions | length > 1 %}
+  <hr class="divider">
+  <div class="muted small mb">История версий</div>
+  <div class="flex flex-wrap" style="gap:8px">
+    {% for v in p.versions %}
+    <form method="post" action="/admin/agent/prompts/{{ p.id }}/activate" class="flex" style="gap:6px">
+      <input type="hidden" name="version" value="{{ v.version }}">
+      <button type="submit" class="btn small {% if v.version == p.active_version %}primary{% else %}secondary{% endif %}" {% if v.version == p.active_version %}disabled{% endif %}>
+        v{{ v.version }}{% if v.version == p.active_version %} · активна{% endif %}
+      </button>
+    </form>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% else %}
+{{ empty_state('file-text', 'Промптов нет') }}
+{% endfor %}
+
+{% endblock %}

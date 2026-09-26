@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_components.html" import badge, empty_state with context %}
+{% block page_title %}AI-агент · Журнал запусков{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="card-header"><h2>Журнал запусков</h2><span class="muted small">Аудит каждого запуска графа агента</span></div>
+  {% if runs %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Намерение</th><th>Модель</th><th>Токены (в/из)</th><th class="num">Задержка</th><th>Статус</th><th>{{ t('report.date', lang) }}</th><th>Ошибка</th></tr>
+      </thead>
+      <tbody>
+        {% for r in runs %}
+        <tr>
+          <td>{{ r.intent or '—' }}</td>
+          <td class="muted">{{ r.model or '—' }}</td>
+          <td class="muted">{{ r.tokens_in }}/{{ r.tokens_out }}</td>
+          <td class="num muted">{{ r.latency_ms }} мс</td>
+          <td>
+            {% if r.status == 'ok' %}{{ badge('posted', 'ok') }}
+            {% elif r.status == 'approval_pending' %}{{ badge('draft', 'одобрение') }}
+            {% elif r.status == 'rejected' %}{{ badge('deleted', 'отклонено') }}
+            {% else %}{{ badge('deleted', 'ошибка') }}{% endif %}
+          </td>
+          <td class="muted">{{ r.created_at.strftime('%d.%m %H:%M') if r.created_at else '—' }}</td>
+          <td class="muted small">{{ r.error or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ empty_state('clock', 'Запусков пока нет') }}
+  {% endif %}
+</div>
+
+{% endblock %}

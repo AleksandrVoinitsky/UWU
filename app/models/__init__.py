@@ -47,6 +47,20 @@ from app.models.users import PERMISSIONS, Role, User  # noqa: F401
 from app.models.messaging import Chat, Message  # noqa: F401
 from app.models.bot import BotConfig  # noqa: F401
 from app.models.customer import Cart, CartItem, Customer, CustomerBinding  # noqa: F401
+from app.models.agent import (  # noqa: F401
+    AGENT_PERMISSIONS,
+    APPROVAL_POLICIES,
+    APPROVAL_STATUSES,
+    DEFAULT_AGENT_CONFIG,
+    RUN_STATUSES,
+    AgentApiKey,
+    AgentApproval,
+    AgentConfig,
+    AgentPrompt,
+    AgentPromptVersion,
+    AgentRun,
+    AgentTool,
+)
 
 __all__ = [
     "Base",

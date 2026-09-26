@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "_components.html" import badge, empty_state with context %}
+{% block page_title %}AI-агент · API-ключи{% endblock %}
+{% block content %}
+
+{% if new_key %}
+<div class="card" style="border-color:var(--accent)">
+  <div class="card-header"><h2>Новый ключ создан — скопируйте сейчас</h2></div>
+  <div class="muted small mb">Ключ показывается только один раз и не хранится в открытом виде.</div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <code style="font-family:var(--font-mono);font-size:14px;padding:10px 14px;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;word-break:break-all">{{ new_key }}</code>
+    <span class="badge blue">{{ new_key_name }}</span>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header"><h2>Создать ключ</h2></div>
+  <form method="post" action="/admin/agent/keys">
+    <div class="form-row">
+      <div class="field"><label>Название ключа</label><input type="text" name="name" required placeholder="например prod-agent"></div>
+    </div>
+    <div class="form-actions"><button type="submit" class="btn primary">{{ t('common.create', lang) }}</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-header"><h2>Ключи</h2></div>
+  {% if keys %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Название</th><th>Права</th><th>Статус</th><th>Использован</th><th>Истекает</th><th></th></tr></thead>
+      <tbody>
+        {% for k in keys %}
+        <tr>
+          <td>{{ k.name }}</td>
+          <td class="muted">{{ k.permissions | join(', ') or '—' }}</td>
+          <td>{% if k.enabled %}{{ badge('posted', 'активен') }}{% else %}{{ badge('deleted', 'отключён') }}{% endif %}</td>
+          <td class="muted">{{ k.last_used_at.strftime('%d.%m %H:%M') if k.last_used_at else '—' }}</td>
+          <td class="muted">{{ k.expires_at.strftime('%d.%m.%Y') if k.expires_at else '—' }}</td>
+          <td>
+            <div class="flex" style="gap:6px;justify-content:flex-end">
+              <form method="post" action="/admin/agent/keys/{{ k.id }}/toggle"><button class="btn text small" type="submit">{% if k.enabled %}Отключить{% else %}Включить{% endif %}</button></form>
+              <form method="post" action="/admin/agent/keys/{{ k.id }}/delete"><button class="btn text small danger" type="button" onclick="confirmSubmit(this.form, 'Удалить ключ?', {danger:true})">{{ t('common.delete', lang) }}</button></form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ empty_state('shield', 'Ключей нет') }}
+  {% endif %}
+</div>
+
+{% endblock %}

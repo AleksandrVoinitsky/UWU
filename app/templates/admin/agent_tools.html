@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "_components.html" import badge, empty_state with context %}
+{% block page_title %}AI-агент · Инструменты{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="card-header">
+    <h2>Инструменты (действия)</h2>
+    <span class="muted small">Каждое действие — обёртка над REST-эндпоинтом ядра</span>
+  </div>
+  <div class="muted small mb">Политика одобрения: <code>auto</code> — без одобрения, <code>threshold</code> — при сумме выше порога, <code>always</code> — всегда.</div>
+
+  {% for tool in tools %}
+  <form method="post" action="/admin/agent/tools/{{ tool.id }}" class="bot-card">
+    <div class="flex-between flex-wrap">
+      <div class="flex" style="gap:10px;align-items:center">
+        <h3 style="font-size:15px;font-weight:600">{{ tool.name }} <span class="muted small">({{ tool.key }})</span></h3>
+        {% if tool.enabled %}{{ badge('posted', 'включён') }}{% else %}{{ badge('neutral', 'выключен') }}{% endif %}
+      </div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px">
+        <input type="checkbox" name="enabled" {% if tool.enabled %}checked{% endif %} style="width:auto"> Включён
+      </label>
+    </div>
+    <div class="form-row" style="margin-top:10px">
+      <div class="field" style="margin:0"><label>Название</label><input type="text" name="name" value="{{ tool.name }}" required></div>
+      <div class="field" style="margin:0"><label>Эндпоинт</label><input type="text" name="endpoint" value="{{ tool.endpoint }}" required></div>
+      <div class="field" style="margin:0"><label>Метод</label>
+        <select name="method">
+          {% for m in ['GET', 'POST', 'PUT', 'DELETE'] %}
+          <option value="{{ m }}" {% if tool.method == m %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field" style="margin:0"><label>Право</label><input type="text" name="permission" value="{{ tool.permission or '' }}" placeholder="catalog.read"></div>
+      <div class="field" style="margin:0"><label>Одобрение</label>
+        <select name="approval_policy">
+          {% for p in policies %}
+          <option value="{{ p }}" {% if tool.approval_policy == p %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field" style="margin:0"><label>Порог суммы, ₽</label><input type="number" step="0.01" name="approval_threshold_amount" value="{{ tool.approval_threshold_amount or '' }}"></div>
+      <div class="field" style="margin:0"><label>Rate limit/мин</label><input type="number" name="rate_limit" value="{{ tool.rate_limit }}"></div>
+    </div>
+    <div class="field" style="margin-top:10px"><label>Описание (для LLM)</label><textarea name="description" rows="2" required>{{ tool.description }}</textarea></div>
+    <div class="form-actions" style="margin-top:10px"><button type="submit" class="btn primary small">{{ t('common.save', lang) }}</button></div>
+  </form>
+  {% else %}
+  {{ empty_state('settings', 'Инструментов нет') }}
+  {% endfor %}
+</div>
+
+{% endblock %}
