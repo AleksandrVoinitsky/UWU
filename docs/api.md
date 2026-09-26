@@ -63,6 +63,27 @@
 | GET | `/api/reports/money/balance` | Остаток денег |
 | GET | `/api/reports/money/movements` | Движения денег (`start`, `end`) |
 
+## AI-агент (авторизация API-ключом)
+
+Эндпоинты, потребляемые отдельным сервисом `uwu-ai-agent`. Авторизация — API-ключ
+агента (создаётся в админке `/admin/agent/keys`): `Authorization: Bearer <key>`
+(допустим и заголовок `X-Api-Key`).
+
+| Метод | Путь | Описание |
+| --- | --- | --- |
+| GET | `/api/agent/prompts` | Активные промпты (с текстом активной версии) |
+| GET | `/api/agent/tools` | Включённые инструменты |
+| GET | `/api/agent/inbox` | Непрочитанные входящие (polling) |
+| POST | `/api/agent/messages` | Опубликовать ответ агента (`author="agent"`) |
+| GET | `/api/agent/context/{chat_id}` | Контекст покупателя (профиль/корзина/история) |
+| POST | `/api/agent/approvals` | Создать запрос одобрения (HITL) |
+| GET | `/api/agent/approvals/{id}` | Статус одобрения |
+| POST | `/api/agent/runs` | Записать результат запуска (аудит) |
+| GET | `/api/agent/search_catalog?query=` | Поиск товаров (название/артикул) |
+| GET | `/api/agent/get_stock?nomenklatura_id=` | Остаток товара (учёт/доступно) |
+| GET | `/api/agent/get_cart?customer_id=` | Корзина покупателя |
+| GET | `/api/agent/get_zakaz?order_id=` | Статус/состав заявки покупателя |
+
 ## Пример
 
 ```bash

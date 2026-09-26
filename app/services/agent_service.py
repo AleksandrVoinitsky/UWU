@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.agent import (
+    AGENT_PERMISSIONS,
     DEFAULT_AGENT_CONFIG,
     AgentApiKey,
     AgentApproval,
@@ -399,7 +400,7 @@ async def create_key(
     key = AgentApiKey(
         name=name,
         key_hash=_hash_key(raw),
-        permissions=permissions or [],
+        permissions=permissions if permissions is not None else list(AGENT_PERMISSIONS),
         expires_at=expires_at,
     )
     session.add(key)

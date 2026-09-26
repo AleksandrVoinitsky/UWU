@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_session
 from app.core.security import decode_access_token
+from app.models.agent import AgentApiKey
 from app.models.users import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
@@ -19,6 +20,12 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=Fals
 _CREDENTIALS_ERROR = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="Could not validate credentials",
+    headers={"WWW-Authenticate": "Bearer"},
+)
+
+_AGENT_CREDENTIALS_ERROR = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Invalid API key",
     headers={"WWW-Authenticate": "Bearer"},
 )
 
@@ -45,6 +52,37 @@ async def get_current_user(
     if user is None or not user.is_active:
         raise _CREDENTIALS_ERROR
     return user
+
+
+def _extract_api_key(request: Request) -> str | None:
+    """Извлекает API-ключ агента из ``Authorization: Bearer`` или ``X-Api-Key``."""
+    auth = request.headers.get("authorization", "")
+    if auth.lower().startswith("bearer "):
+        token = auth[7:].strip()
+        if token:
+            return token
+    return request.headers.get("x-api-key")
+
+
+async def get_current_agent(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> AgentApiKey:
+    """Аутентифицирует агента по API-ключу (таблица ``agent_api_keys``).
+
+    Ключ проверяется через :func:`app.services.agent_service.verify_key` (хеш
+    SHA-256, признак ``enabled``, срок действия). Возвращает запись ключа,
+    по полю ``permissions`` которой ядро проверяет права инструментов.
+    """
+    raw = _extract_api_key(request)
+    if not raw:
+        raise _AGENT_CREDENTIALS_ERROR
+    from app.services.agent_service import verify_key
+
+    key = await verify_key(session, raw)
+    if key is None:
+        raise _AGENT_CREDENTIALS_ERROR
+    return key
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:

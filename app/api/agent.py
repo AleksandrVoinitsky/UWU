@@ -1,0 +1,394 @@
+"""API, потребляемое AI-агентом (``/api/agent/*``).
+
+Агент выполняется в отдельном контейнере ``uwu-ai-agent`` и обращается к ядру
+через эти эндпоинты с API-key аутентификацией (см. :func:`app.core.deps.get_current_agent`).
+Здесь ядро — единственный источник бизнес-логики: чтение конфигурации агента
+(промпты/инструменты), обмен сообщениями, контекст покупателя, одобрения
+(human-in-the-loop) и журнал запусков.
+
+См. также: :mod:`app.services.agent_service`, :mod:`app.models.agent`,
+:mod:`app.services.customer_service`, :mod:`app.services.stock_service`.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.core.database import get_session
+from app.core.deps import get_current_agent
+from app.models.agent import AgentApiKey, AgentApproval, AgentRun
+from app.models.catalog import Nomenklatura
+from app.models.customer import Customer
+from app.models.document.base_document import Document
+from app.models.enums import DocType
+from app.models.messaging import Chat, Message
+from app.services import agent_service, customer_service, stock_service
+
+router = APIRouter(prefix="/api/agent", tags=["agent"])
+
+# Все эндпоинты требуют валидного API-ключа агента.
+AGENT = Depends(get_current_agent)
+
+
+def _require_perm(key: AgentApiKey, perm: str) -> None:
+    """Проверяет право инструмента по API-ключу (минимальные привилегии)."""
+    if perm not in key.permissions:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+
+# --- Конфигурация (кэш агента) -------------------------------------------------
+
+
+@router.get("/prompts")
+async def list_prompts(
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Активные промпты (с текстом активной версии) — для кэша агента."""
+    prompts = await agent_service.list_prompts(session)
+    out = []
+    for p in prompts:
+        ver = await agent_service.active_template(session, p)
+        out.append(
+            {
+                "key": p.key,
+                "name": p.name,
+                "description": p.description,
+                "active_version": p.active_version,
+                "template": ver.template if ver else "",
+                "variables": ver.variables if ver else [],
+                "model": ver.model if ver else None,
+                "temperature": ver.temperature if ver else None,
+                "max_tokens": ver.max_tokens if ver else None,
+            }
+        )
+    return out
+
+
+@router.get("/tools")
+async def list_tools(
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Включённые инструменты — для регистрации в LLM (tool-calling)."""
+    tools = await agent_service.list_tools(session)
+    return [
+        {
+            "key": t.key,
+            "name": t.name,
+            "description": t.description,
+            "endpoint": t.endpoint,
+            "method": t.method,
+            "params_schema": t.params_schema,
+            "permission": t.permission,
+            "approval_policy": t.approval_policy,
+            "approval_threshold_amount": (
+                str(t.approval_threshold_amount)
+                if t.approval_threshold_amount is not None
+                else None
+            ),
+            "rate_limit": t.rate_limit,
+        }
+        for t in tools
+        if t.enabled
+    ]
+
+
+# --- Сообщения -----------------------------------------------------------------
+
+
+@router.get("/inbox")
+async def inbox(
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Непрочитанные входящие сообщения (polling-режим) с контекстом чата."""
+    result = await session.execute(
+        select(Message, Chat)
+        .join(Chat, Chat.id == Message.chat_id)
+        .where(Message.direction == "in", Message.is_read.is_(False))
+        .order_by(Message.id)
+    )
+    return [
+        {
+            "message_id": m.id,
+            "chat_id": c.id,
+            "chat_name": c.name,
+            "channel": c.channel,
+            "customer_id": c.customer_id,
+            "text": m.text,
+            "created_at": m.created_at.isoformat(),
+        }
+        for m, c in result.all()
+    ]
+
+
+class AgentMessageRequest(BaseModel):
+    chat_id: int
+    text: str
+    author: str = "agent"
+    agent_run_id: int | None = None
+
+
+@router.post("/messages", status_code=status.HTTP_201_CREATED)
+async def post_message(
+    payload: AgentMessageRequest,
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Публикует ответ агента в чат (``direction="out"``, ``author`` по умолчанию ``agent``)."""
+    chat = await session.get(Chat, payload.chat_id)
+    if chat is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
+
+    message = Message(
+        chat_id=payload.chat_id,
+        direction="out",
+        text=payload.text,
+        author=payload.author,
+        agent_run_id=payload.agent_run_id,
+    )
+    session.add(message)
+    chat.last_message_at = datetime.now(timezone.utc)
+    await session.commit()
+
+    # Внешний канал (Telegram/MAX) — доставляем ответ через адаптер бота.
+    if chat.channel in ("telegram", "maks"):
+        from app.bots.service import deliver_outgoing
+
+        await deliver_outgoing(chat, payload.text)
+
+    return {
+        "id": message.id,
+        "direction": "out",
+        "author": message.author,
+        "text": message.text,
+        "created_at": message.created_at.isoformat(),
+    }
+
+
+@router.get("/context/{chat_id}")
+async def context(
+    chat_id: int,
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Сводка контекста покупателя: чат, профиль, корзина и последние сообщения."""
+    chat = await session.get(Chat, chat_id)
+    if chat is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
+
+    customer = None
+    cart: list[dict] = []
+    if chat.customer_id is not None:
+        customer = await session.get(Customer, chat.customer_id)
+        if customer is not None:
+            cart = await customer_service.get_cart_items(session, customer.id)
+
+    recent = (
+        await session.execute(
+            select(Message).where(Message.chat_id == chat_id).order_by(Message.id.desc()).limit(20)
+        )
+    ).scalars().all()
+
+    return {
+        "chat": {
+            "id": chat.id,
+            "name": chat.name,
+            "channel": chat.channel,
+            "agent_enabled": chat.agent_enabled,
+        },
+        "customer": {"id": customer.id, "name": customer.name} if customer else None,
+        "cart": cart,
+        "history": [
+            {
+                "id": m.id,
+                "direction": m.direction,
+                "author": m.author,
+                "text": m.text,
+                "created_at": m.created_at.isoformat(),
+            }
+            for m in reversed(recent)
+        ],
+    }
+
+
+# --- Одобрения (human-in-the-loop) ---------------------------------------------
+
+
+class ApprovalCreate(BaseModel):
+    tool_key: str
+    payload: dict = {}
+    chat_id: int | None = None
+    customer_id: int | None = None
+    run_id: int | None = None
+
+
+@router.post("/approvals", status_code=status.HTTP_201_CREATED)
+async def create_approval(
+    payload: ApprovalCreate,
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Создаёт запрос одобрения действия (агент прерывает граф и ждёт решения)."""
+    approval = AgentApproval(
+        tool_key=payload.tool_key,
+        payload=payload.payload,
+        chat_id=payload.chat_id,
+        customer_id=payload.customer_id,
+        run_id=payload.run_id,
+        status="pending",
+        resume_value={},
+    )
+    session.add(approval)
+    await session.commit()
+    await session.refresh(approval)
+    return {
+        "id": approval.id,
+        "tool_key": approval.tool_key,
+        "status": approval.status,
+    }
+
+
+@router.get("/approvals/{approval_id}")
+async def get_approval(
+    approval_id: int,
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Статус одобрения (агент опрашивает для возобновления графа)."""
+    approval = await session.get(AgentApproval, approval_id)
+    if approval is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval not found")
+    return {
+        "id": approval.id,
+        "tool_key": approval.tool_key,
+        "status": approval.status,
+        "resume_value": approval.resume_value,
+        "decided_by": approval.decided_by,
+        "decided_at": approval.decided_at.isoformat() if approval.decided_at else None,
+    }
+
+
+# --- Журнал запусков -----------------------------------------------------------
+
+
+class RunCreate(BaseModel):
+    trace_id: str
+    chat_id: int | None = None
+    customer_id: int | None = None
+    intent: str | None = None
+    prompt_versions: dict = {}
+    tool_calls: list = []
+    tokens_in: int = 0
+    tokens_out: int = 0
+    latency_ms: int = 0
+    model: str | None = None
+    status: str = "ok"
+    error: str | None = None
+
+
+@router.post("/runs", status_code=status.HTTP_201_CREATED)
+async def create_run(
+    payload: RunCreate,
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Пишет результат запуска агента в журнал (аудит/трассировка)."""
+    run = AgentRun(**payload.model_dump())
+    session.add(run)
+    await session.commit()
+    await session.refresh(run)
+    return {"id": run.id, "trace_id": run.trace_id}
+
+
+# --- Tool-friendly чтение (обёртки над REST-эндпоинтами ядра) -------------------
+
+
+@router.get("/search_catalog")
+async def search_catalog(
+    query: str = Query(..., min_length=1),
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Поиск товаров по названию/артикулу (с остатком и ценой)."""
+    _require_perm(key, "catalog.read")
+    result = await session.execute(
+        select(Nomenklatura)
+        .where(
+            or_(
+                Nomenklatura.name.ilike(f"%{query}%"),
+                Nomenklatura.artikul.ilike(f"%{query}%"),
+            )
+        )
+        .order_by(Nomenklatura.name)
+        .limit(50)
+    )
+    out = []
+    for n in result.scalars():
+        stock = await stock_service.get_balance(session, n.id)
+        out.append(
+            {
+                "id": n.id,
+                "name": n.name,
+                "full_name": n.full_name,
+                "artikul": n.artikul,
+                "price": str(n.retail_price) if n.retail_price is not None else None,
+                "stock": str(stock),
+            }
+        )
+    return out
+
+
+@router.get("/get_stock")
+async def get_stock(
+    nomenklatura_id: int,
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Остаток товара: учётный и доступный (учёт − резерв)."""
+    _require_perm(key, "catalog.read")
+    balance = await stock_service.get_balance(session, nomenklatura_id)
+    available = await stock_service.get_available(session, nomenklatura_id)
+    return {
+        "nomenklatura_id": nomenklatura_id,
+        "balance": str(balance),
+        "available": str(available),
+    }
+
+
+@router.get("/get_cart")
+async def get_cart(
+    customer_id: int,
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Текущая корзина покупателя (позиции с названиями и суммой)."""
+    _require_perm(key, "catalog.read")
+    items = await customer_service.get_cart_items(session, customer_id)
+    total = await customer_service.cart_total(session, customer_id)
+    return {"customer_id": customer_id, "items": items, "total": str(total)}
+
+
+@router.get("/get_zakaz")
+async def get_zakaz(
+    order_id: int,
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Статус и состав заявки покупателя (ZAKAZ)."""
+    _require_perm(key, "documents.read")
+    result = await session.execute(
+        select(Document)
+        .options(selectinload(Document.items))
+        .where(Document.id == order_id, Document.doc_type == DocType.ZAKAZ.value)
+    )
+    doc = result.scalar_one_or_none()
+    if doc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return await customer_service.order_context(session, doc)

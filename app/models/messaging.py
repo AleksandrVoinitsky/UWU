@@ -30,6 +30,8 @@ class Chat(Base, IdMixin, TimestampMixin):
     # Покупатель интернет-магазина (для чата «сайт»): связывает чат с учётной
     # записью покупателя и используется для отображения в чате продавца.
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
+    # Включать ли автоматический ответ AI-агента по этому чату.
+    agent_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     messages: Mapped[list["Message"]] = relationship(
@@ -46,6 +48,11 @@ class Message(Base, IdMixin):
     chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id"), nullable=False, index=True)
     direction: Mapped[str] = mapped_column(String(10), default="out", server_default="out", nullable=False)  # in | out
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    # Кто написал сообщение: operator | agent | customer. Позволяет различать
+    # ответы AI-агента в чате и вести аудит (см. docs/ai-agent.md).
+    author: Mapped[str] = mapped_column(String(20), default="operator", server_default="operator", nullable=False)
+    # Ссылка на запуск агента (agent_runs) — связывает ответ с трассировкой.
+    agent_run_id: Mapped[int | None] = mapped_column(ForeignKey("agent_runs.id"), nullable=True)
     # Прочитано ли получателем. Получатель определяется направлением:
     # "in" (от покупателя) читает оператор; "out" (от оператора) читает покупатель.
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)

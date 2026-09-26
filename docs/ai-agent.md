@@ -331,11 +331,11 @@ START → classify_intent
 
 ### Изменения существующих таблиц
 
-- **`Message`** — добавить `author` (`operator | agent | customer`; по умолчанию
-  `operator`) и `agent_run_id` (nullable, ссылка на запуск). Позволяет различать
-  ответы агента в чате и аудит.
-- **`Chat`** — добавить `agent_enabled` (bool, default false) — включать агента
-  по чату/каналу.
+- **`Message`** — ✅ добавлены `author` (`operator | agent | customer`; по
+  умолчанию `operator`) и `agent_run_id` (nullable, ссылка на запуск). Позволяет
+  различать ответы агента в чате и аудит. Миграция `a1b2c3d4e5f9`.
+- **`Chat`** — ✅ добавлен `agent_enabled` (bool, default false) — включать
+  агента по чату/каналу. Миграция `a1b2c3d4e5f9`.
 - **`Role`/`permissions`** — новые права: `agent.manage`, `agent.prompts.manage`,
   `agent.tools.manage`, `agent.approvals.manage` (для разграничения в админке).
 - **`Role` агента** — специальный принципал с урезанными правами (только чтение
@@ -348,8 +348,11 @@ START → classify_intent
 > [`app/services/agent_service.py`](../app/services/agent_service.py).
 > Страницы админки: `/admin/agent` (обзор/конфигурация), `/admin/agent/prompts`,
 > `/admin/agent/tools`, `/admin/agent/keys`, `/admin/agent/runs`,
-> `/admin/agent/approvals`. Эндпоинты, потребляемые самим агентом (ниже) —
-> следующий этап.
+> `/admin/agent/approvals`.
+>
+> ✅ **Реализованы эндпоинты, потребляемые самим агентом** — в
+> [`app/api/agent.py`](../app/api/agent.py) (API-key аутентификация через
+> [`get_current_agent`](../app/core/deps.py); плюс tool-friendly чтение).
 
 Новые эндпоинты (требуют API-key аутентификации, кроме админки):
 

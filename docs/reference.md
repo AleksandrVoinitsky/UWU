@@ -389,6 +389,30 @@ initData (для тестов и локальной проверки).
 | `/admin/agent/runs` | журнал запусков |
 | `/admin/agent/approvals` (+ `/{id}/decide`) | одобрения |
 
+## app/api/agent.py — API, потребляемое агентом
+
+Эндпоинты `/api/agent/*` с API-key аутентификацией (`get_current_agent` в
+`app/core/deps.py`). Агент (`uwu-ai-agent`) — клиент этих эндпоинтов.
+
+| Маршрут | Назначение |
+| --- | --- |
+| `GET /api/agent/prompts` | активные промпты (кэш агента) |
+| `GET /api/agent/tools` | включённые инструменты (регистрация в LLM) |
+| `GET /api/agent/inbox` | непрочитанные входящие (polling) |
+| `POST /api/agent/messages` | опубликовать ответ агента |
+| `GET /api/agent/context/{chat_id}` | контекст покупателя (профиль/корзина/история) |
+| `POST /api/agent/approvals` | создать запрос одобрения (HITL) |
+| `GET /api/agent/approvals/{id}` | статус одобрения (resume) |
+| `POST /api/agent/runs` | записать результат запуска (аудит) |
+| `GET /api/agent/search_catalog` | поиск товаров (tool) |
+| `GET /api/agent/get_stock` | остаток товара (tool) |
+| `GET /api/agent/get_cart` | корзина покупателя (tool) |
+| `GET /api/agent/get_zakaz` | статус/состав заявки (tool) |
+
+Зависимость `get_current_agent` читает `Authorization: Bearer <key>` (или
+`X-Api-Key`) и проверяет ключ через `agent_service.verify_key` (SHA-256,
+`enabled`, срок действия); права инструментов проверяются по `key.permissions`.
+
 См. [ai-agent](ai-agent.md).
 
 ## app/models/site.py — управление сайтом/MiniApp
