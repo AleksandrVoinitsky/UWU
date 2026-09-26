@@ -183,7 +183,7 @@
   }
 
   function channelLabel(channel) {
-    return { internal: "Клиент", telegram: "Telegram", maks: "Макс" }[channel] || channel;
+    return { internal: "Клиент", telegram: "Telegram", maks: "Макс", site: "Сайт" }[channel] || channel;
   }
 
   function loadChats() {

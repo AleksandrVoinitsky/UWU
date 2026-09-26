@@ -116,3 +116,90 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 });
+
+/* ---------- Чат с продавцом ---------- */
+(function () {
+  var fab = document.getElementById('shop-chat-fab');
+  if (!fab) return;
+
+  var popup = document.getElementById('shop-chat-popup');
+  var backdrop = document.getElementById('shop-chat-backdrop');
+  var closeBtn = document.getElementById('shop-chat-close');
+  var messagesEl = document.getElementById('shop-chat-messages');
+  var input = document.getElementById('shop-chat-text');
+  var sendBtn = document.getElementById('shop-chat-send');
+
+  var opened = false;
+  var pollTimer = null;
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function fmtTime(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+
+  function toggle(open) {
+    opened = open !== undefined ? open : !opened;
+    popup.classList.toggle('open', opened);
+    backdrop.classList.toggle('open', opened);
+    if (opened) { load(); startPolling(); } else { stopPolling(); }
+  }
+
+  function render(messages) {
+    messagesEl.innerHTML = '';
+    if (!messages || !messages.length) {
+      messagesEl.innerHTML = '<div class="shop-chat-empty">Напишите нам — мы на связи</div>';
+      return;
+    }
+    messages.forEach(function (m) {
+      var el = document.createElement('div');
+      // Для покупателя его сообщения — справа, ответы продавца — слева.
+      el.className = 'msg ' + (m.direction === 'in' ? 'outgoing' : 'incoming');
+      el.innerHTML = '<span></span><span class="time">' + fmtTime(m.created_at) + '</span>';
+      el.querySelector('span').textContent = m.text;
+      messagesEl.appendChild(el);
+    });
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function load() {
+    fetch('/shop/api/chat')
+      .then(function (r) { if (!r.ok) throw new Error('load failed'); return r.json(); })
+      .then(function (data) { render(data.messages); })
+      .catch(function () {});
+  }
+
+  function send() {
+    var text = (input.value || '').trim();
+    if (!text) return;
+    input.value = '';
+    fetch('/shop/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text })
+    })
+      .then(function (r) { if (!r.ok) throw new Error('send failed'); return r.json(); })
+      .then(function () { load(); })
+      .catch(function () { input.value = text; });
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(load, 4000);
+  }
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  fab.addEventListener('click', function () { toggle(); });
+  if (closeBtn) closeBtn.addEventListener('click', function () { toggle(false); });
+  if (backdrop) backdrop.addEventListener('click', function () { toggle(false); });
+  if (sendBtn) sendBtn.addEventListener('click', send);
+  if (input) input.addEventListener('keydown', function (e) { if (e.key === 'Enter') send(); });
+})();

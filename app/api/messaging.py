@@ -87,7 +87,8 @@ async def send_message(
     await session.commit()
 
     # Если чат внешний (Telegram/MAX) — отправляем ответ через адаптер бота.
-    if chat.channel != "internal":
+    # Канал «site» (покупатель интернет-магазина) доставляется опросом — без адаптера.
+    if chat.channel in ("telegram", "maks"):
         from app.bots.service import deliver_outgoing
 
         await deliver_outgoing(chat, payload.text)

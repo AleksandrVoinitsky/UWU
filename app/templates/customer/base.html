@@ -26,6 +26,28 @@
   <main class="shop-main">
     {% block content %}{% endblock %}
   </main>
+
+  {% if customer %}
+  <!-- Чат с продавцом -->
+  <button id="shop-chat-fab" class="shop-chat-fab" aria-label="Чат с продавцом">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+    </svg>
+  </button>
+  <div id="shop-chat-backdrop" class="shop-chat-backdrop"></div>
+  <div id="shop-chat-popup" class="shop-chat-popup" role="dialog" aria-label="Чат с продавцом">
+    <div class="shop-chat-header">
+      <span>Чат с продавцом</span>
+      <button id="shop-chat-close" class="shop-chat-close" aria-label="Закрыть">✕</button>
+    </div>
+    <div id="shop-chat-messages" class="shop-chat-messages"></div>
+    <div class="shop-chat-input">
+      <input id="shop-chat-text" type="text" placeholder="Ваше сообщение…" autocomplete="off">
+      <button id="shop-chat-send" class="shop-chat-send" aria-label="Отправить">➤</button>
+    </div>
+  </div>
+  {% endif %}
+
   <script src="/static/js/customer.js"></script>
 </body>
 </html>

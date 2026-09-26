@@ -22,6 +22,8 @@
 - [`app/customer/web.py`](app/customer/web.py) — серверные страницы.
 - [`app/services/customer_service.py`](app/services/customer_service.py) —
   бизнес-логика (регистрация, корзина, заказ, привязка к контрагенту).
+- [`app/services/chat_service.py`](app/services/chat_service.py) — чат покупателя
+  с продавцом (переиспользует `Chat`/`Message`).
 - [`app/services/pdf_service.py`](app/services/pdf_service.py) — PDF заказа (WeasyPrint).
 
 ## Модели данных
@@ -92,6 +94,29 @@ MiniApp переиспользует тот же REST API `/shop/api/*` и ст�
 Локальная проверка всех адресов: `python scripts/test_miniapp.py` (см.
 [`scripts/test_miniapp.py`](scripts/test_miniapp.py)).
 
+## Чат с продавцом
+
+Для авторизованного покупателя на сайте отображается плавающий значок чата в
+правом нижнем углу (минималистичная форма: список сообщений + поле ввода).
+Сообщения попадают в общий чат продавца **единообразно** с Telegram/MAX —
+через те же модели `Chat`/`Message`.
+
+- **Канал** — `Chat.channel = "site"`, `Chat.customer_id` связывает чат с
+  учётной записью покупателя (для отображения имени/телефона у продавца).
+- **Создание** — ленивое: чат создаётся при первом сообщении покупателя и после
+  этого появляется в списке чатов продавца (`GET /api/chats`, ярлык «Сайт»).
+- **Направления:** сообщение покупателя — `direction="in"`, ответ продавца —
+  `direction="out"`. Ответ доходит покупателю через опрос `GET /shop/api/chat`
+  (для канала `site` внешнего адаптера нет, доставка — polling).
+- **API:** `GET /shop/api/chat` (история), `POST /shop/api/chat` (отправить;
+  400 на пустое/слишком длинное сообщение). Требуют аутентификацию покупателя.
+- **UI:** [`app/templates/customer/base.html`](app/templates/customer/base.html)
+  (разметка виджета), [`app/static/js/customer.js`](app/static/js/customer.js)
+  (логика + опрос), [`app/static/css/customer.css`](app/static/css/customer.css)
+  (стили).
+
+Миграция: `alembic/versions/e5f6a7b8c9d0_chat_customer.py` (`chats.customer_id`).
+
 ## Тесты
 
 [`tests/test_customer.py`](tests/test_customer.py) покрывает: разделение токенов,
@@ -102,6 +127,10 @@ MiniApp переиспользует тот же REST API `/shop/api/*` и ст�
 [`tests/test_miniapp.py`](tests/test_miniapp.py) покрывает: валидацию подписи
 initData (Telegram/MAX, в т.ч. неверный секрет), привязку покупателя и вход через
 dev-режим.
+
+[`tests/test_chat.py`](tests/test_chat.py) покрывает чат с продавцом: создание
+чата при первом сообщении, привязку к покупателю, отображение у продавца,
+ответ продавца, отклонение пустого сообщения и требование аутентификации.
 
 ## PDF
 

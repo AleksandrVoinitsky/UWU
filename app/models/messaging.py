@@ -22,16 +22,20 @@ class Chat(Base, IdMixin, TimestampMixin):
     __tablename__ = "chats"
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    channel: Mapped[str] = mapped_column(String(30), default="internal", nullable=False)  # internal | telegram | maks
+    channel: Mapped[str] = mapped_column(String(30), default="internal", nullable=False)  # internal | telegram | maks | site
     # Внешний идентификатор чата в мессенджере (chat_id Telegram, user_id MAX) —
     # нужен для отправки ответа оператора обратно в мессенджер.
     external_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     kontragent_id: Mapped[int | None] = mapped_column(ForeignKey("kontragenty.id"), nullable=True)
+    # Покупатель интернет-магазина (для чата «сайт»): связывает чат с учётной
+    # записью покупателя и используется для отображения в чате продавца.
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     messages: Mapped[list["Message"]] = relationship(
         back_populates="chat", cascade="all, delete-orphan", order_by="Message.id"
     )
+    customer: Mapped["Customer | None"] = relationship()  # noqa: F821
 
 
 class Message(Base, IdMixin):
