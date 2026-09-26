@@ -1,0 +1,79 @@
+{# ============================================================================
+   UWU — библиотека переиспользуемых UI-компонентов (Jinja-макросы)
+   ----------------------------------------------------------------------------
+   Импорт: {% from "_components.html" import search_input, badge, empty_row,
+            modal, modal_footer, modal_end, field with context %}
+
+   Макросы обращаются к глобальным `t` (перевод) и `icon` (inline-SVG), а также
+   к переменной контекста `lang` — поэтому импорт должен быть `with context`.
+   ========================================================================== #}
+
+
+{# --- Поле поиска по таблице ------------------------------------------------- #}
+{% macro search_input(target, placeholder=None) -%}
+<div class="search-input">
+  <span class="icon">{{ icon('search', 15) }}</span>
+  <input type="text" data-search="#{{ target }}"
+         placeholder="{{ placeholder or t('common.search', lang) }}…"
+         aria-label="{{ t('common.search', lang) }}">
+</div>
+{%- endmacro %}
+
+
+{# --- Статусный бейдж -------------------------------------------------------- #}
+{% macro badge(kind, text) -%}
+<span class="badge {{ kind }}">{{ text }}</span>
+{%- endmacro %}
+
+
+{# --- Строка «пусто» в таблице ----------------------------------------------- #}
+{% macro empty_row(colspan, message=None) -%}
+<tr data-empty><td colspan="{{ colspan }}" class="muted">{{ message or t('common.empty', lang) }}</td></tr>
+{%- endmacro %}
+
+
+{# --- Пустое состояние (вне таблиц) ------------------------------------------ #}
+{% macro empty_state(icon_name='inbox', title=None, hint=None) -%}
+<div class="empty-state">
+  <div class="empty-ico">{{ icon(icon_name, 40) }}</div>
+  {% if title %}<div class="empty-title">{{ title }}</div>{% endif %}
+  {% if hint %}<div class="muted small">{{ hint }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+
+{# --- Открытие модального окна ------------------------------------------------ #}
+{% macro modal(id, title) -%}
+<div class="modal-backdrop" id="{{ id }}" role="dialog" aria-modal="true" aria-label="{{ title }}">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>{{ title }}</h3>
+      <button type="button" class="modal-close" data-modal-close aria-label="{{ t('common.close', lang) }}">{{ icon('x', 16) }}</button>
+    </div>
+{%- endmacro %}
+
+
+{# --- Подвал модального окна (отмена + сохранение) --------------------------- #}
+{% macro modal_footer(cancel_label=None, submit_label=None) -%}
+    <div class="modal-body modal-footer">
+      <button type="button" class="btn secondary" data-modal-close>{{ cancel_label or t('common.cancel', lang) }}</button>
+      <button type="submit" class="btn primary">{{ submit_label or t('common.save', lang) }}</button>
+    </div>
+{%- endmacro %}
+
+
+{# --- Закрытие модального окна ------------------------------------------------ #}
+{% macro modal_end() -%}
+  </div>
+</div>
+{%- endmacro %}
+
+
+{# --- Поле формы (label + произвольный контрол через caller) ----------------- #}
+{% macro field(label, hint=None) -%}
+<div class="field">
+  <label>{{ label }}</label>
+  {{ caller() }}
+  {%- if hint %}<div class="hint">{{ hint }}</div>{% endif %}
+</div>
+{%- endmacro %}

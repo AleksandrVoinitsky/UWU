@@ -4,87 +4,96 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}UWU{% endblock %}</title>
+  {# Ранняя установка темы до отрисовки CSS — исключает «мигание» при смене темы. #}
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('uwu-theme');
+        if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
   <div class="app">
     {% if user %}
     <aside class="sidebar" id="sidebar">
-      <div class="brand">UWU</div>
+      <div class="brand"><span class="brand-mark">U</span> UWU</div>
 
       {% if section == 'admin' %}
         <div class="nav-group">{{ t('menu.settings', lang) }}</div>
-        <a class="nav-link" href="/admin">{{ t('menu.dashboard', lang) }}</a>
-        <a class="nav-link" href="/admin/users">{{ t('menu.users', lang) }}</a>
-        <a class="nav-link" href="/admin/roles">{{ t('menu.roles', lang) }}</a>
-        <a class="nav-link" href="/admin/settings">{{ t('menu.settings', lang) }}</a>
-        <a class="nav-link" href="/admin/docs">{{ t('menu.docs', lang) }}</a>
-        <a class="nav-link" href="/admin/audit">Журнал действий</a>
-        <a class="nav-link" href="/admin/bots">Боты</a>
-        <a class="nav-link" href="/admin/customers">Покупатели</a>
+        <a class="nav-link" href="/admin">{{ icon('grid') }}{{ t('menu.dashboard', lang) }}</a>
+        <a class="nav-link" href="/admin/users">{{ icon('users') }}{{ t('menu.users', lang) }}</a>
+        <a class="nav-link" href="/admin/roles">{{ icon('shield') }}{{ t('menu.roles', lang) }}</a>
+        <a class="nav-link" href="/admin/settings">{{ icon('settings') }}{{ t('menu.settings', lang) }}</a>
+        <a class="nav-link" href="/admin/docs">{{ icon('book') }}{{ t('menu.docs', lang) }}</a>
+        <a class="nav-link" href="/admin/audit">{{ icon('alert') }}Журнал действий</a>
+        <a class="nav-link" href="/admin/bots">{{ icon('bot') }}Боты</a>
+        <a class="nav-link" href="/admin/customers">{{ icon('users') }}Покупатели</a>
       {% else %}
-        <a class="nav-link" href="/">{{ t('menu.dashboard', lang) }}</a>
-        <a class="nav-link rmk-link" href="/rmk">{{ t('menu.rmk', lang) }}</a>
+        <a class="nav-link" href="/">{{ icon('grid') }}{{ t('menu.dashboard', lang) }}</a>
+        <a class="nav-link rmk-link" href="/rmk">{{ icon('cart') }}{{ t('menu.rmk', lang) }}</a>
 
         <div class="nav-group-parent">
-          <div class="nav-group-header">{{ t('menu.catalog', lang) }} <span class="chevron">›</span></div>
+          <div class="nav-group-header">{{ t('menu.catalog', lang) }} <span class="chevron">{{ icon('chevron-right', 14) }}</span></div>
           <div class="nav-sub">
-            <a class="nav-link" href="/catalog/nomenklatura">{{ t('catalog.nomenklatura', lang) }}</a>
-            <a class="nav-link" href="/catalog/kontragenty">{{ t('catalog.kontragenty', lang) }}</a>
-            <a class="nav-link" href="/dogovory">Договоры</a>
-            <a class="nav-link" href="/catalog/sklady">{{ t('catalog.sklady', lang) }}</a>
-            <a class="nav-link" href="/catalog/firmy">{{ t('catalog.firmy', lang) }}</a>
-            <a class="nav-link" href="/catalog/kassy">{{ t('catalog.kassy', lang) }}</a>
-            <a class="nav-link" href="/catalog/valyuty">{{ t('catalog.valyuty', lang) }}</a>
-            <a class="nav-link" href="/catalog/edinitsy">{{ t('catalog.edinitsy', lang) }}</a>
-            <a class="nav-link" href="/catalog/stavki_nds">{{ t('catalog.stavki_nds', lang) }}</a>
-            <a class="nav-link" href="/catalog/tipy_tsen">Типы цен</a>
-            <a class="nav-link" href="/catalog/categories">Категории товаров</a>
-            <a class="nav-link" href="/catalog/sotrudniki">Сотрудники</a>
-            <a class="nav-link" href="/catalog/scheta">Расчётные счета</a>
+            <a class="nav-link" href="/catalog/nomenklatura">{{ icon('box') }}{{ t('catalog.nomenklatura', lang) }}</a>
+            <a class="nav-link" href="/catalog/kontragenty">{{ icon('users') }}{{ t('catalog.kontragenty', lang) }}</a>
+            <a class="nav-link" href="/dogovory">{{ icon('file-text') }}Договоры</a>
+            <a class="nav-link" href="/catalog/sklady">{{ icon('warehouse') }}{{ t('catalog.sklady', lang) }}</a>
+            <a class="nav-link" href="/catalog/firmy">{{ icon('building') }}{{ t('catalog.firmy', lang) }}</a>
+            <a class="nav-link" href="/catalog/kassy">{{ icon('banknote') }}{{ t('catalog.kassy', lang) }}</a>
+            <a class="nav-link" href="/catalog/valyuty">{{ icon('coins') }}{{ t('catalog.valyuty', lang) }}</a>
+            <a class="nav-link" href="/catalog/edinitsy">{{ icon('scale') }}{{ t('catalog.edinitsy', lang) }}</a>
+            <a class="nav-link" href="/catalog/stavki_nds">{{ icon('percent') }}{{ t('catalog.stavki_nds', lang) }}</a>
+            <a class="nav-link" href="/catalog/tipy_tsen">{{ icon('tag') }}Типы цен</a>
+            <a class="nav-link" href="/catalog/categories">{{ icon('folder') }}Категории товаров</a>
+            <a class="nav-link" href="/catalog/sotrudniki">{{ icon('user') }}Сотрудники</a>
+            <a class="nav-link" href="/catalog/scheta">{{ icon('credit-card') }}Расчётные счета</a>
           </div>
         </div>
 
         <div class="nav-group-parent">
-          <div class="nav-group-header">{{ t('menu.documents', lang) }} <span class="chevron">›</span></div>
+          <div class="nav-group-header">{{ t('menu.documents', lang) }} <span class="chevron">{{ icon('chevron-right', 14) }}</span></div>
           <div class="nav-sub">
-            <a class="nav-link" href="/documents">{{ t('menu.documents', lang) }}</a>
-            <a class="nav-link" href="/zakazy">Заявки</a>
-            <a class="nav-link" href="/inventarizaciya">Инвентаризация</a>
-            <a class="nav-link" href="/documents/new?doc_type=rashod">{{ t('doc.rashod', lang) }}</a>
-            <a class="nav-link" href="/documents/new?doc_type=prihod">{{ t('doc.prihod', lang) }}</a>
-            <a class="nav-link" href="/documents/new?doc_type=peremeshenie">{{ t('doc.peremeshenie', lang) }}</a>
+            <a class="nav-link" href="/documents">{{ icon('file-text') }}{{ t('menu.documents', lang) }}</a>
+            <a class="nav-link" href="/zakazy">{{ icon('clipboard-list') }}Заявки</a>
+            <a class="nav-link" href="/inventarizaciya">{{ icon('clipboard-check') }}Инвентаризация</a>
+            <a class="nav-link" href="/documents/new?doc_type=rashod">{{ icon('arrow-up-right') }}{{ t('doc.rashod', lang) }}</a>
+            <a class="nav-link" href="/documents/new?doc_type=prihod">{{ icon('arrow-down') }}{{ t('doc.prihod', lang) }}</a>
+            <a class="nav-link" href="/documents/new?doc_type=peremeshenie">{{ icon('swap') }}{{ t('doc.peremeshenie', lang) }}</a>
           </div>
         </div>
 
         <div class="nav-group-parent">
-          <div class="nav-group-header">{{ t('menu.reports', lang) }} <span class="chevron">›</span></div>
+          <div class="nav-group-header">{{ t('menu.reports', lang) }} <span class="chevron">{{ icon('chevron-right', 14) }}</span></div>
           <div class="nav-sub">
-            <a class="nav-link" href="/reports/stock">{{ t('report.stock', lang) }}</a>
-            <a class="nav-link" href="/reports/movements">{{ t('report.movements', lang) }}</a>
-            <a class="nav-link" href="/reports/turnover">Оборотная ведомость</a>
-            <a class="nav-link" href="/reports/item">Карточка товара</a>
-            <a class="nav-link" href="/reports/batches">Партии товаров</a>
-            <a class="nav-link" href="/reports/sales">{{ t('report.sales', lang) }}</a>
-            <a class="nav-link" href="/reports/settlements">{{ t('report.settlements', lang) }}</a>
-            <a class="nav-link" href="/reports/invoices">Задолженность по документам</a>
-            <a class="nav-link" href="/reports/settlement-movements">Движения по взаиморасчётам</a>
-            <a class="nav-link" href="/reports/abc">ABC-анализ</a>
-            <a class="nav-link" href="/reports/accounting">Бухгалтерские проводки</a>
-            <a class="nav-link" href="/reports/purchase-sales">Книга покупок/продаж</a>
-            <a class="nav-link" href="/reports/commission">Комиссия</a>
-            <a class="nav-link" href="/reports/money">{{ t('report.money', lang) }}</a>
-            <a class="nav-link" href="/reports/cash-book">Кассовая книга</a>
+            <a class="nav-link" href="/reports/stock">{{ icon('bar-chart') }}{{ t('report.stock', lang) }}</a>
+            <a class="nav-link" href="/reports/movements">{{ icon('trending-up') }}{{ t('report.movements', lang) }}</a>
+            <a class="nav-link" href="/reports/turnover">{{ icon('refresh') }}Оборотная ведомость</a>
+            <a class="nav-link" href="/reports/item">{{ icon('box') }}Карточка товара</a>
+            <a class="nav-link" href="/reports/batches">{{ icon('layers') }}Партии товаров</a>
+            <a class="nav-link" href="/reports/sales">{{ icon('bar-chart') }}{{ t('report.sales', lang) }}</a>
+            <a class="nav-link" href="/reports/settlements">{{ icon('users') }}{{ t('report.settlements', lang) }}</a>
+            <a class="nav-link" href="/reports/invoices">{{ icon('receipt') }}Задолженность по документам</a>
+            <a class="nav-link" href="/reports/settlement-movements">{{ icon('swap') }}Движения по взаиморасчётам</a>
+            <a class="nav-link" href="/reports/abc">{{ icon('gauge') }}ABC-анализ</a>
+            <a class="nav-link" href="/reports/accounting">{{ icon('book') }}Бухгалтерские проводки</a>
+            <a class="nav-link" href="/reports/purchase-sales">{{ icon('receipt') }}Книга покупок/продаж</a>
+            <a class="nav-link" href="/reports/commission">{{ icon('percent') }}Комиссия</a>
+            <a class="nav-link" href="/reports/money">{{ icon('wallet') }}{{ t('report.money', lang) }}</a>
+            <a class="nav-link" href="/reports/cash-book">{{ icon('banknote') }}Кассовая книга</a>
           </div>
         </div>
       {% endif %}
 
       <div class="sidebar-footer">
         <div class="flex" style="gap:4px;padding:4px 8px">
-          <a class="nav-link" href="/set-language/ru">RU</a>
+          <a class="nav-link" href="/set-language/ru">{{ icon('globe', 16) }}RU</a>
           <a class="nav-link" href="/set-language/en">EN</a>
         </div>
-        <a class="nav-link" href="/logout">{{ t('menu.logout', lang) }}</a>
+        <a class="nav-link" href="/logout">{{ icon('logout') }}{{ t('menu.logout', lang) }}</a>
       </div>
     </aside>
     {% endif %}
@@ -93,10 +102,14 @@
       {% if user %}
       <div class="topbar">
         <div class="flex" style="gap:10px">
-          <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+          <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Меню">{{ icon('grid', 18) }}</button>
           <div class="page-title">{% block page_title %}{% endblock %}</div>
         </div>
         <div class="topbar-actions">
+          <button class="theme-toggle" id="theme-toggle" title="{{ t('common.theme', lang) }}" aria-label="{{ t('common.theme', lang) }}">
+            <span class="ico-sun">{{ icon('sun') }}</span>
+            <span class="ico-moon">{{ icon('moon') }}</span>
+          </button>
           <span class="user-chip">
             <span class="avatar">{{ (user.login or '?')[0] }}</span>
             <span>{{ user.full_name or user.login }}</span>
@@ -105,17 +118,17 @@
       </div>
       {% endif %}
 
-      {% block content %}{% endblock %}
+      <div class="content-inner page-enter">
+        {% block content %}{% endblock %}
+      </div>
     </main>
   </div>
 
   {% if user %}
-  <!-- Плавающий чат (заглушка мессенджера с клиентами) -->
-  <button id="chat-fab" class="chat-fab" title="{{ t('chat.title', lang) }}" aria-label="Чат">
+  <!-- Плавающий чат (мессенджер с клиентами) -->
+  <button id="chat-fab" class="chat-fab" title="{{ t('chat.title', lang) }}" aria-label="{{ t('chat.title', lang) }}">
     <span class="dot"></span>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-    </svg>
+    {{ icon('chat', 24) }}
   </button>
 
   <div id="chat-backdrop" class="chat-backdrop"></div>
@@ -124,7 +137,7 @@
       <div class="messenger-sidebar">
         <div class="messenger-sidebar-header">
           <span>{{ t('chat.title', lang) }}</span>
-          <button id="chat-close" class="modal-close" aria-label="Закрыть">✕</button>
+          <button id="chat-close" class="modal-close" aria-label="{{ t('common.close', lang) }}">{{ icon('x', 16) }}</button>
         </div>
         <div class="messenger-search"><input id="chat-search" type="text" placeholder="{{ t('common.search', lang) }}…"></div>
         <div class="messenger-chat-list" id="chat-list"></div>
@@ -136,7 +149,7 @@
         </div>
         <div class="messenger-input">
           <input id="chat-input" type="text" placeholder="{{ t('chat.placeholder', lang) }}">
-          <button id="chat-send" class="btn primary">➤</button>
+          <button id="chat-send" class="btn primary" style="border-radius:50%;width:40px;height:40px;padding:0" aria-label="Отправить">{{ icon('send', 18) }}</button>
         </div>
       </div>
     </div>

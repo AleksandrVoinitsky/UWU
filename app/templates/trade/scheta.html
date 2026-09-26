@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block page_title %}Расчётные счета{% endblock %}
+{% from "_components.html" import search_input, badge, empty_row, modal, modal_footer, modal_end, field with context %}
 {% block content %}
 <div class="card">
   <div class="card-header">
     <h2>Расчётные счета <span class="muted">· {{ items|length }}</span></h2>
     <div class="flex flex-wrap">
-      <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#schet-table" placeholder="{{ t('common.search', lang) }}…"></div>
+      {{ search_input('schet-table') }}
       <button class="btn primary" data-modal-open="modal-schet">{{ t('common.create', lang) }}</button>
     </div>
   </div>
@@ -20,49 +21,37 @@
           <td>{{ item.account }}</td>
           <td class="muted">{{ item.bik or '—' }}</td>
         </tr>
-        {% else %}<tr data-empty><td colspan="4" class="muted">Нет записей</td></tr>{% endfor %}
+        {% else %}{{ empty_row(4, 'Нет записей') }}{% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-<div class="modal-backdrop" id="modal-schet">
-  <div class="modal">
-    <div class="modal-header"><h3>{{ t('common.create', lang) }} · Расчётный счёт</h3><button class="modal-close" data-modal-close>✕</button></div>
-    <form method="post" action="/catalog/scheta">
-      <div class="modal-body">
-        <div class="form-row">
-          <div class="field"><label>Контрагент</label><select name="kontragent_id">{% for k in kontragenty %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}</select></div>
-          <div class="field"><label>Банк</label><input type="text" name="bank_name"></div>
-          <div class="field"><label>Счёт</label><input type="text" name="account" required></div>
-          <div class="field"><label>БИК</label><input type="text" name="bik"></div>
-        </div>
+{{ modal('modal-schet', t('common.create', lang) ~ ' · Расчётный счёт') }}
+  <form method="post" action="/catalog/scheta">
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="field"><label>Контрагент</label><select name="kontragent_id">{% for k in kontragenty %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Банк</label><input type="text" name="bank_name"></div>
+        <div class="field"><label>Счёт</label><input type="text" name="account" required></div>
+        <div class="field"><label>БИК</label><input type="text" name="bik"></div>
       </div>
-      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
-        <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
-      </div>
-    </form>
-  </div>
-</div>
+    </div>
+    {{ modal_footer(submit_label=t('common.add', lang)) }}
+  </form>
+{{ modal_end() }}
 
-<div class="modal-backdrop" id="modal-schet-edit">
-  <div class="modal">
-    <div class="modal-header"><h3>{{ t('common.edit', lang) }} · Расчётный счёт</h3><button class="modal-close" data-modal-close>✕</button></div>
-    <form method="post" action="" data-action-pattern="/catalog/scheta/{id}/update">
-      <div class="modal-body">
-        <div class="form-row">
-          <div class="field"><label>Контрагент</label><select name="kontragent_id">{% for k in kontragenty %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}</select></div>
-          <div class="field"><label>Банк</label><input type="text" name="bank_name"></div>
-          <div class="field"><label>Счёт</label><input type="text" name="account" required></div>
-          <div class="field"><label>БИК</label><input type="text" name="bik"></div>
-        </div>
+{{ modal('modal-schet-edit', t('common.edit', lang) ~ ' · Расчётный счёт') }}
+  <form method="post" action="" data-action-pattern="/catalog/scheta/{id}/update">
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="field"><label>Контрагент</label><select name="kontragent_id">{% for k in kontragenty %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Банк</label><input type="text" name="bank_name"></div>
+        <div class="field"><label>Счёт</label><input type="text" name="account" required></div>
+        <div class="field"><label>БИК</label><input type="text" name="bik"></div>
       </div>
-      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
-        <button type="submit" class="btn primary">{{ t('common.save', lang) }}</button>
-      </div>
-    </form>
-  </div>
-</div>
+    </div>
+    {{ modal_footer() }}
+  </form>
+{{ modal_end() }}
 {% endblock %}

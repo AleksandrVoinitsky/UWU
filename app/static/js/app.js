@@ -2,6 +2,60 @@
 (function () {
   "use strict";
 
+  /* ---------- Анимированные счётчики (data-counter) ---------- */
+  function animateCounters(root) {
+    var els = (root || document).querySelectorAll("[data-counter]");
+    els.forEach(function (el) {
+      var target = parseFloat(el.getAttribute("data-counter")) || 0;
+      var decimals = parseInt(el.getAttribute("data-counter-decimals") || "0", 10);
+      var prefix = el.getAttribute("data-counter-prefix") || "";
+      var duration = 900;
+      var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduced) { el.textContent = prefix + fmtNum(target, decimals); return; }
+      var start = null;
+      function step(ts) {
+        if (!start) start = ts;
+        var p = Math.min((ts - start) / duration, 1);
+        var eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = prefix + fmtNum(target * eased, decimals);
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  function fmtNum(n, decimals) {
+    return n.toLocaleString("ru-RU", {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  }
+
+  window.animateCounters = animateCounters;
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () { animateCounters(); });
+  } else {
+    animateCounters();
+  }
+
+  /* ---------- Переключение темы (light / dark) ---------- */
+  var themeToggle = document.getElementById("theme-toggle");
+
+  function currentTheme() {
+    return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    try { localStorage.setItem("uwu-theme", theme); } catch (e) {}
+  }
+
+  if (themeToggle) {
+    themeToggle.addEventListener("click", function () {
+      applyTheme(currentTheme() === "dark" ? "light" : "dark");
+    });
+  }
+
   /* ---------- Модальные окна ---------- */
   function openModal(id) {
     var el = document.getElementById(id);

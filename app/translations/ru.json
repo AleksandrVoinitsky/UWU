@@ -22,6 +22,11 @@
   "common.code": "Код",
   "common.delete": "Удалить",
   "common.edit": "Редактировать",
+  "common.close": "Закрыть",
+  "common.empty": "Нет записей",
+  "common.theme": "Переключить тему",
+  "common.theme.light": "Светлая тема",
+  "common.theme.dark": "Тёмная тема",
   "catalog.nomenklatura": "Номенклатура",
   "catalog.kontragenty": "Контрагенты",
   "catalog.sklady": "Склады",
@@ -113,5 +118,15 @@
   "period.30d": "30 дней",
   "period.this_month": "Этот месяц",
   "period.last_month": "Прошлый месяц",
-  "period.quarter": "Квартал"
+  "period.quarter": "Квартал",
+  "admin.active_users": "Активные",
+  "admin.admins": "Администраторы",
+  "admin.quick_actions": "Быстрые действия",
+  "admin.new_user": "Новый пользователь",
+  "admin.audit": "Журнал действий",
+  "admin.role": "Роль",
+  "admin.status": "Статус",
+  "admin.active": "Активен",
+  "admin.disabled": "Отключён",
+  "admin.permissions": "Права"
 }

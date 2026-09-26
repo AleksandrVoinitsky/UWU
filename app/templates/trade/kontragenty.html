@@ -1,15 +1,13 @@
 {% extends "base.html" %}
 {% block page_title %}{{ t('catalog.kontragenty', lang) }}{% endblock %}
+{% from "_components.html" import search_input, badge, empty_row, modal, modal_footer, modal_end, field with context %}
 {% block content %}
 
 <div class="card">
   <div class="card-header">
     <h2>{{ t('catalog.kontragenty', lang) }} <span class="muted">· {{ items|length }}</span></h2>
     <div class="flex flex-wrap">
-      <div class="search-input">
-        <span class="icon">⌕</span>
-        <input type="text" data-search="#kg-table" placeholder="{{ t('common.search', lang) }}…">
-      </div>
+      {{ search_input('kg-table') }}
       <button class="btn primary" data-modal-open="modal-kg">{{ t('common.create', lang) }}</button>
     </div>
   </div>
@@ -25,15 +23,13 @@
           <td class="muted">{{ item.phones or '—' }}</td>
           <td>{{ 'Юр. лицо' if item.vid == 'yur' else 'Физ. лицо' }}</td>
         </tr>
-        {% else %}<tr data-empty><td colspan="5" class="muted">Нет записей</td></tr>{% endfor %}
+        {% else %}{{ empty_row(5) }}{% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-<div class="modal-backdrop" id="modal-kg">
-  <div class="modal">
-    <div class="modal-header"><h3>{{ t('common.create', lang) }} · {{ t('catalog.kontragenty', lang) }}</h3><button class="modal-close" data-modal-close>✕</button></div>
+{{ modal('modal-kg', t('common.create', lang) ~ ' · ' ~ t('catalog.kontragenty', lang)) }}
     <form method="post" action="/catalog/kontragenty">
       <div class="modal-body">
         <div class="form-row">
@@ -46,17 +42,11 @@
           </div>
         </div>
       </div>
-      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
-        <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
-      </div>
+      {{ modal_footer(submit_label=t('common.add', lang)) }}
     </form>
-  </div>
-</div>
+{{ modal_end() }}
 
-<div class="modal-backdrop" id="modal-kg-edit">
-  <div class="modal">
-    <div class="modal-header"><h3>{{ t('common.edit', lang) }} · {{ t('catalog.kontragenty', lang) }}</h3><button class="modal-close" data-modal-close>✕</button></div>
+{{ modal('modal-kg-edit', t('common.edit', lang) ~ ' · ' ~ t('catalog.kontragenty', lang)) }}
     <form method="post" action="" data-action-pattern="/catalog/kontragenty/{id}/update">
       <div class="modal-body">
         <div class="form-row">
@@ -69,11 +59,7 @@
           </div>
         </div>
       </div>
-      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
-        <button type="submit" class="btn primary">{{ t('common.save', lang) }}</button>
-      </div>
+      {{ modal_footer() }}
     </form>
-  </div>
-</div>
+{{ modal_end() }}
 {% endblock %}

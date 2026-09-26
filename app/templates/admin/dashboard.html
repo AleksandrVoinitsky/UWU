@@ -1,35 +1,101 @@
 {% extends "base.html" %}
+{% from "_components.html" import badge, empty_state with context %}
 {% block page_title %}{{ t('menu.dashboard', lang) }}{% endblock %}
+
 {% block content %}
-<div class="grid">
-  <div class="card">
-    <div class="stat">{{ users|length }}</div>
-    <div class="stat-label">{{ t('menu.users', lang) }}</div>
+{% set active_users = users | selectattr('is_active') | list %}
+{% set admin_users = users | selectattr('is_admin') | list %}
+
+<!-- Сводка -->
+<div class="kpi-grid">
+  <div class="kpi-card accent-blue">
+    <div class="kpi-top"><span class="kpi-label">{{ t('menu.users', lang) }}</span><span class="kpi-icon">{{ icon('users') }}</span></div>
+    <div class="kpi-value"><span data-counter="{{ users|length }}" data-counter-decimals="0">{{ users|length }}</span></div>
   </div>
-  <div class="card">
-    <div class="stat">{{ roles|length }}</div>
-    <div class="stat-label">{{ t('menu.roles', lang) }}</div>
+  <div class="kpi-card accent-green">
+    <div class="kpi-top"><span class="kpi-label">{{ t('admin.active_users', lang) }}</span><span class="kpi-icon">{{ icon('check') }}</span></div>
+    <div class="kpi-value"><span data-counter="{{ active_users|length }}" data-counter-decimals="0">{{ active_users|length }}</span></div>
+  </div>
+  <div class="kpi-card accent-purple">
+    <div class="kpi-top"><span class="kpi-label">{{ t('admin.admins', lang) }}</span><span class="kpi-icon">{{ icon('shield') }}</span></div>
+    <div class="kpi-value"><span data-counter="{{ admin_users|length }}" data-counter-decimals="0">{{ admin_users|length }}</span></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-top"><span class="kpi-label">{{ t('menu.roles', lang) }}</span><span class="kpi-icon">{{ icon('settings') }}</span></div>
+    <div class="kpi-value"><span data-counter="{{ roles|length }}" data-counter-decimals="0">{{ roles|length }}</span></div>
   </div>
 </div>
 
+<!-- Быстрые действия -->
+<div class="card">
+  <div class="card-header"><h2>{{ t('admin.quick_actions', lang) }}</h2></div>
+  <div class="quick-actions">
+    <a class="qa qa-primary" href="/admin/users"><span class="qa-icon">{{ icon('plus') }}</span><span>{{ t('admin.new_user', lang) }}</span></a>
+    <a class="qa" href="/admin/roles"><span class="qa-icon">{{ icon('shield') }}</span><span>{{ t('menu.roles', lang) }}</span></a>
+    <a class="qa" href="/admin/settings"><span class="qa-icon">{{ icon('settings') }}</span><span>{{ t('menu.settings', lang) }}</span></a>
+    <a class="qa qa-ghost" href="/admin/docs"><span class="qa-icon">{{ icon('book') }}</span><span>{{ t('menu.docs', lang) }}</span></a>
+    <a class="qa qa-ghost" href="/admin/audit"><span class="qa-icon">{{ icon('alert') }}</span><span>{{ t('admin.audit', lang) }}</span></a>
+  </div>
+</div>
+
+<!-- Пользователи -->
 <div class="card">
   <div class="card-header">
     <h2>{{ t('menu.users', lang) }}</h2>
     <a class="btn text small" href="/admin/users">{{ t('common.edit', lang) }} →</a>
   </div>
+  {% if users %}
   <div class="table-wrap">
     <table class="table">
-      <thead><tr><th>{{ t('auth.username', lang) }}</th><th>{{ t('common.name', lang) }}</th><th>Статус</th></tr></thead>
+      <thead><tr><th>{{ t('auth.username', lang) }}</th><th>{{ t('common.name', lang) }}</th><th>{{ t('admin.role', lang) }}</th><th>{{ t('admin.status', lang) }}</th></tr></thead>
       <tbody>
         {% for u in users %}
         <tr>
-          <td>{{ u.login }}</td>
+          <td>
+            <div class="flex" style="gap:10px">
+              <span class="avatar">{{ (u.login or '?')[0] }}</span>
+              <span>{{ u.login }}</span>
+            </div>
+          </td>
           <td>{{ u.full_name or '—' }}</td>
-          <td>{% if u.is_admin %}<span class="badge neutral">admin</span>{% elif u.is_active %}<span class="badge posted">active</span>{% else %}<span class="badge deleted">disabled</span>{% endif %}</td>
+          <td>{% if u.is_admin %}{{ badge('purple', 'admin') }}{% elif u.role %}{{ u.role.name }}{% else %}—{% endif %}</td>
+          <td>
+            {% if u.is_admin %}{{ badge('neutral', 'admin') }}
+            {% elif u.is_active %}{{ badge('posted', t('admin.active', lang)) }}
+            {% else %}{{ badge('deleted', t('admin.disabled', lang)) }}{% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% else %}{{ empty_state('users', t('common.empty', lang)) }}{% endif %}
+</div>
+
+<!-- Роли -->
+<div class="card">
+  <div class="card-header">
+    <h2>{{ t('menu.roles', lang) }}</h2>
+    <a class="btn text small" href="/admin/roles">{{ t('common.edit', lang) }} →</a>
+  </div>
+  {% if roles %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>{{ t('common.name', lang) }}</th><th>{{ t('admin.permissions', lang) }}</th></tr></thead>
+      <tbody>
+        {% for r in roles %}
+        <tr>
+          <td><strong>{{ r.name }}</strong> <span class="muted small">({{ r.key }})</span></td>
+          <td>
+            <div class="flex flex-wrap" style="gap:6px">
+              {% for p in r.permissions %}{{ badge('neutral', p) }}{% endfor %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}{{ empty_state('shield', t('common.empty', lang)) }}{% endif %}
 </div>
 {% endblock %}

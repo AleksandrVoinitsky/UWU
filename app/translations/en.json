@@ -22,6 +22,11 @@
   "common.code": "Code",
   "common.delete": "Delete",
   "common.edit": "Edit",
+  "common.close": "Close",
+  "common.empty": "No records",
+  "common.theme": "Toggle theme",
+  "common.theme.light": "Light theme",
+  "common.theme.dark": "Dark theme",
   "catalog.nomenklatura": "Items",
   "catalog.kontragenty": "Counterparties",
   "catalog.sklady": "Warehouses",
@@ -113,5 +118,15 @@
   "period.30d": "30 days",
   "period.this_month": "This month",
   "period.last_month": "Last month",
-  "period.quarter": "Quarter"
+  "period.quarter": "Quarter",
+  "admin.active_users": "Active",
+  "admin.admins": "Administrators",
+  "admin.quick_actions": "Quick actions",
+  "admin.new_user": "New user",
+  "admin.audit": "Audit log",
+  "admin.role": "Role",
+  "admin.status": "Status",
+  "admin.active": "Active",
+  "admin.disabled": "Disabled",
+  "admin.permissions": "Permissions"
 }

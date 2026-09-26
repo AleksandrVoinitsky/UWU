@@ -9,6 +9,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.core.i18n import translate
+from app.web.icons import icon
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -18,8 +19,9 @@ _env = Environment(
     enable_async=False,
 )
 
-# Глобальная функция перевода в шаблонах.
+# Глобальные функции в шаблонах: перевод и inline-SVG иконки.
 _env.globals["t"] = translate
+_env.globals["icon"] = icon
 
 
 def render(template_name: str, **context) -> str:

@@ -1,16 +1,14 @@
 {% extends "base.html" %}
 {% block page_title %}{{ t('catalog.nomenklatura', lang) }}{% endblock %}
+{% from "_components.html" import search_input, empty_row, modal, modal_footer, modal_end with context %}
 {% block content %}
 
 <div class="card">
   <div class="card-header">
     <h2>{{ t('catalog.nomenklatura', lang) }} <span class="muted">· {{ items|length }}</span></h2>
     <div class="flex flex-wrap">
-      <div class="search-input">
-        <span class="icon">⌕</span>
-        <input type="text" data-search="#nomen-table" placeholder="{{ t('common.search', lang) }}…">
-      </div>
-      <button class="btn primary" data-modal-open="modal-nomen">{{ t('common.create', lang) }}</button>
+      {{ search_input('nomen-table') }}
+      <button class="btn primary" data-modal-open="modal-nomen">{{ icon('plus', 16) }}{{ t('common.create', lang) }}</button>
     </div>
   </div>
   <div class="table-wrap">
@@ -45,7 +43,7 @@
           </td>
         </tr>
         {% else %}
-        <tr data-empty><td colspan="6" class="muted">Нет записей</td></tr>
+        {{ empty_row(6) }}
         {% endfor %}
       </tbody>
     </table>
@@ -53,12 +51,7 @@
 </div>
 
 <!-- Модальное окно создания -->
-<div class="modal-backdrop" id="modal-nomen">
-  <div class="modal">
-    <div class="modal-header">
-      <h3>{{ t('common.create', lang) }} · {{ t('catalog.nomenklatura', lang) }}</h3>
-      <button class="modal-close" data-modal-close aria-label="Закрыть">✕</button>
-    </div>
+{{ modal('modal-nomen', t('common.create', lang) ~ ' · ' ~ t('catalog.nomenklatura', lang)) }}
     <form method="post" action="/catalog/nomenklatura">
       <div class="modal-body">
         <div class="form-row">
@@ -96,18 +89,12 @@
           </div>
         </div>
       </div>
-      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
-        <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
-      </div>
+      {{ modal_footer(submit_label=t('common.add', lang)) }}
     </form>
-  </div>
-</div>
+{{ modal_end() }}
 
 <!-- Модальное окно редактирования -->
-<div class="modal-backdrop" id="modal-nomen-edit">
-  <div class="modal">
-    <div class="modal-header"><h3>{{ t('common.edit', lang) }} · {{ t('catalog.nomenklatura', lang) }}</h3><button class="modal-close" data-modal-close>✕</button></div>
+{{ modal('modal-nomen-edit', t('common.edit', lang) ~ ' · ' ~ t('catalog.nomenklatura', lang)) }}
     <form method="post" action="" data-action-pattern="/catalog/nomenklatura/{id}/update">
       <div class="modal-body">
         <div class="form-row">
@@ -157,13 +144,9 @@
         </div>
         <input type="file" id="edit-photo-file" accept="image/*" style="display:none">
       </div>
-      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
-        <button type="submit" class="btn primary">{{ t('common.save', lang) }}</button>
-      </div>
+      {{ modal_footer() }}
     </form>
-  </div>
-</div>
+{{ modal_end() }}
 
 <script>
 var editPhotoFile = document.getElementById('edit-photo-file');

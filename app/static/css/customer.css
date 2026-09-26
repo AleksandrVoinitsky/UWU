@@ -6,7 +6,9 @@
   justify-content: space-between;
   gap: 16px;
   padding: 14px 24px;
-  background: var(--surface);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;

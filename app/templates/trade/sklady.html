@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block page_title %}{{ t('catalog.sklady', lang) }}{% endblock %}
+{% from "_components.html" import search_input, badge, empty_row, modal, modal_footer, modal_end, field with context %}
 {% block content %}
 <div class="card">
   <div class="card-header">
     <h2>{{ t('catalog.sklady', lang) }} <span class="muted">· {{ items|length }}</span></h2>
     <div class="flex flex-wrap">
-      <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#sklad-table" placeholder="{{ t('common.search', lang) }}…"></div>
+      {{ search_input('sklad-table') }}
       <button class="btn primary" data-modal-open="modal-sklad">{{ t('common.create', lang) }}</button>
     </div>
   </div>
@@ -20,15 +21,13 @@
           <td>{{ {'optovy':'Оптовый','roznichny':'Розничный','neavtomat':'НТТ'}.get(item.tip, item.tip) }}</td>
           <td>{{ '✓' if item.is_default else '—' }}</td>
         </tr>
-        {% else %}<tr data-empty><td colspan="4" class="muted">Нет записей</td></tr>{% endfor %}
+        {% else %}{{ empty_row(4) }}{% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-<div class="modal-backdrop" id="modal-sklad">
-  <div class="modal">
-    <div class="modal-header"><h3>{{ t('common.create', lang) }} · {{ t('catalog.sklady', lang) }}</h3><button class="modal-close" data-modal-close>✕</button></div>
+{{ modal('modal-sklad', t('common.create', lang) ~ ' · ' ~ t('catalog.sklady', lang)) }}
     <form method="post" action="/catalog/sklady">
       <div class="modal-body">
         <div class="form-row">
@@ -39,17 +38,11 @@
           </div>
         </div>
       </div>
-      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
-        <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
-      </div>
+      {{ modal_footer(submit_label=t('common.add', lang)) }}
     </form>
-  </div>
-</div>
+{{ modal_end() }}
 
-<div class="modal-backdrop" id="modal-sklad-edit">
-  <div class="modal">
-    <div class="modal-header"><h3>{{ t('common.edit', lang) }} · {{ t('catalog.sklady', lang) }}</h3><button class="modal-close" data-modal-close>✕</button></div>
+{{ modal('modal-sklad-edit', t('common.edit', lang) ~ ' · ' ~ t('catalog.sklady', lang)) }}
     <form method="post" action="" data-action-pattern="/catalog/sklady/{id}/update">
       <div class="modal-body">
         <div class="form-row">
@@ -60,11 +53,7 @@
           </div>
         </div>
       </div>
-      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
-        <button type="submit" class="btn primary">{{ t('common.save', lang) }}</button>
-      </div>
+      {{ modal_footer() }}
     </form>
-  </div>
-</div>
+{{ modal_end() }}
 {% endblock %}

@@ -4,12 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ t('auth.login', lang) }} — {{ app_name }}</title>
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('uwu-theme');
+        if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
+  <button class="theme-toggle" id="theme-toggle" style="position:fixed;top:16px;right:16px;z-index:10" title="{{ t('common.theme', lang) }}" aria-label="{{ t('common.theme', lang) }}">
+    <span class="ico-sun">{{ icon('sun') }}</span>
+    <span class="ico-moon">{{ icon('moon') }}</span>
+  </button>
+
   <div class="login-wrap">
     <div class="login-card">
-      <div class="logo">{{ app_name }}</div>
+      <div class="logo"><span class="brand-mark">U</span>{{ app_name }}</div>
       <p class="subtitle">{{ t('auth.login', lang) }}</p>
       {% if error %}<div class="error">{{ error }}</div>{% endif %}
       <form method="post" action="/login">
@@ -21,9 +34,11 @@
           <label>{{ t('auth.password', lang) }}</label>
           <input type="password" name="password" autocomplete="current-password" required>
         </div>
-        <button type="submit" class="btn primary">{{ t('auth.signin', lang) }}</button>
+        <button type="submit" class="btn primary large" style="width:100%">{{ t('auth.signin', lang) }}</button>
       </form>
     </div>
   </div>
+
+  <script src="/static/js/app.js"></script>
 </body>
 </html>

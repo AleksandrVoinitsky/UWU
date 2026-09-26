@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block page_title %}{{ t('catalog.edinitsy', lang) }}{% endblock %}
+{% from "_components.html" import search_input, badge, empty_row, modal, modal_footer, modal_end, field with context %}
 {% block content %}
 <div class="card">
   <div class="card-header">
     <h2>{{ t('catalog.edinitsy', lang) }} <span class="muted">· {{ items|length }}</span></h2>
     <div class="flex flex-wrap">
-      <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#ed-table" placeholder="{{ t('common.search', lang) }}…"></div>
+      {{ search_input('ed-table') }}
       <button class="btn primary" data-modal-open="modal-ed">{{ t('common.create', lang) }}</button>
     </div>
   </div>
@@ -15,15 +16,13 @@
       <tbody>
         {% for item in items %}
         <tr data-row data-edit="modal-ed-edit" data-id="{{ item.id }}" data-name="{{ item.name }}" data-short_name="{{ item.short_name }}" style="cursor:pointer" title="Нажмите для редактирования"><td>{{ item.name }}</td><td class="muted">{{ item.short_name }}</td><td class="num">{{ item.coefficient }}</td></tr>
-        {% else %}<tr data-empty><td colspan="3" class="muted">Нет записей</td></tr>{% endfor %}
+        {% else %}{{ empty_row(3) }}{% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-<div class="modal-backdrop" id="modal-ed">
-  <div class="modal">
-    <div class="modal-header"><h3>{{ t('common.create', lang) }} · {{ t('catalog.edinitsy', lang) }}</h3><button class="modal-close" data-modal-close>✕</button></div>
+{{ modal('modal-ed', t('common.create', lang) ~ ' · ' ~ t('catalog.edinitsy', lang)) }}
     <form method="post" action="/catalog/edinitsy">
       <div class="modal-body">
         <div class="form-row">
@@ -31,17 +30,11 @@
           <div class="field"><label>Сокращение</label><input type="text" name="short_name" required></div>
         </div>
       </div>
-      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
-        <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
-      </div>
+      {{ modal_footer(submit_label=t('common.add', lang)) }}
     </form>
-  </div>
-</div>
+{{ modal_end() }}
 
-<div class="modal-backdrop" id="modal-ed-edit">
-  <div class="modal">
-    <div class="modal-header"><h3>{{ t('common.edit', lang) }} · {{ t('catalog.edinitsy', lang) }}</h3><button class="modal-close" data-modal-close>✕</button></div>
+{{ modal('modal-ed-edit', t('common.edit', lang) ~ ' · ' ~ t('catalog.edinitsy', lang)) }}
     <form method="post" action="" data-action-pattern="/catalog/edinitsy/{id}/update">
       <div class="modal-body">
         <div class="form-row">
@@ -49,11 +42,7 @@
           <div class="field"><label>Сокращение</label><input type="text" name="short_name" required></div>
         </div>
       </div>
-      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
-        <button type="submit" class="btn primary">{{ t('common.save', lang) }}</button>
-      </div>
+      {{ modal_footer() }}
     </form>
-  </div>
-</div>
+{{ modal_end() }}
 {% endblock %}

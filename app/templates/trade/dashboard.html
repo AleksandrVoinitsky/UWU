@@ -1,18 +1,39 @@
 {% extends "base.html" %}
+{% from "_components.html" import badge, empty_state with context %}
 {% block page_title %}{{ t('menu.dashboard', lang) }}{% endblock %}
 
 {% macro delta(value) -%}
   {% if value is not none %}
-    {% if value > 0 %}<span class="delta up">▲ {{ "%.1f"|format(value) }}%</span>
-    {% elif value < 0 %}<span class="delta down">▼ {{ "%.1f"|format(value|abs) }}%</span>
+    {% if value > 0 %}<span class="delta up">{{ icon('trending-up', 12) }} {{ "%.1f"|format(value) }}%</span>
+    {% elif value < 0 %}<span class="delta down">{{ icon('trending-down', 12) }} {{ "%.1f"|format(value|abs) }}%</span>
     {% else %}<span class="delta neutral">±0%</span>{% endif %}
   {% else %}<span class="delta neutral">—</span>{% endif %}
 {%- endmacro %}
 
-{% macro kpi(label, value, suffix, delta_val, accent='') -%}
+{% macro kpi(label, value, suffix, delta_val, icon_name, accent='') -%}
   <div class="kpi-card {{ accent }}">
-    <div class="kpi-label">{{ label }}</div>
-    <div class="kpi-value">{{ value }}{% if suffix %} <span class="kpi-suffix">{{ suffix }}</span>{% endif %}</div>
+    <div class="kpi-top">
+      <span class="kpi-label">{{ label }}</span>
+      <span class="kpi-icon">{{ icon(icon_name) }}</span>
+    </div>
+    <div class="kpi-value">
+      <span data-counter="{{ '%.2f'|format(value) }}" data-counter-decimals="2">{{ "%.2f"|format(value) }}</span>
+      {% if suffix %}<span class="kpi-suffix">{{ suffix }}</span>{% endif %}
+    </div>
+    <div class="kpi-foot">{{ delta(delta_val) }}</div>
+  </div>
+{%- endmacro %}
+
+{% macro kpi_int(label, value, suffix, delta_val, icon_name, accent='') -%}
+  <div class="kpi-card {{ accent }}">
+    <div class="kpi-top">
+      <span class="kpi-label">{{ label }}</span>
+      <span class="kpi-icon">{{ icon(icon_name) }}</span>
+    </div>
+    <div class="kpi-value">
+      <span data-counter="{{ value }}" data-counter-decimals="0">{{ value }}</span>
+      {% if suffix %}<span class="kpi-suffix">{{ suffix }}</span>{% endif %}
+    </div>
     <div class="kpi-foot">{{ delta(delta_val) }}</div>
   </div>
 {%- endmacro %}
@@ -23,22 +44,35 @@
 
 {% block content %}
 
-<!-- Период -->
-<div class="card dash-period">
-  <div class="flex-between flex-wrap" style="gap:12px">
-    <div class="period-pills">
-      {% for key, label in periods.items() %}
-      <a class="pill {% if period == key %}active{% endif %}" href="/?period={{ key }}">{{ t(label, lang) }}</a>
-      {% endfor %}
-    </div>
-    <form class="flex" method="get" action="/" style="gap:8px;align-items:center">
-      <input type="date" name="start" value="{{ start.isoformat() }}">
-      <span class="muted">—</span>
-      <input type="date" name="end" value="{{ end.isoformat() }}">
-      <button class="btn secondary small" type="submit">OK</button>
-    </form>
+<!-- Герой: главный показатель периода -->
+<div class="dash-hero">
+  <div class="hero-kicker">{{ t('dashboard.period_trade', lang) }}</div>
+  <div class="hero-value">
+    <span data-counter="{{ '%.2f'|format(cur.revenue) }}" data-counter-decimals="2">{{ "%.2f"|format(cur.revenue) }}</span>
+    <span class="suffix">₽</span>
   </div>
-  <div class="muted small" style="margin-top:8px">{{ start }} — {{ end }} · {{ t('dashboard.vs_prev', lang) }}</div>
+  <div class="hero-caption">{{ start }} — {{ end }} · {{ t('dashboard.vs_prev', lang) }}</div>
+  <div class="hero-deltas">
+    {{ delta(deltas.revenue) }}
+    <span class="delta neutral">{{ icon('receipt', 12) }} {{ cur.orders_count }} {{ t('dashboard.sales_count', lang) }}</span>
+    <span class="delta neutral">{{ icon('bar-chart', 12) }} {{ t('dashboard.avg_check', lang) }} {{ "%.0f"|format(cur.avg_check) }} ₽</span>
+  </div>
+
+  <div class="card dash-period" style="margin:18px 0 0;border:none;box-shadow:none;padding:0;background:transparent">
+    <div class="flex-between flex-wrap" style="gap:12px">
+      <div class="period-pills">
+        {% for key, label in periods.items() %}
+        <a class="pill {% if period == key %}active{% endif %}" href="/?period={{ key }}">{{ t(label, lang) }}</a>
+        {% endfor %}
+      </div>
+      <form class="flex" method="get" action="/" style="gap:8px;align-items:center">
+        <input type="date" name="start" value="{{ start.isoformat() }}">
+        <span class="muted">—</span>
+        <input type="date" name="end" value="{{ end.isoformat() }}">
+        <button class="btn secondary small" type="submit">OK</button>
+      </form>
+    </div>
+  </div>
 </div>
 
 <!-- Быстрые действия -->
@@ -46,42 +80,42 @@
   <div class="card-header"><h2>{{ t('dashboard.quick_actions', lang) }}</h2></div>
   <div class="quick-actions">
     <a class="qa qa-primary" href="/documents/new?doc_type=rashod">
-      <span class="qa-icon">➜</span><span>{{ t('doc.rashod', lang) }}</span>
+      <span class="qa-icon">{{ icon('arrow-up-right') }}</span><span>{{ t('doc.rashod', lang) }}</span>
     </a>
     <a class="qa" href="/documents/new?doc_type=prihod">
-      <span class="qa-icon">↓</span><span>{{ t('doc.prihod', lang) }}</span>
+      <span class="qa-icon">{{ icon('arrow-down') }}</span><span>{{ t('doc.prihod', lang) }}</span>
     </a>
     <a class="qa" href="/documents/new?doc_type=peremeshenie">
-      <span class="qa-icon">⇄</span><span>{{ t('doc.peremeshenie', lang) }}</span>
+      <span class="qa-icon">{{ icon('swap') }}</span><span>{{ t('doc.peremeshenie', lang) }}</span>
     </a>
     <a class="qa" href="/documents/new?doc_type=pko">
-      <span class="qa-icon">+</span><span>{{ t('doc.pko', lang) }}</span>
+      <span class="qa-icon">{{ icon('plus') }}</span><span>{{ t('doc.pko', lang) }}</span>
     </a>
     <a class="qa" href="/documents/new?doc_type=rko">
-      <span class="qa-icon">−</span><span>{{ t('doc.rko', lang) }}</span>
+      <span class="qa-icon">{{ icon('minus') }}</span><span>{{ t('doc.rko', lang) }}</span>
     </a>
-    <a class="qa qa-ghost" href="/rmk"><span class="qa-icon">🛒</span><span>{{ t('menu.rmk', lang) }}</span></a>
-    <a class="qa qa-ghost" href="/documents"><span class="qa-icon">☰</span><span>{{ t('menu.documents', lang) }}</span></a>
+    <a class="qa qa-ghost" href="/rmk"><span class="qa-icon">{{ icon('cart') }}</span><span>{{ t('menu.rmk', lang) }}</span></a>
+    <a class="qa qa-ghost" href="/documents"><span class="qa-icon">{{ icon('file-text') }}</span><span>{{ t('menu.documents', lang) }}</span></a>
   </div>
 </div>
 
 <!-- Торговля за период -->
 {{ section(t('dashboard.period_trade', lang)) }}
 <div class="kpi-grid">
-  {{ kpi(t('dashboard.revenue', lang), "%.2f"|format(cur.revenue), '₽', deltas.revenue, 'accent-blue') }}
-  {{ kpi(t('dashboard.profit', lang), "%.2f"|format(cur.profit), '₽', deltas.profit, 'accent-green') }}
-  {{ kpi(t('dashboard.avg_check', lang), "%.2f"|format(cur.avg_check), '₽', deltas.avg_check, '') }}
-  {{ kpi(t('dashboard.sales_count', lang), cur.orders_count, '', deltas.orders_count, '') }}
-  {{ kpi(t('dashboard.purchases', lang), "%.2f"|format(cur.purchases), '₽', deltas.purchases, '') }}
+  {{ kpi(t('dashboard.revenue', lang), cur.revenue, '₽', deltas.revenue, 'trending-up', 'accent-blue') }}
+  {{ kpi(t('dashboard.profit', lang), cur.profit, '₽', deltas.profit, 'sparkles', 'accent-green') }}
+  {{ kpi(t('dashboard.avg_check', lang), cur.avg_check, '₽', deltas.avg_check, 'receipt', '') }}
+  {{ kpi_int(t('dashboard.sales_count', lang), cur.orders_count, '', deltas.orders_count, 'cart', '') }}
+  {{ kpi(t('dashboard.purchases', lang), cur.purchases, '₽', deltas.purchases, 'truck', 'accent-orange') }}
 </div>
 
 <!-- Текущее состояние -->
 {{ section(t('dashboard.current_state', lang)) }}
 <div class="kpi-grid">
-  {{ kpi(t('dashboard.money_balance', lang), "%.2f"|format(money), '₽', none, 'accent-blue') }}
-  {{ kpi(t('dashboard.stock_value', lang), "%.2f"|format(stock_value), '₽', none, '') }}
-  {{ kpi(t('dashboard.receivable', lang), "%.2f"|format(receivable), '₽', none, 'accent-green') }}
-  {{ kpi(t('dashboard.payable', lang), "%.2f"|format(payable), '₽', none, 'accent-red') }}
+  {{ kpi(t('dashboard.money_balance', lang), money, '₽', none, 'banknote', 'accent-blue') }}
+  {{ kpi(t('dashboard.stock_value', lang), stock_value, '₽', none, 'warehouse', '') }}
+  {{ kpi(t('dashboard.receivable', lang), receivable, '₽', none, 'users', 'accent-green') }}
+  {{ kpi(t('dashboard.payable', lang), payable, '₽', none, 'coins', 'accent-red') }}
 </div>
 
 <!-- Графики -->
@@ -112,44 +146,46 @@
   </div>
 </div>
 
-<!-- Последние продажи -->
-<div class="card">
-  <div class="card-header"><h2>{{ t('dashboard.recent_sales', lang) }}</h2><a class="btn text small" href="/documents">{{ t('menu.documents', lang) }} →</a></div>
-  {% if recent_sales %}
-  <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th>{{ t('report.date', lang) }}</th><th>№</th><th>{{ t('catalog.kontragenty', lang) }}</th><th class="num">{{ t('dashboard.amount', lang) }}</th><th class="num">{{ t('dashboard.profit', lang) }}</th></tr></thead>
-      <tbody>
-        {% for r in recent_sales %}
-        <tr>
-          <td>{{ r.date }}</td>
-          <td>{{ r.number }}</td>
-          <td>{{ r.kontragent or '—' }}</td>
-          <td class="num">{{ "%.2f"|format(r.total) }} ₽</td>
-          <td class="num">{{ "%.2f"|format(r.profit) }} ₽</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<!-- Последние продажи + низкие остатки -->
+<div class="charts-grid">
+  <div class="card">
+    <div class="card-header"><h2>{{ t('dashboard.recent_sales', lang) }}</h2><a class="btn text small" href="/documents">{{ t('menu.documents', lang) }} →</a></div>
+    {% if recent_sales %}
+    <ul class="feed">
+      {% for r in recent_sales %}
+      <li>
+        <span class="feed-ico">{{ icon('arrow-up-right') }}</span>
+        <span class="feed-main">
+          <span class="feed-title">{{ r.kontragent or ('№ ' ~ r.number) }}</span>
+          <span class="feed-meta">{{ r.date }} · № {{ r.number }}</span>
+        </span>
+        <span class="feed-amount">{{ "%.2f"|format(r.total) }} ₽</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}{{ empty_state('receipt', t('rmk.empty', lang)) }}{% endif %}
   </div>
-  {% else %}<div class="muted small" style="padding:8px 0">{{ t('rmk.empty', lang) }}</div>{% endif %}
-</div>
 
-<!-- Низкие остатки -->
-<div class="card">
-  <div class="card-header"><h2>{{ t('dashboard.low_stock', lang) }}</h2><a class="btn text small" href="/reports/stock">{{ t('report.stock', lang) }} →</a></div>
-  {% if low_stock %}
-  <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th>{{ t('common.name', lang) }}</th><th class="num">{{ t('report.quantity', lang) }}</th></tr></thead>
-      <tbody>
-        {% for r in low_stock %}
-        <tr><td>{{ r.name }}</td><td class="num {% if r.quantity <= 0 %}muted{% endif %}">{{ r.quantity }}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="card">
+    <div class="card-header"><h2>{{ t('dashboard.low_stock', lang) }}</h2><a class="btn text small" href="/reports/stock">{{ t('report.stock', lang) }} →</a></div>
+    {% if low_stock %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>{{ t('common.name', lang) }}</th><th class="num">{{ t('report.quantity', lang) }}</th></tr></thead>
+        <tbody>
+          {% for r in low_stock %}
+          <tr>
+            <td>{{ r.name }}</td>
+            <td class="num">
+              {% if r.quantity <= 0 %}{{ badge('deleted', r.quantity) }}{% else %}{{ badge('draft', r.quantity) }}{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}{{ empty_state('check', t('rmk.empty', lang)) }}{% endif %}
   </div>
-  {% else %}<div class="muted small" style="padding:8px 0">{{ t('rmk.empty', lang) }}</div>{% endif %}
 </div>
 
 <!-- Рекомендации к заказу -->
@@ -184,9 +220,9 @@
           <td class="num">{{ "%.0f"|format(r.target) }}</td>
           <td class="num" style="font-weight:600">{% if r.to_order > 0 %}{{ "%.0f"|format(r.to_order) }}{% else %}—{% endif %}</td>
           <td class="num">
-            {% if r.status == 'order' %}<span class="badge order">{{ t('dashboard.reorder_order', lang) }}</span>
-            {% elif r.status == 'ok' %}<span class="badge posted">{{ t('dashboard.reorder_ok', lang) }}</span>
-            {% else %}<span class="badge neutral">{{ t('dashboard.reorder_no_sales', lang) }}</span>{% endif %}
+            {% if r.status == 'order' %}{{ badge('order', t('dashboard.reorder_order', lang)) }}
+            {% elif r.status == 'ok' %}{{ badge('posted', t('dashboard.reorder_ok', lang)) }}
+            {% else %}{{ badge('neutral', t('dashboard.reorder_no_sales', lang)) }}{% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -195,19 +231,19 @@
   </div>
   <div class="pagination">
     {% if replenish_page > 1 %}
-    <a class="btn secondary small" href="{{ repl_qs }}&repl_page={{ replenish_page - 1 }}">‹</a>
+    <a class="btn secondary small" href="{{ repl_qs }}&repl_page={{ replenish_page - 1 }}">{{ icon('chevron-right', 14) }}</a>
     {% else %}
-    <span class="btn secondary small" style="opacity:.4">‹</span>
+    <span class="btn secondary small" style="opacity:.4">{{ icon('chevron-right', 14) }}</span>
     {% endif %}
     <span class="muted small">{{ t('dashboard.reorder_pages', lang, page=replenish_page, total=replenish_total_pages) }}</span>
     {% if replenish_page < replenish_total_pages %}
-    <a class="btn secondary small" href="{{ repl_qs }}&repl_page={{ replenish_page + 1 }}">›</a>
+    <a class="btn secondary small" href="{{ repl_qs }}&repl_page={{ replenish_page + 1 }}">{{ icon('chevron-right', 14) }}</a>
     {% else %}
-    <span class="btn secondary small" style="opacity:.4">›</span>
+    <span class="btn secondary small" style="opacity:.4">{{ icon('chevron-right', 14) }}</span>
     {% endif %}
   </div>
   {% else %}
-  <div class="muted small" style="padding:8px 0">{{ t('rmk.empty', lang) }}</div>
+  {{ empty_state('inbox', t('rmk.empty', lang)) }}
   {% endif %}
 </div>
 
@@ -224,17 +260,43 @@
   var topItems = {{ top_items_json | safe }};
   var topClients = {{ top_clients_json | safe }};
 
-  var grid = { color: 'rgba(120,120,128,0.12)' };
-  var tick = { color: '#8e8e93' };
-  var legend = { labels: { color: '#8e8e93', boxWidth: 10, boxHeight: 10 } };
+  var cs = getComputedStyle(document.documentElement);
+  function css(v) { return cs.getPropertyValue(v).trim(); }
+  var C = {
+    text: css('--text-secondary'),
+    tertiary: css('--text-tertiary'),
+    grid: css('--border'),
+    blue: css('--blue'),
+    green: css('--green'),
+    orange: css('--orange'),
+    indigo: css('--indigo'),
+    accent: css('--accent'),
+  };
+
+  var tick = { color: C.tertiary, font: { family: '-apple-system, "SF Pro Text", sans-serif' } };
+  var legend = { labels: { color: C.text, boxWidth: 10, boxHeight: 10, usePointStyle: true } };
+  var tooltip = {
+    backgroundColor: css('--surface'),
+    titleColor: css('--text'),
+    bodyColor: css('--text'),
+    borderColor: css('--border'),
+    borderWidth: 1,
+    padding: 10,
+    cornerRadius: 10,
+    displayColors: true,
+  };
 
   function line(id, labels, datasets) {
     return new Chart(document.getElementById(id), {
       type: 'line',
       data: { labels: labels, datasets: datasets },
-      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-        plugins: { legend: legend },
-        scales: { x: { ticks: { ...tick, maxTicksLimit: 12 }, grid: { display: false } }, y: { ticks: tick, grid: grid } } }
+      options: { responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: legend, tooltip: tooltip },
+        scales: {
+          x: { ticks: { ...tick, maxTicksLimit: 12 }, grid: { display: false } },
+          y: { ticks: tick, grid: { color: C.grid }, border: { display: false } }
+        } }
     });
   }
   function bar(id, labels, datasets) {
@@ -242,36 +304,42 @@
       type: 'bar',
       data: { labels: labels, datasets: datasets },
       options: { responsive: true, maintainAspectRatio: false,
-        plugins: { legend: legend },
-        scales: { x: { ticks: { ...tick, maxTicksLimit: 12 }, grid: { display: false } }, y: { ticks: tick, grid: grid } } }
+        plugins: { legend: legend, tooltip: tooltip },
+        scales: {
+          x: { ticks: { ...tick, maxTicksLimit: 12 }, grid: { display: false } },
+          y: { ticks: tick, grid: { color: C.grid }, border: { display: false } }
+        } }
     });
   }
   function hbar(id, labels, data, color) {
     return new Chart(document.getElementById(id), {
       type: 'bar',
-      data: { labels: labels, datasets: [{ data: data, backgroundColor: color, borderRadius: 4 }] },
+      data: { labels: labels, datasets: [{ data: data, backgroundColor: color, borderRadius: 6, maxBarThickness: 22 }] },
       options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { x: { ticks: tick, grid: grid }, y: { ticks: { ...tick, autoSkip: false }, grid: { display: false } } } }
+        plugins: { legend: { display: false }, tooltip: tooltip },
+        scales: {
+          x: { ticks: tick, grid: { color: C.grid }, border: { display: false } },
+          y: { ticks: { ...tick, autoSkip: false }, grid: { display: false } }
+        } }
     });
   }
 
   line('daily-chart', labels, [
-    { label: {{ t('dashboard.revenue', lang) | tojson }}, data: revenue, borderColor: '#0a84ff', backgroundColor: 'rgba(10,132,255,0.08)', tension: 0.3, fill: true, pointRadius: 0 },
-    { label: {{ t('dashboard.profit', lang) | tojson }}, data: profit, borderColor: '#30d158', backgroundColor: 'rgba(48,209,88,0.08)', tension: 0.3, fill: true, pointRadius: 0 }
+    { label: {{ t('dashboard.revenue', lang) | tojson }}, data: revenue, borderColor: C.blue, backgroundColor: 'rgba(10,132,255,0.10)', tension: 0.35, fill: true, pointRadius: 0, borderWidth: 2.5 },
+    { label: {{ t('dashboard.profit', lang) | tojson }}, data: profit, borderColor: C.green, backgroundColor: 'rgba(48,209,88,0.08)', tension: 0.35, fill: true, pointRadius: 0, borderWidth: 2.5 }
   ]);
 
   bar('orders-chart', labels, [
-    { label: {{ t('dashboard.sales_count', lang) | tojson }}, data: orders, backgroundColor: '#5e5ce6', borderRadius: 3 }
+    { label: {{ t('dashboard.sales_count', lang) | tojson }}, data: orders, backgroundColor: C.indigo, borderRadius: 5, maxBarThickness: 34 }
   ]);
 
   bar('money-chart', moneyLabels, [
-    { label: {{ t('dashboard.income', lang) | tojson }}, data: income, backgroundColor: '#30d158', borderRadius: 3 },
-    { label: {{ t('dashboard.expense', lang) | tojson }}, data: expense, backgroundColor: '#ff9f0a', borderRadius: 3 }
+    { label: {{ t('dashboard.income', lang) | tojson }}, data: income, backgroundColor: C.green, borderRadius: 5, maxBarThickness: 20 },
+    { label: {{ t('dashboard.expense', lang) | tojson }}, data: expense, backgroundColor: C.orange, borderRadius: 5, maxBarThickness: 20 }
   ]);
 
-  if (topItems.length) hbar('items-chart', topItems.map(function (r) { return r.name; }), topItems.map(function (r) { return r.amount; }), '#0a84ff');
-  if (topClients.length) hbar('clients-chart', topClients.map(function (r) { return r.name; }), topClients.map(function (r) { return r.amount; }), '#30d158');
+  if (topItems.length) hbar('items-chart', topItems.map(function (r) { return r.name; }), topItems.map(function (r) { return r.amount; }), C.blue);
+  if (topClients.length) hbar('clients-chart', topClients.map(function (r) { return r.name; }), topClients.map(function (r) { return r.amount; }), C.green);
 })();
 </script>
 {% endblock %}

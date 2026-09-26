@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block page_title %}Сотрудники{% endblock %}
+{% from "_components.html" import search_input, badge, empty_row, modal, modal_footer, modal_end, field with context %}
 {% block content %}
 <div class="card">
   <div class="card-header">
     <h2>Сотрудники <span class="muted">· {{ items|length }}</span></h2>
     <div class="flex flex-wrap">
-      <div class="search-input"><span class="icon">⌕</span><input type="text" data-search="#sotr-table" placeholder="{{ t('common.search', lang) }}…"></div>
+      {{ search_input('sotr-table') }}
       <button class="btn primary" data-modal-open="modal-sotr">{{ t('common.create', lang) }}</button>
     </div>
   </div>
@@ -15,45 +16,33 @@
       <tbody>
         {% for item in items %}
         <tr data-row data-edit="modal-sotr-edit" data-id="{{ item.id }}" data-name="{{ item.name }}" data-position="{{ item.position or '' }}" style="cursor:pointer" title="Нажмите для редактирования"><td>{{ item.name }}</td><td class="muted">{{ item.position or '—' }}</td></tr>
-        {% else %}<tr data-empty><td colspan="2" class="muted">Нет записей</td></tr>{% endfor %}
+        {% else %}{{ empty_row(2, 'Нет записей') }}{% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-<div class="modal-backdrop" id="modal-sotr">
-  <div class="modal">
-    <div class="modal-header"><h3>{{ t('common.create', lang) }} · Сотрудник</h3><button class="modal-close" data-modal-close>✕</button></div>
-    <form method="post" action="/catalog/sotrudniki">
-      <div class="modal-body">
-        <div class="form-row">
-          <div class="field"><label>ФИО</label><input type="text" name="name" required></div>
-          <div class="field"><label>Должность</label><input type="text" name="position"></div>
-        </div>
+{{ modal('modal-sotr', t('common.create', lang) ~ ' · Сотрудник') }}
+  <form method="post" action="/catalog/sotrudniki">
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="field"><label>ФИО</label><input type="text" name="name" required></div>
+        <div class="field"><label>Должность</label><input type="text" name="position"></div>
       </div>
-      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
-        <button type="submit" class="btn primary">{{ t('common.add', lang) }}</button>
-      </div>
-    </form>
-  </div>
-</div>
+    </div>
+    {{ modal_footer(submit_label=t('common.add', lang)) }}
+  </form>
+{{ modal_end() }}
 
-<div class="modal-backdrop" id="modal-sotr-edit">
-  <div class="modal">
-    <div class="modal-header"><h3>{{ t('common.edit', lang) }} · Сотрудник</h3><button class="modal-close" data-modal-close>✕</button></div>
-    <form method="post" action="" data-action-pattern="/catalog/sotrudniki/{id}/update">
-      <div class="modal-body">
-        <div class="form-row">
-          <div class="field"><label>ФИО</label><input type="text" name="name" required></div>
-          <div class="field"><label>Должность</label><input type="text" name="position"></div>
-        </div>
+{{ modal('modal-sotr-edit', t('common.edit', lang) ~ ' · Сотрудник') }}
+  <form method="post" action="" data-action-pattern="/catalog/sotrudniki/{id}/update">
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="field"><label>ФИО</label><input type="text" name="name" required></div>
+        <div class="field"><label>Должность</label><input type="text" name="position"></div>
       </div>
-      <div class="modal-body" style="padding-top:0;display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" class="btn secondary" data-modal-close>{{ t('common.cancel', lang) }}</button>
-        <button type="submit" class="btn primary">{{ t('common.save', lang) }}</button>
-      </div>
-    </form>
-  </div>
-</div>
+    </div>
+    {{ modal_footer() }}
+  </form>
+{{ modal_end() }}
 {% endblock %}

@@ -259,6 +259,34 @@
 | `web/trade.py` | `/`, справочники `/catalog/*` (в т.ч. `/catalog/categories`), документы `/documents`, отчёты `/reports/*` |
 | `web/docs.py` | `/admin/docs` (встроенная Markdown-документация) |
 
+## app/web/icons.py — иконки интерфейса
+
+### `ICONS: dict[str, str]`
+**Назначение:** декларативный словарь внутренней SVG-разметки иконок (стиль
+SF Symbols / Lucide, `viewBox="0 0 24 24"`). Имя → paths.
+
+### `icon(name, size=18, cls="") -> Markup`
+**Назначение:** рендерит inline-SVG иконку по имени. **Технически:** возвращает
+`markupsafe.Markup` (безопасно вставлять в шаблон без `| safe`); неизвестное имя —
+пустая строка (мягкая деградация). Регистрируется как Jinja-глобал `icon` в
+[`app/templates.py`](../app/templates.py).
+
+## app/templates/_components.html — переиспользуемые макросы
+
+Библиотека UI-компонентов (Jinja-макросы), импортируемых в шаблоны как
+`{% from "_components.html" import ... with context %}`:
+
+| Макрос | Назначение |
+| --- | --- |
+| `search_input(target, placeholder)` | поле живого поиска по таблице |
+| `badge(kind, text)` | статусный бейдж |
+| `empty_row(colspan, message)` | строка «пусто» в таблице |
+| `empty_state(icon_name, title, hint)` | пустое состояние вне таблицы |
+| `modal(id, title)` / `modal_footer(...)` / `modal_end()` | каркас модального окна |
+| `field(label, hint)` | поле формы (label + контрол через `caller()`) |
+
+Подробности и правила использования — в [design-system](design-system.md).
+
 ## app/services/customer_service.py — клиентский сайт
 
 | Функция | Назначение |
@@ -327,5 +355,15 @@ initData (для тестов и локальной проверки).
 ### `confirmSubmit(form, message, opts)`
 **Назначение:** стилизованные модальные окна (с размытием фона) для
 уведомлений и подтверждений — вместо системных `alert()`/`confirm()`.
+
+### `animateCounters(root?)`
+**Назначение:** плавная анимация чисел у элементов с атрибутом `data-counter`
+(с учётом `prefers-reduced-motion`). Атрибуты: `data-counter` (число),
+`data-counter-decimals`, `data-counter-prefix`.
+
+### Переключатель темы (`#theme-toggle`)
+**Назначение:** переключение светлой/тёмной темы. Значение хранится в
+`localStorage` (`uwu-theme`), ранняя установка `data-theme` — в `<head>` шаблонов,
+чтобы исключить «мигание» при загрузке. См. [design-system](design-system.md).
 
 См. также [api](api.md) и [security](security.md).
