@@ -1,7 +1,7 @@
 """Управление сайтом/MiniApp: публикация товаров, настройки сайта, акции.
 
-Revision ID: c3d4e5f6a7b8
-Revises: b2c3d4e5f6a7
+Revision ID: a1b2c3d4e5f8
+Revises: a1b2c3d4e5f7
 Create Date: 2026-09-27
 """
 from __future__ import annotations
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
 
-revision = "c3d4e5f6a7b8"
-down_revision = "b2c3d4e5f6a7"
+revision = "a1b2c3d4e5f8"
+down_revision = "a1b2c3d4e5f7"
 branch_labels = None
 depends_on = None
 
