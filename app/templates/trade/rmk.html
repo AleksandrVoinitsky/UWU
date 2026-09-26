@@ -57,6 +57,15 @@
   </div>
 </div>
 
+{% if zakaz_number %}
+<div class="card" style="padding:12px 16px;margin-bottom:16px;border-color:var(--accent)">
+  <div class="flex flex-wrap" style="gap:10px;align-items:center">
+    <span class="badge blue">Продажа заявки {{ zakaz_number }}</span>
+    <span class="muted small">Позиции заявки добавлены в накладную — проведите продажу на кассе.</span>
+  </div>
+</div>
+{% endif %}
+
 <div class="rmk-layout">
   <!-- Товары -->
   <div>
@@ -107,4 +116,6 @@
 </div>
 
 <script type="application/json" id="rmk-data">{{ items_json | safe }}</script>
+<script type="application/json" id="rmk-preload">{{ preload_json | safe }}</script>
+<script type="application/json" id="rmk-zakaz-id">{{ zakaz_id | tojson }}</script>
 {% endblock %}

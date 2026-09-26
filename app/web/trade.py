@@ -7,7 +7,6 @@
 """
 from __future__ import annotations
 
-import uuid
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -26,7 +25,7 @@ from app.models import catalog as cat
 from app.models.document.base_document import Document
 from app.models.enums import DocSubtype, DocType
 from app.models.users import User
-from app.services import cash_service, catalog_service, document_service, price_service, report_service, stock_service
+from app.services import cash_service, catalog_service, document_service, image_service, price_service, report_service, stock_service
 from app.services.stock_service import InsufficientStockError
 from app.templates import render
 from app.web.helpers import _csv_response, _json_safe, _sanitize_csv_cell
@@ -679,44 +678,13 @@ async def upload_nomenklatura_image(
     if obj is None:
         return JSONResponse({"detail": "Товар не найден"}, status_code=404)
 
-    content_type = (file.content_type or "").lower()
-    ext = {
-        "png": ".png", "jpeg": ".jpg", "jpg": ".jpg",
-        "webp": ".webp", "gif": ".gif",
-    }
-    matched = None
-    for key, val in ext.items():
-        if key in content_type:
-            matched = val
-            break
-    if matched is None:
-        return JSONResponse({"detail": "Неподдерживаемый формат изображения"}, status_code=400)
-
-    # Читаем с ограничением размера (защита от memory-DoS) и проверяем
-    # сигнатуру файла, а не только клиентский content_type.
-    data = await file.read(_MAX_IMAGE_BYTES + 1)
-    if len(data) > _MAX_IMAGE_BYTES:
-        return JSONResponse({"detail": "Изображение слишком большое"}, status_code=400)
-    magic = {
-        ".png": b"\x89PNG\r\n\x1a\n",
-        ".jpg": b"\xff\xd8\xff",
-        ".gif": b"GIF8",
-        ".webp": b"RIFF",
-    }
-    actual_ext = None
-    for ext_name, signature in magic.items():
-        if data.startswith(signature):
-            actual_ext = ext_name
-            break
-    if actual_ext is None:
-        return JSONResponse({"detail": "Файл не является изображением"}, status_code=400)
+    # Единый хелпер: валидация по сигнатуре (WebP — RIFF+WEBP) и сохранение
+    # байт как есть (альфа-канал/прозрачность стикеров сохраняется).
+    filename = await image_service.save_image(file, "nomen")
+    if filename is None:
+        return JSONResponse({"detail": "Неподдерживаемое или слишком большое изображение"}, status_code=400)
 
     uploads = Path(settings.uploads_dir)
-    uploads.mkdir(parents=True, exist_ok=True)
-    filename = f"nomen_{item_id}_{uuid.uuid4().hex[:8]}{actual_ext}"
-    dest = uploads / filename
-    dest.write_bytes(data)
-
     # Удаляем старое изображение.
     if obj.image_path:
         old = uploads / obj.image_path
@@ -1008,11 +976,34 @@ async def rmk_page(
     revenue = await cash_service.shift_revenue(session, shift) if shift else Decimal("0")
     expenses = await cash_service.shift_expenses(session, shift) if shift else Decimal("0")
 
+    # Предзагрузка корзины из заявки (продажа заказа через РМК).
+    zakaz_id = _to_int(request.query_params.get("zakaz_id"))
+    zakaz_number = None
+    preload: list[dict] = []
+    if zakaz_id:
+        zakaz = await document_service.get_document(session, zakaz_id)
+        if zakaz is not None and zakaz.doc_type == DocType.ZAKAZ.value:
+            zakaz_number = zakaz.number
+            nomen_map = {n.id: n for n in nomen}
+            for it in zakaz.items:
+                nm = nomen_map.get(it.nomenklatura_id)
+                preload.append(
+                    {
+                        "id": it.nomenklatura_id,
+                        "name": nm.name if nm else f"#{it.nomenklatura_id}",
+                        "price": float(it.price),
+                        "qty": float(it.quantity),
+                    }
+                )
+
     return _page(
         request, user, "trade/rmk.html",
         items_json=_json_safe(items),
         sklady=sklady, kassy=kassy,
         shift=shift, revenue=revenue, expenses=expenses,
+        preload_json=_json_safe(preload),
+        zakaz_id=zakaz_id,
+        zakaz_number=zakaz_number,
     )
 
 
@@ -1069,6 +1060,7 @@ async def rmk_sell(
     sklad_id = data.get("sklad_id")
     doc_type = DocType.VOZVRAT if data.get("return") else DocType.RASHOD
     received = data.get("received")
+    zakaz_id = _to_int(data.get("zakaz_id"))
 
     # Валидируем строки заранее — невалидный JSON иначе даёт 500 (KeyError/ValueError).
     parsed_items = []
@@ -1091,6 +1083,13 @@ async def rmk_sell(
                 if pp is not None and i["price"] < pp:
                     return JSONResponse({"detail": f"Цена ниже закупочной ({pp})"}, status_code=400)
 
+    # Доп. данные документа: полученная сумма и ссылка на продаваемую заявку.
+    extra: dict = {}
+    if received is not None:
+        extra["received"] = received
+    if zakaz_id:
+        extra["zakaz_id"] = zakaz_id
+
     try:
         document = await document_service.create_document(
             session,
@@ -1098,7 +1097,7 @@ async def rmk_sell(
             subtype=DocSubtype.CASH if doc_type == DocType.RASHOD else None,
             doc_date=date.today(),
             sklad_id=sklad_id,
-            extra={"received": received} if received is not None else None,
+            extra=extra or None,
             items=parsed_items,
             created_by_id=user.id,
         )
@@ -1107,6 +1106,15 @@ async def rmk_sell(
         return JSONResponse({"detail": str(exc)}, status_code=409)
     except document_service.DocumentError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=400)
+
+    # Продажа заявки через РМК закрывает заявку (status -> done).
+    if zakaz_id:
+        zakaz = await document_service.get_document(session, zakaz_id)
+        if zakaz is not None and zakaz.doc_type == DocType.ZAKAZ.value:
+            zextra = dict(zakaz.extra or {})
+            zextra["state"] = "done"
+            zakaz.extra = zextra
+            await session.commit()
 
     return {"id": document.id}
 

@@ -79,16 +79,8 @@
     </div>
     <div class="modal-body" style="padding-top:0;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
       {% if st in ['new', 'in_work'] %}
-      <form method="post" action="/zakazy/{{ z.id }}/reserve"><button class="btn secondary">Резерв</button></form>
-      <form method="post" action="/zakazy/{{ z.id }}/ship"><button class="btn secondary" type="button" onclick="confirmSubmit(this.form, 'Отгрузить заявку и создать расходную накладную?')">Отгрузить</button></form>
-      {% endif %}
-      {% if st == 'new' %}
-      <form method="post" action="/zakazy/{{ z.id }}/state"><input type="hidden" name="state" value="in_work"><button class="btn primary">В работу</button></form>
-      {% elif st == 'in_work' %}
-      <form method="post" action="/zakazy/{{ z.id }}/state"><input type="hidden" name="state" value="done"><button class="btn primary">Выполнить</button></form>
-      {% endif %}
-      {% if st in ['new', 'in_work'] %}
-      <form method="post" action="/zakazy/{{ z.id }}/state"><input type="hidden" name="state" value="cancelled"><button class="btn danger">Отменить</button></form>
+      <a class="btn primary" href="/rmk?zakaz_id={{ z.id }}">{{ icon('cart', 16) }} Продать через РМК</a>
+      <form method="post" action="/zakazy/{{ z.id }}/state"><input type="hidden" name="state" value="cancelled"><button class="btn danger">Отклонить</button></form>
       {% endif %}
     </div>
   </div>

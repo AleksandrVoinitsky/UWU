@@ -174,3 +174,26 @@ async def test_create_promotion_via_route(client, seeded_session, admin_token):
     assert resp.status_code == 303
     promos = await site_service.list_promotions(seeded_session)
     assert any(p.name == "Тест" for p in promos)
+
+
+# --- Изображения (WebP без фона) ----------------------------------------------
+
+
+def test_detect_webp_transparent():
+    from app.services import image_service
+
+    webp = b"RIFF\x00\x00\x00\x00WEBPVP8 " + b"\x00" * 24
+    assert image_service.detect_ext(webp) == ".webp"
+
+
+def test_detect_rejects_wav_riff():
+    from app.services import image_service
+
+    wav = b"RIFF\x00\x00\x00\x00WAVEfmt " + b"\x00" * 24
+    assert image_service.detect_ext(wav) is None
+
+
+def test_detect_png():
+    from app.services import image_service
+
+    assert image_service.detect_ext(b"\x89PNG\r\n\x1a\n" + b"\x00" * 20) == ".png"

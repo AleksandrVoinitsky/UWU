@@ -589,6 +589,19 @@
     var cart = {};
     var currentTotal = 0;
 
+    // Продажа заявки через РМК: id заявки и предзагрузка её позиций.
+    var zakazId = null;
+    var zakazIdEl = document.getElementById("rmk-zakaz-id");
+    if (zakazIdEl) {
+      var zid = parseInt(zakazIdEl.textContent, 10);
+      if (zid) zakazId = zid;
+    }
+    var preload = [];
+    var preloadEl = document.getElementById("rmk-preload");
+    if (preloadEl) {
+      try { preload = JSON.parse(preloadEl.textContent) || []; } catch (e) { preload = []; }
+    }
+
     function money(n) {
       return (Math.round((Number(n) + Number.EPSILON) * 100) / 100).toFixed(2);
     }
@@ -687,6 +700,7 @@
 
     if (search) search.addEventListener("input", function () { renderGrid(search.value); });
     renderGrid();
+    preload.forEach(function (it) { addToCart(it.id, it.name, it.price || 0, it.qty || 1); });
     renderCart();
 
     function doSell(isReturn) {
@@ -710,7 +724,7 @@
       fetch("/rmk/sell", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sklad_id: skladId ? parseInt(skladId, 10) : null, items: lines, return: !!isReturn, received: received }),
+        body: JSON.stringify({ sklad_id: skladId ? parseInt(skladId, 10) : null, items: lines, return: !!isReturn, received: received, zakaz_id: zakazId }),
       })
         .then(function (r) {
           if (!r.ok) return r.json().then(function (e) { throw new Error(e.detail || "Ошибка"); });

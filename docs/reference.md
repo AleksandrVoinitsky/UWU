@@ -419,6 +419,18 @@ initData (для тестов и локальной проверки).
 `/admin/site/promotions` (+ `/{id}/toggle`, `/{id}/delete`),
 `/admin/site/products/{id}/toggle` (публикация товара).
 
+## app/services/image_service.py — загрузка изображений
+
+### `detect_ext(data) -> str | None`
+**Назначение:** определение формата по сигнатуре (PNG/JPEG/GIF/WebP). WebP
+определяется по `RIFF` + `WEBP` (отличается от WAV). **Технически:** сравнение
+магических байтов.
+
+### `save_image(file, prefix) -> str | None`
+**Назначение:** валидация и сохранение изображения (ограничение размера,
+проверка сигнатуры, без перекодирования — прозрачность/альфа-канал WebP-стикеров
+сохраняется). Используется загрузкой фото товара, логотипа и баннера.
+
 ## app/static/js/app.js — фронтенд-диалоги
 
 ### `confirmDialog(message, opts) -> Promise<boolean>`

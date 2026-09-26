@@ -7,36 +7,23 @@
 """
 from __future__ import annotations
 
-import uuid
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.database import get_session
 from app.core.deps import get_current_user_from_cookie
 from app.core.i18n import translate
 from app.models.catalog import Category, Nomenklatura
 from app.models.site import DISCOUNT_TYPES
 from app.models.users import User
-from app.services import catalog_service, site_service
+from app.services import catalog_service, image_service, site_service
 from app.templates import render
 
 router = APIRouter(tags=["web-admin-site"])
-
-_MAX_IMAGE_BYTES = 5 * 1024 * 1024
-
-_IMAGE_EXT = {".png": ".png", ".jpg": ".jpg", ".jpeg": ".jpg", ".webp": ".webp", ".gif": ".gif"}
-_MAGIC = {
-    ".png": b"\x89PNG\r\n\x1a\n",
-    ".jpg": b"\xff\xd8\xff",
-    ".gif": b"GIF8",
-    ".webp": b"RIFF",
-}
 
 
 def _lang(request: Request) -> str:
@@ -58,29 +45,6 @@ def _page(request: Request, user: User, template: str, **ctx) -> HTMLResponse:
 
 async def _require_admin(user: User) -> bool:
     return not user.is_admin
-
-
-async def _save_image(file: UploadFile, prefix: str) -> str | None:
-    """Сохраняет загруженное изображение в /uploads; возвращает имя файла."""
-    content_type = (file.content_type or "").lower()
-    ext = None
-    for key, val in _IMAGE_EXT.items():
-        if key in content_type:
-            ext = val
-            break
-    if ext is None:
-        return None
-    data = await file.read(_MAX_IMAGE_BYTES + 1)
-    if len(data) > _MAX_IMAGE_BYTES:
-        return None
-    actual_ext = next((e for e, sig in _MAGIC.items() if data.startswith(sig)), None)
-    if actual_ext is None:
-        return None
-    uploads = Path(settings.uploads_dir)
-    uploads.mkdir(parents=True, exist_ok=True)
-    filename = f"{prefix}_{uuid.uuid4().hex[:8]}{actual_ext}"
-    (uploads / filename).write_bytes(data)
-    return filename
 
 
 def _as_decimal(raw: str | None) -> Decimal | None:
@@ -162,7 +126,7 @@ async def site_upload_logo(
 ):
     if await _require_admin(user):
         return RedirectResponse("/", status_code=303)
-    filename = await _save_image(file, "logo")
+    filename = await image_service.save_image(file, "logo")
     if filename:
         await site_service.set_settings(session, {"logo_path": filename})
     return RedirectResponse("/admin/site", status_code=303)
@@ -177,7 +141,7 @@ async def site_upload_banner(
 ):
     if await _require_admin(user):
         return RedirectResponse("/", status_code=303)
-    filename = await _save_image(file, "banner")
+    filename = await image_service.save_image(file, "banner")
     if filename:
         await site_service.set_settings(session, {"banner_image_path": filename})
     return RedirectResponse("/admin/site", status_code=303)
