@@ -56,9 +56,30 @@
 - отображаемое имя;
 - индикатор статуса (активен / включён / выключен).
 
-Изменения применяются **после перезапуска** сервиса (боты стартуют в lifespan
-приложения). Маршруты — в [`app/web/admin.py`](app/web/admin.py), шаблон —
-[`app/templates/admin/bots.html`](app/templates/admin/bots.html).
+Изменения применяются **сразу** (горячее применение): при сохранении настроек
+запускается/перезапускается/останавливается соответствующий адаптер через
+`apply_bot_config()` — без перезапуска сервиса. При рестарте приложения боты
+также стартуют из lifespan. Маршруты — в [`app/web/admin.py`](app/web/admin.py),
+шаблон — [`app/templates/admin/bots.html`](app/templates/admin/bots.html).
+
+## Боевое использование (production)
+
+Чек-лист перед запуском ботов в проде:
+
+1. **Токены** — задать в админке `/admin/bots` (Telegram и/или MAX). Токен
+   маскируется, пустое поле не перезаписывает сохранённый.
+2. **HTTPS** — для Telegram Web App (MiniApp) обязателен: Web Apps открываются
+   только по `https`. Для локальной отладки — ngrok/cloudflared туннель.
+3. **MiniApp** — в @BotFather указать кнопку меню: *Bot Settings → Menu Button →
+   Configure menu button → Web App*, URL = `https://<домен>/shop/mini/launch`
+   (мост читает `initData` из Telegram и пересылает на `/shop/mini`). См.
+   [customer](customer.md).
+4. **MINIAPP_DEV** — в проде `false` (подпись `initData` проверяется). `true`
+   только для локальной отладки.
+5. **Webhook vs polling** — Telegram использует long polling (нормально для
+   прода). MAX использует long polling официального API (~2 RPS); для высокой
+   нагрузки вендор рекомендует webhook — отдельная задача.
+6. **Секреты** — токены не логируются и не отображаются в UI.
 
 ## Безопасность и логирование
 

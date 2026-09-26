@@ -131,3 +131,48 @@ async def test_admin_bots_page_renders(client, seeded_session):
     assert resp.status_code == 200
     assert "Telegram" in resp.text
     assert "MAX" in resp.text
+
+
+# --- Горячее применение настроек (без перезапуска) ---
+
+
+async def test_bot_manager_stop(seeded_session):
+    adapter = FakeAdapter()
+    bot_manager.start(adapter)
+    assert bot_manager.get("telegram") is adapter
+    await bot_manager.stop("telegram")
+    assert bot_manager.get("telegram") is None
+    bot_manager.clear()
+
+
+async def test_apply_bot_config_stops_when_disabled(seeded_session):
+    from app.bots.service import apply_bot_config
+    from app.core.database import async_session_factory
+
+    adapter = FakeAdapter()
+    bot_manager.register(adapter)
+    await apply_bot_config(async_session_factory, "telegram", enabled=False, token=None)
+    assert bot_manager.get("telegram") is None
+    bot_manager.clear()
+
+
+async def test_admin_save_bots_applies_hot_reload(client, seeded_session):
+    """Сохранение настроек в админке выключает зарегистрированного бота сразу."""
+    from app.bots.service import bot_manager
+
+    bot_manager.register(FakeAdapter())
+    admin = (
+        await seeded_session.execute(
+            select(user_service.User).where(user_service.User.is_admin.is_(True))
+        )
+    ).scalars().first()
+    client.cookies.set("access_token", create_access_token(str(admin.id)))
+
+    resp = await client.post(
+        "/admin/bots",
+        data={"telegram_enabled": "", "telegram_name": "ТГ", "maks_enabled": "", "maks_name": ""},
+    )
+    assert resp.status_code == 303
+    # Телеграм-бот выключен — адаптер остановлен (токен не задан).
+    assert bot_manager.get("telegram") is None
+    bot_manager.clear()

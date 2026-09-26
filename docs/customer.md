@@ -79,6 +79,10 @@ MiniApp переиспользует тот же REST API `/shop/api/*` и ст�
 - **Точка входа** `GET /shop/mini` принимает подписанный `initData` (Telegram
   `hash` — HMAC_SHA256(bot_token, "WebAppData"); MAX `sign` — HMAC_SHA256 со
   секретом приложения), проверяет подпись и находит/создаёт покупателя.
+- **Мост Telegram** `GET /shop/mini/launch` — HTML-страница, которая грузит
+  `telegram-web-app.js`, читает `window.Telegram.WebApp.initData` и пересылает
+  его на `/shop/mini`. Telegram передаёт `initData` не в URL, а через SDK,
+  поэтому в BotFather указывают именно `/shop/mini/launch` (Web App URL).
 - **Привязка** — модель `CustomerBinding` (channel + external_id → customer).
   При первом входе покупатель создаётся автоматически (синтетический логин
   `ma_<channel>_<id>`); привязку к реальному телефону/контрагенту добавим на

@@ -83,3 +83,14 @@ async def test_mini_entry_dev_mode(client, seeded_session, monkeypatch):
     ).scalars().all()
     assert len(binding) == 1
     assert binding[0].external_id == "123"
+
+
+# --- Мост Telegram Web App ---
+
+
+async def test_mini_launch_bridge(client):
+    resp = await client.get("/shop/mini/launch")
+    assert resp.status_code == 200
+    assert "telegram-web-app.js" in resp.text
+    assert "Telegram.WebApp.initData" in resp.text
+    assert "/shop/mini?channel=telegram" in resp.text

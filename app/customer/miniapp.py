@@ -67,3 +67,61 @@ async def mini_entry(
         secure=settings.environment == "production",
     )
     return response
+
+
+# HTML-мост Telegram Web App: читает initData из SDK и пересылает на /shop/mini.
+# Telegram передаёт initData не в URL, а через window.Telegram.WebApp.initData,
+# поэтому нужен этот промежуточный шаг. Указать этот URL в BotFather как Web App.
+_MINI_LAUNCH_HTML = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UWU</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:#070b16; color:#e8edf9; font-family:-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .box { text-align:center; padding:24px; }
+  .mark { width:56px; height:56px; border-radius:16px; margin:0 auto 16px;
+          background:linear-gradient(135deg,#7c9cff,#4ee0c0); display:grid; place-items:center;
+          font-weight:800; font-size:24px; color:#0a1020; }
+  .spinner { width:22px; height:22px; margin:12px auto 0; border:2px solid rgba(126,150,200,.3);
+             border-top-color:#7c9cff; border-radius:50%; animation:spin 0.8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .muted { color:#97a4c0; font-size:13px; margin-top:10px; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="mark">U</div>
+    <div id="status">Открытие магазина…</div>
+    <div class="spinner"></div>
+    <div class="muted" id="hint"></div>
+  </div>
+  <script>
+    (function () {
+      var status = document.getElementById('status');
+      var hint = document.getElementById('hint');
+      if (!window.Telegram || !window.Telegram.WebApp) {
+        status.textContent = 'Откройте Mini App из Telegram';
+        hint.textContent = 'Этот адрес предназначен для кнопки меню бота.';
+        return;
+      }
+      Telegram.WebApp.ready();
+      var initData = Telegram.WebApp.initData || '';
+      if (!initData) {
+        status.textContent = 'Не удалось получить данные Telegram';
+        return;
+      }
+      window.location.replace('/shop/mini?channel=telegram&initData=' + encodeURIComponent(initData));
+    })();
+  </script>
+</body>
+</html>"""
+
+
+@router.get("/mini/launch", response_class=HTMLResponse)
+async def mini_launch():
+    """Мост Telegram Web App (укажите этот URL в BotFather как Web App)."""
+    return HTMLResponse(_MINI_LAUNCH_HTML)

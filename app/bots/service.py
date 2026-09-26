@@ -56,6 +56,23 @@ class BotManager:
             old_task.cancel()
         self._tasks[adapter.channel] = asyncio.create_task(adapter.run())
 
+    async def stop(self, channel: str) -> None:
+        """Останавливает и убирает адаптер одного канала (горячая перезагрузка)."""
+        adapter = self._adapters.pop(channel, None)
+        task = self._tasks.pop(channel, None)
+        if adapter is not None:
+            try:
+                await adapter.shutdown()
+            except Exception:  # noqa: BLE001
+                logger.exception("Error stopping bot %s", channel)
+        if task is not None:
+            if not task.done():
+                task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+
     async def stop_all(self) -> None:
         for adapter in self._adapters.values():
             try:
@@ -132,6 +149,30 @@ async def upsert_config(
     await session.commit()
     await session.refresh(cfg)
     return cfg
+
+
+async def apply_bot_config(
+    session_factory: async_sessionmaker, channel: str, enabled: bool, token: str | None
+) -> None:
+    """Применяет настройки бота сразу — без перезапуска сервиса.
+
+    Запускает/перезапускает адаптер, если бот включён и есть токен; иначе
+    останавливает его. Вызывается после сохранения настроек в админке.
+    """
+    if enabled and token:
+        try:
+            from functools import partial
+
+            adapter = create_adapter(
+                channel, token, partial(store_incoming, session_factory)
+            )
+            bot_manager.start(adapter)
+            logger.info("Bot %s started/reloaded", channel)
+        except Exception:  # noqa: BLE001
+            logger.exception("Не удалось запустить бота %s", channel)
+    else:
+        await bot_manager.stop(channel)
+        logger.info("Bot %s stopped", channel)
 
 
 # --- Приём/отправка сообщений ---

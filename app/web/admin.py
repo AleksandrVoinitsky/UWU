@@ -243,16 +243,19 @@ async def admin_save_bots(
 ):
     if not user.is_admin:
         return RedirectResponse("/", status_code=303)
-    from app.bots.service import BOT_CHANNELS, upsert_config
+    from app.bots.service import BOT_CHANNELS, apply_bot_config, upsert_config
+    from app.core.database import async_session_factory
 
     form = await request.form()
     for channel in BOT_CHANNELS:
         enabled = form.get(f"{channel}_enabled") == "on"
         token = (form.get(f"{channel}_token") or "").strip() or None
         name = (form.get(f"{channel}_name") or "").strip() or None
-        await upsert_config(
+        cfg = await upsert_config(
             session, channel, enabled=enabled, token=token, name=name
         )
+        # Горячее применение: старт/рестарт/остановка бота сразу, без рестарта.
+        await apply_bot_config(async_session_factory, channel, cfg.enabled, cfg.token)
     return RedirectResponse("/admin/bots", status_code=303)
 
 
