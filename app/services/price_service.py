@@ -93,6 +93,9 @@ async def set_explicit_price(
         )
     else:
         row.price = price
+    # Делаем запись видимой для последующих запросов в этой же транзакции
+    # (при autoflush=False без flush resolve_prices не увидит новую цену).
+    await session.flush()
 
 
 async def clear_explicit_price(
@@ -105,3 +108,4 @@ async def clear_explicit_price(
             TsenaNomenklatury.tip_tsen_id == tip_tsen_id,
         )
     )
+    await session.flush()

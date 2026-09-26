@@ -29,6 +29,8 @@ services:
       DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-ru}
       UPLOADS_DIR: /app/uploads
       MINIAPP_DEV: ${MINIAPP_DEV:-false}
+      # production — небезопасные SECRET_KEY/пароль блокируют запуск (fail-fast).
+      ENVIRONMENT: ${ENVIRONMENT:-production}
     ports:
       - "8000:8000"
     volumes:

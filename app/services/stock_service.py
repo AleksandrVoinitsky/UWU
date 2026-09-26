@@ -103,18 +103,25 @@ async def consume_batches(
     sklad_id: int,
     quantity: Decimal,
     method: CostMethod,
+    allow_negative: bool = False,
+    source_document_id: int | None = None,
 ) -> tuple[list[ConsumedLine], Decimal]:
     """Списывает ``quantity`` по методу себестоимости.
 
     Возвращает (строки списания по партиям, общая себестоимость).
 
-    Возбуждает :class:`InsufficientStockError`, если остатка не хватает.
+    Возбуждает :class:`InsufficientStockError`, если остатка не хватает, кроме
+    случая ``allow_negative=True`` (режим «Без контроля остатков»): тогда
+    списывается всё доступное, а нехватка фиксируется отрицательной партией.
     """
     stmt = select(StockBatch).where(
         StockBatch.nomenklatura_id == nomenklatura_id,
         StockBatch.sklad_id == sklad_id,
         StockBatch.quantity > 0,
     )
+    # Блокируем строки партий до конца транзакции, чтобы два конкурентных
+    # списания не прошли проверку остатка одновременно (перепродажа).
+    stmt = stmt.with_for_update()
     if method == CostMethod.LIFO:
         stmt = stmt.order_by(StockBatch.id.desc())
     else:  # FIFO и средняя списывают в порядке поступления
@@ -123,7 +130,7 @@ async def consume_batches(
     batches = list(result.scalars())
 
     total_available = sum((b.quantity for b in batches), Decimal("0"))
-    if total_available < quantity:
+    if total_available < quantity and not allow_negative:
         raise InsufficientStockError(
             nomenklatura_id=nomenklatura_id,
             sklad_id=sklad_id,
@@ -131,10 +138,8 @@ async def consume_batches(
             required=quantity,
         )
 
-    if method == CostMethod.AVERAGE:
-        if total_available == 0:
-            # quantity == 0 при пустом остатке: нечего списывать (иначе 0/0).
-            return [], Decimal("0")
+    avg_cost = Decimal("0")
+    if method == CostMethod.AVERAGE and total_available > 0:
         total_cost = sum((b.quantity * b.unit_cost for b in batches), Decimal("0"))
         avg_cost = (total_cost / total_available).quantize(Decimal("0.0001"))
 
@@ -152,6 +157,23 @@ async def consume_batches(
         consumed.append(ConsumedLine(batch.id, take, unit_cost))
         remaining -= take
 
+    # Нехватка при разрешённом отрицательном остатке: фиксируем её
+    # отрицательной партией, чтобы остаток корректно ушёл в минус.
+    if remaining > 0:
+        unit_cost = avg_cost if method == CostMethod.AVERAGE else Decimal("0")
+        negative_batch = StockBatch(
+            nomenklatura_id=nomenklatura_id,
+            sklad_id=sklad_id,
+            quantity=-remaining,
+            unit_cost=unit_cost,
+            ownership="own",
+            source_document_id=source_document_id,
+        )
+        session.add(negative_batch)
+        await session.flush()
+        consumed.append(ConsumedLine(negative_batch.id, remaining, unit_cost))
+        remaining = Decimal("0")
+
     total_amount = sum((c.amount for c in consumed), Decimal("0"))
     return consumed, total_amount
 
@@ -165,8 +187,28 @@ async def register_outgoing(
     sklad_id: int,
     quantity: Decimal,
     amount: Decimal,
+    consumed: list[ConsumedLine] | None = None,
 ) -> None:
-    """Регистрирует движение расхода (без изменения партий)."""
+    """Регистрирует движение расхода (без изменения партий).
+
+    Если передан ``consumed`` (состав списания по партиям), создаётся по одному
+    движению на партию с корректным ``batch_id`` — это позволяет при отмене
+    проведения точно восстановить исходные партии (FIFO/LIFO).
+    """
+    if consumed:
+        for line in consumed:
+            session.add(
+                StockMovement(
+                    document_id=document_id,
+                    date=date,
+                    nomenklatura_id=nomenklatura_id,
+                    sklad_id=sklad_id,
+                    quantity=-line.quantity,
+                    amount=-line.amount,
+                    batch_id=line.batch_id,
+                )
+            )
+        return
     movement = StockMovement(
         document_id=document_id,
         date=date,
@@ -226,6 +268,16 @@ async def reserve(
     zakaz_id: int | None = None,
 ) -> None:
     """Резервирует товар (проверяет доступный остаток)."""
+    # Блокируем партии (nomenklatura, sklad), чтобы два конкурентных
+    # резервирования не прошли проверку доступного остатка одновременно.
+    await session.execute(
+        select(StockBatch.id)
+        .where(
+            StockBatch.nomenklatura_id == nomenklatura_id,
+            StockBatch.sklad_id == sklad_id,
+        )
+        .with_for_update()
+    )
     available = await get_available(session, nomenklatura_id, sklad_id)
     if quantity > available:
         raise InsufficientStockError(

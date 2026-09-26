@@ -33,8 +33,9 @@ _WEAK_ADMIN_PASSWORDS = {"", "admin", "password", "123456", "changeme"}
 def validate_security_settings() -> list[str]:
     """Проверяет настройки безопасности и возвращает список предупреждений.
 
-    Не падает с ошибкой — чтобы не ломать существующие развёртывания, — но
-    громко логирует проблемы, которые оператор обязан устранить в проде.
+    В dev-режиме только громко логирует проблемы; в ``environment="production"``
+    возбуждает :class:`RuntimeError`, не давая стартовать с небезопасными
+    настройками (fail-fast).
 
     См. также: :class:`app.core.config.Settings`.
     """
@@ -48,8 +49,18 @@ def validate_security_settings() -> list[str]:
         warnings.append(
             "ADMIN_PASSWORD использует слабый пароль по умолчанию. Смените его."
         )
+    if settings.miniapp_dev:
+        warnings.append(
+            "MINIAPP_DEV включён — проверка подписи initData отключена. Это "
+            "допустимо только для локальной разработки, отключите в проде."
+        )
     for message in warnings:
         logger.warning("Security check: %s", message)
+    if warnings and settings.environment == "production":
+        raise RuntimeError(
+            "Refusing to start in production with insecure security settings: "
+            + "; ".join(warnings)
+        )
     return warnings
 
 

@@ -28,10 +28,24 @@ pytest tests/ -v
 | Файл | Покрытие |
 | --- | --- |
 | `tests/test_auth.py` | Вход, неверный пароль, неизвестный пользователь |
+| `tests/test_api_auth.py` | Аутентификация REST API (401/200) |
 | `tests/test_catalog.py` | Автокоды, создание справочников через API |
-| `tests/test_documents.py` | Приход, расход (FIFO), контроль остатков, перемещение, отмена проведения, взаиморасчёты |
+| `tests/test_documents.py` | Приход, расход (FIFO), контроль остатков, перемещение, отмена проведения, взаиморасчёты, печатные формы |
 | `tests/test_reports.py` | Остатки, взаиморасчёты, деньги |
 | `tests/test_users.py` | Сид админа/ролей, CRUD пользователей, защита от удаления админа |
+| `tests/test_security.py` | Настройки безопасности (секреты, токены) |
+| `tests/test_numbering.py` | Нумерация документов (advisory-lock) |
+| `tests/test_prices.py` | Ценообразование (автонаценка, явные цены) |
+| `tests/test_dashboard.py` | Дашборд, KPI, графики |
+| `tests/test_customer.py` | Покупатель: регистрация, вход, корзина, заказ |
+| `tests/test_miniapp.py` | MiniApp (Telegram/MAX) initData, привязка |
+| `tests/test_bots.py` | Боты: фабрика, чаты, доставка сообщений |
+| `tests/test_chat.py` | Мессенджер (чаты, сообщения) |
+| `tests/test_bugfix.py` | Регрессионные тесты багфиксов |
+| `tests/test_encoding.py` | Кодировки (mojibake) |
+| `tests/test_logging.py` | Логирование |
+| `tests/test_csv.py` | CSV-экспорт, защита от формульной инъекции |
+| `tests/test_audit_fixes.py` | Регрессионные тесты на находки аудита (XSS, себестоимость, права, rate limiting, CSRF, отмена проведения FIFO и др.) |
 
 ## Ключевые проверяемые сценарии
 

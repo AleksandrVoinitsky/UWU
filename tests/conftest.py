@@ -28,10 +28,12 @@ os.environ.setdefault(
 
 import app.core.database as db  # noqa: E402
 
-# Пересоздаём движок с NullPool для тестов.
+# Пересоздаём движок с NullPool для тестов. Настройки сессии (включая
+# ``autoflush=False``) должны повторять продакшен (``app.core.database``),
+# иначе тесты маскируют баги, проявляющиеся только в проде.
 _test_engine = create_async_engine(os.environ["DATABASE_URL"], poolclass=NullPool)
 _test_session_factory = async_sessionmaker(
-    bind=_test_engine, class_=db.AsyncSession, expire_on_commit=False
+    bind=_test_engine, class_=db.AsyncSession, expire_on_commit=False, autoflush=False
 )
 db.engine = _test_engine
 db.async_session_factory = _test_session_factory

@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import time
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from app.api.router import api_router
 from app.core.config import settings
@@ -28,6 +30,29 @@ logger = get_logger("app.main")
 
 # Пути, которые не логируем как запросы (шум: статика и health-чеки).
 _SKIP_REQUEST_LOG_PREFIXES = ("/static", "/uploads", "/healthz")
+
+# Методы, меняющие состояние (для CSRF-проверки same-origin).
+_CSRF_METHODS = ("POST", "PUT", "PATCH", "DELETE")
+
+
+def _csrf_failed(request: Request) -> bool:
+    """Проверяет same-origin для state-changing запросов (защита от CSRF).
+
+    Cookie-аутентифицированные эндпоинты уязвимы к CSRF: браузер автоматически
+    прикладывает cookie к cross-site запросу. Проверяем, что ``Origin``/``Referer``
+    совпадают с ``Host``; если заголовок отсутствует (небраузерный клиент) — не
+    блокируем, т.к. такие клиенты не прикладывают cookie автоматически.
+    """
+    host = request.headers.get("host")
+    origin = request.headers.get("origin")
+    if origin:
+        origin_host = urlparse(origin).netloc
+        return bool(origin_host and host and origin_host != host)
+    referer = request.headers.get("referer")
+    if referer:
+        referer_host = urlparse(referer).netloc
+        return bool(referer_host and host and referer_host != host)
+    return False
 
 
 @asynccontextmanager
@@ -106,6 +131,16 @@ def create_app() -> FastAPI:
             )
         return response
 
+    @application.middleware("http")
+    async def csrf_protect(request: Request, call_next):
+        """Защита от CSRF для cookie-аутентифицированных state-changing запросов."""
+        if request.method in _CSRF_METHODS and _csrf_failed(request):
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "CSRF check failed"},
+            )
+        return await call_next(request)
+
     @application.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):
         """Единая точка обработки необработанных ошибок: логируем и отдаём 500."""
@@ -121,8 +156,15 @@ def create_app() -> FastAPI:
         )
 
     @application.get("/healthz", tags=["health"])
-    async def healthz() -> dict:
-        return {"status": "ok"}
+    async def healthz() -> JSONResponse:
+        """Проверка готовности: отдаёт ok только при доступной БД."""
+        try:
+            async with async_session_factory() as session:
+                await session.execute(text("SELECT 1"))
+        except Exception as exc:  # noqa: BLE001 — healthcheck обязан не падать
+            logger.warning("Healthcheck failed: %s", exc)
+            return JSONResponse(status_code=503, content={"status": "unhealthy"})
+        return JSONResponse({"status": "ok"})
 
     return application
 

@@ -12,7 +12,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, TypeVar
 
-from sqlalchemy import Integer, func, select
+from sqlalchemy import Integer, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import Base
@@ -20,6 +20,10 @@ from app.models.catalog import CurrencyRate, Kontragent, Nomenklatura
 from app.models.constants import DEFAULT_CONSTANTS, Constant
 
 ModelT = TypeVar("ModelT", bound=Base)
+
+# Пространство advisory-lock для генерации кодов справочников (защита от
+# дублей кода при параллельном создании).
+_CODE_LOCK_NAMESPACE = 44
 
 
 async def list_all(session: AsyncSession, model: type[ModelT]) -> list[ModelT]:
@@ -63,6 +67,12 @@ async def next_code(session: AsyncSession, model: type[Any], prefix: str = "") -
     «999» и снова сгенерировал «1000» (дубль уникального кода); при этом пустые
     и нечисловые коды (например «» или «ABC») игнорируются.
     """
+    # Сериализуем генерацию кода на время транзакции — иначе два параллельных
+    # создания получат одинаковый код и нарушат unique-констрейнт.
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(:ns, hashtext(:key))"),
+        {"ns": _CODE_LOCK_NAMESPACE, "key": f"uwu_code_{model.__tablename__}"},
+    )
     max_code = await session.execute(
         select(func.max(func.cast(model.code, Integer))).where(  # type: ignore[attr-defined]
             model.code.op("~")(r"^\d+$")  # только чисто числовые коды

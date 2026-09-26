@@ -53,7 +53,9 @@ async def stock_balances(session: AsyncSession) -> list[dict]:
     for nomen_id, sklad_id, ownership, qty, cost in result.all():
         nomen = await session.get(Nomenklatura, nomen_id)
         sklad = await session.get(Sklad, sklad_id)
-        reserved = reserved_map.get((nomen_id, sklad_id), Decimal("0"))
+        # Резерв учитывается только для собственных товаров.
+        is_own = ownership == "own"
+        reserved = reserved_map.get((nomen_id, sklad_id), Decimal("0")) if is_own else Decimal("0")
         rows.append(
             {
                 "nomenklatura_id": nomen_id,
@@ -64,7 +66,7 @@ async def stock_balances(session: AsyncSession) -> list[dict]:
                 "ownership": ownership,
                 "quantity": qty,
                 "reserved": reserved,
-                "available": qty - reserved,
+                "available": qty - reserved if is_own else qty,
                 "cost": (cost or Decimal("0")).quantize(Decimal("0.01")),
             }
         )
@@ -244,12 +246,16 @@ async def abc_analysis(session: AsyncSession, start: date, end: date) -> list[di
     cumulative = Decimal("0")
     for nomen_id, amount in data:
         nomen = await session.get(Nomenklatura, nomen_id)
+        prev_cumulative = cumulative
         cumulative += amount
         pct = (amount / total * Decimal("100")).quantize(Decimal("0.01")) if total else Decimal("0")
         cum_pct = (cumulative / total * Decimal("100")).quantize(Decimal("0.01")) if total else Decimal("0")
-        if cum_pct <= Decimal("80"):
+        prev_cum_pct = (prev_cumulative / total * Decimal("100")).quantize(Decimal("0.01")) if total else Decimal("0")
+        # Класс определяется по накопленной доле ДО добавления позиции: позиция,
+        # пересекающая порог 80% (кумулятивно 60→90), относится к A, а не к B.
+        if prev_cum_pct < Decimal("80"):
             cls = "A"
-        elif cum_pct <= Decimal("95"):
+        elif prev_cum_pct < Decimal("95"):
             cls = "B"
         else:
             cls = "C"
@@ -314,13 +320,15 @@ async def commission_report(session: AsyncSession) -> dict:
             }
         )
 
-    # Долг комитентам: отрицательные взаиморасчёты только по принятым на
-    # реализацию приходам (subtype=realization), а не любые долги поставщикам.
+    # Долг комитентам: задолженность по принятым на реализацию приходам
+    # (subtype=realization) за вычетом оплат. Оплаты (РКО/платёжное поручение)
+    # ссылаются на накладную через base_document_id, поэтому суммируем движения
+    # по base_document_id: исходная задолженность (document_id == base_document_id,
+    # amount < 0) и погашения (оплаты, amount > 0) дают чистый долг.
     debt_stmt = (
         select(func.coalesce(func.sum(SettlementMovement.amount), 0))
-        .join(Document, Document.id == SettlementMovement.document_id)
+        .join(Document, Document.id == SettlementMovement.base_document_id)
         .where(
-            SettlementMovement.amount < 0,
             Document.doc_type == DocType.PRIHOD.value,
             Document.subtype == "realization",
         )
@@ -409,8 +417,16 @@ async def cash_book(session: AsyncSession, start: date, end: date) -> list[dict]
         .order_by(MoneyMovement.date)
     )
     result = await session.execute(stmt)
+    # Начальный остаток — все движения денег до начала периода.
+    running = (
+        (await session.execute(
+            select(func.coalesce(func.sum(MoneyMovement.amount), 0)).where(
+                MoneyMovement.date < start
+            )
+        )).scalar()
+        or Decimal("0")
+    )
     rows = []
-    running = Decimal("0")
     for day, income, expense in result.all():
         running += income + expense
         rows.append(

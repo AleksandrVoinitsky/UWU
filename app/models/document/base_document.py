@@ -45,8 +45,8 @@ class Document(Base, IdMixin, TimestampMixin):
     kassa_id: Mapped[int | None] = mapped_column(ForeignKey("kassy.id"), nullable=True)
     valyuta_id: Mapped[int | None] = mapped_column(ForeignKey("valyuty.id"), nullable=True)
 
-    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
-    nds_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    nds_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
 
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -88,7 +88,7 @@ class DocumentItem(Base, IdMixin):
     price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     nds_rate_id: Mapped[int | None] = mapped_column(ForeignKey("stavki_nds.id"), nullable=True)
-    nds_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
+    nds_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
 
     document: Mapped[Document] = relationship(back_populates="items")
     nomenklatura: Mapped["Nomenklatura"] = relationship()  # noqa: F821

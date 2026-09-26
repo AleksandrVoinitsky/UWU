@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     debug: bool = False
     uploads_dir: str = "./uploads"  # каталог для загружаемых изображений
     log_level: str = "INFO"  # DEBUG | INFO | WARNING | ERROR | CRITICAL
+    # Окружение развёртывания: "development" | "production". В production
+    # небезопасные настройки безопасности (слабый SECRET_KEY/пароль) блокируют
+    # запуск приложения.
+    environment: str = "development"
     # Режим разработки MiniApp: пропускает проверку подписи initData (для
     # локального тестирования). В проде должен быть выключен.
     miniapp_dev: bool = False

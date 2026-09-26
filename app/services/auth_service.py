@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +27,8 @@ async def authenticate(session: AsyncSession, login: str, password: str) -> str:
         raise AuthError("Invalid login or password")
     if not user.is_active:
         raise AuthError("Account is disabled")
+    user.last_login_at = datetime.now(timezone.utc)
+    await session.commit()
     return create_access_token(str(user.id))
 
 

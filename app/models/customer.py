@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -67,6 +67,12 @@ class CustomerBinding(Base, IdMixin, TimestampMixin):
     """
 
     __tablename__ = "customer_bindings"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "channel", "external_id", name="uq_customer_binding_channel_external"
+        ),
+    )
 
     channel: Mapped[str] = mapped_column(String(30), nullable=False)  # telegram | maks
     external_id: Mapped[str] = mapped_column(String(64), nullable=False)  # user id мессенджера

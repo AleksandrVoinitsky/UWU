@@ -9,8 +9,20 @@ from decimal import Decimal
 
 from app.models.catalog import Kontragent, Nomenklatura, Sklad
 from app.models.enums import DocType
+from app.models.users import Role
 from app.services import catalog_service, document_service, report_service, user_service
 from app.core.security import create_access_token
+from sqlalchemy import select
+
+
+async def _operator_user(seeded_session, login: str):
+    """Создаёт пользователя с ролью оператора (имеет права чтения/записи)."""
+    role = (
+        await seeded_session.execute(select(Role).where(Role.key == "operator"))
+    ).scalar_one()
+    return await user_service.create_user(
+        seeded_session, login=login, password="secret123", role_id=role.id
+    )
 
 
 async def _seed_sale(seeded_session):
@@ -145,9 +157,7 @@ async def test_replenishment_no_sales(seeded_session):
 
 async def test_dashboard_route_has_reorder_section(client, seeded_session):
     await _seed_sale(seeded_session)
-    user = await user_service.create_user(
-        seeded_session, login="operator3", password="secret123"
-    )
+    user = await _operator_user(seeded_session, "operator3")
     client.cookies.set("access_token", create_access_token(str(user.id)))
     resp = await client.get("/")
     assert resp.status_code == 200
@@ -195,9 +205,7 @@ async def test_recent_sales(seeded_session):
 async def test_dashboard_route_renders(client, seeded_session):
     """Главная рендерится для обычного пользователя и содержит график и метрики."""
     await _seed_sale(seeded_session)
-    user = await user_service.create_user(
-        seeded_session, login="operator1", password="secret123", full_name="Оператор"
-    )
+    user = await _operator_user(seeded_session, "operator1")
     client.cookies.set("access_token", create_access_token(str(user.id)))
     resp = await client.get("/")
     assert resp.status_code == 200
@@ -209,9 +217,7 @@ async def test_dashboard_route_renders(client, seeded_session):
 async def test_dashboard_route_period_param(client, seeded_session):
     """Параметр period принимается без ошибок."""
     await _seed_sale(seeded_session)
-    user = await user_service.create_user(
-        seeded_session, login="operator2", password="secret123"
-    )
+    user = await _operator_user(seeded_session, "operator2")
     client.cookies.set("access_token", create_access_token(str(user.id)))
     resp = await client.get("/?period=30d")
     assert resp.status_code == 200

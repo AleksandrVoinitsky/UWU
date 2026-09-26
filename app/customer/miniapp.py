@@ -35,6 +35,8 @@ async def mini_entry(
 
     if settings.miniapp_dev:
         # Режим разработки: подпись не проверяется (для локальной отладки).
+        if channel not in miniapp_service.VALID_CHANNELS:
+            return HTMLResponse("Неизвестный канал", status_code=400)
         external_id = request.query_params.get("user_id")
         name = request.query_params.get("name") or ""
         if not external_id:
@@ -62,5 +64,6 @@ async def mini_entry(
         create_customer_token(customer.id),
         httponly=True,
         samesite="lax",
+        secure=settings.environment == "production",
     )
     return response

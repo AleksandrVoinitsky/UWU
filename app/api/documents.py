@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, require_permission
 from app.models.document.base_document import Document
 from app.models.enums import DocSubtype, DocType
 from app.models.users import User
@@ -29,7 +29,7 @@ async def list_documents(
     end: date | None = None,
     kontragent_id: int | None = None,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    _user: User = Depends(require_permission("documents.read")),
 ):
     stmt = select(Document).order_by(Document.date.desc(), Document.id.desc())
     if doc_type:
@@ -48,7 +48,7 @@ async def list_documents(
 async def get_document(
     document_id: int,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    _user: User = Depends(require_permission("documents.read")),
 ):
     document = await document_service.get_document(session, document_id)
     if document is None:
@@ -102,7 +102,7 @@ async def post_document(
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     try:
-        return await document_service.post_document(session, document)
+        return await document_service.post_document(session, document, user_id=user.id)
     except InsufficientStockError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except document_service.DocumentError as exc:
@@ -120,7 +120,7 @@ async def unpost_document(
     document = await document_service.get_document(session, document_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
-    return await document_service.unpost_document(session, document)
+    return await document_service.unpost_document(session, document, user_id=user.id)
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
@@ -134,5 +134,5 @@ async def delete_document(
     document = await document_service.get_document(session, document_id)
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
-    await document_service.mark_for_deletion(session, document)
+    await document_service.mark_for_deletion(session, document, user_id=user.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

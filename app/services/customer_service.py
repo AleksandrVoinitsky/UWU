@@ -13,6 +13,7 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -23,9 +24,12 @@ from app.models.customer import Cart, CartItem, Customer
 from app.models.document.base_document import Document
 from app.models.enums import DocType
 from app.models.registry import StockBatch
-from app.services import document_service
+from app.services import document_service, stock_service
 
 logger = get_logger("app.customer")
+
+# Максимальное количество одной позиции в корзине (защита от переполнения).
+MAX_CART_QUANTITY = 10**6
 
 
 class CustomerError(Exception):
@@ -34,6 +38,22 @@ class CustomerError(Exception):
 
 class CustomerAuthError(CustomerError):
     """Неверный телефон/пароль или неактивный аккаунт."""
+
+
+_PHONE_TRANSLATION = str.maketrans("", "", " ()-")
+
+
+def _normalize_phone(phone: str) -> str:
+    """Нормализует номер телефона: убирает пробелы, дефисы и скобки."""
+    return (phone or "").translate(_PHONE_TRANSLATION)
+
+
+def _mask_phone(phone: str | None) -> str:
+    """Маскирует телефон для логирования (не пишем PII в открытом виде)."""
+    normalized = _normalize_phone(phone or "")
+    if len(normalized) < 4:
+        return "***"
+    return f"{normalized[:2]}***{normalized[-2:]}"
 
 
 # --- Регистрация и аутентификация ---
@@ -52,7 +72,7 @@ async def register(
     session: AsyncSession, phone: str, password: str, name: str | None = None
 ) -> Customer:
     """Регистрирует покупателя по телефону и паролю."""
-    phone = (phone or "").strip()
+    phone = _normalize_phone((phone or "").strip())
     if not phone:
         raise CustomerError("Укажите номер телефона")
     if len(phone) > 64:
@@ -67,14 +87,20 @@ async def register(
         name=name or None,
     )
     session.add(customer)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Конкурентная регистрация того же телефона (unique-констрейнт).
+        await session.rollback()
+        raise CustomerError("Покупатель с таким телефоном уже зарегистрирован")
     await session.refresh(customer)
-    logger.info("Зарегистрирован покупатель %s", phone)
+    logger.info("Зарегистрирован покупатель %s", _mask_phone(phone))
     return customer
 
 
 async def authenticate(session: AsyncSession, phone: str, password: str) -> Customer:
     """Аутентифицирует покупателя по телефону и паролю."""
+    phone = _normalize_phone((phone or "").strip())
     customer = await get_customer_by_phone(session, phone)
     if customer is None or not verify_password(password, customer.password_hash):
         raise CustomerAuthError("Неверный телефон или пароль")
@@ -201,6 +227,10 @@ async def add_to_cart(
     """Добавляет (или увеличивает) позицию в корзине."""
     if quantity <= 0:
         raise CustomerError("Количество должно быть положительным")
+    if quantity > MAX_CART_QUANTITY:
+        raise CustomerError(f"Количество не может превышать {MAX_CART_QUANTITY}")
+    if await session.get(Nomenklatura, nomenklatura_id) is None:
+        raise CustomerError("Товар не найден")
     cart = await get_cart(session, customer_id)
     stmt = select(CartItem).where(
         CartItem.cart_id == cart.id, CartItem.nomenklatura_id == nomenklatura_id
@@ -247,18 +277,12 @@ async def clear_cart(session: AsyncSession, customer_id: int) -> None:
 async def match_kontragent_by_phone(
     session: AsyncSession, phone: str | None
 ) -> Kontragent | None:
-    """Ищет контрагента по номеру телефона (точное совпадение, затем подстрока)."""
-    if not phone:
+    """Ищет контрагента по точному совпадению нормализованного телефона."""
+    normalized = _normalize_phone(phone or "")
+    if not normalized:
         return None
-    stmt = select(Kontragent).where(Kontragent.phones == phone)
-    kg = (await session.execute(stmt)).scalar_one_or_none()
-    if kg is None:
-        kg = (
-            await session.execute(
-                select(Kontragent).where(Kontragent.phones.ilike(f"%{phone}%"))
-            )
-        ).scalars().first()
-    return kg
+    stmt = select(Kontragent).where(Kontragent.phones == normalized)
+    return (await session.execute(stmt)).scalar_one_or_none()
 
 
 async def checkout(session: AsyncSession, customer: Customer) -> Document:
@@ -267,6 +291,26 @@ async def checkout(session: AsyncSession, customer: Customer) -> Document:
     if not items:
         raise CustomerError("Корзина пуста")
 
+    # Проверка остатка товара перед созданием документа.
+    for it in items:
+        stock = await stock_service.get_balance(session, it["nomenklatura_id"])
+        if stock < it["quantity"]:
+            raise CustomerError(
+                f"Недостаточно товара «{it['name']}» на складе "
+                f"(остаток {stock}, запрошено {it['quantity']})"
+            )
+
+    # Ставка НДС из номенклатуры (для строк документа).
+    nomen_ids = [i["nomenklatura_id"] for i in items]
+    nomen_map = {
+        n.id: n
+        for n in (
+            await session.execute(
+                select(Nomenklatura).where(Nomenklatura.id.in_(nomen_ids))
+            )
+        ).scalars()
+    }
+
     kontragent = await match_kontragent_by_phone(session, customer.phone)
 
     doc_items = [
@@ -274,37 +318,42 @@ async def checkout(session: AsyncSession, customer: Customer) -> Document:
             "nomenklatura_id": i["nomenklatura_id"],
             "quantity": i["quantity"],
             "price": i["price"],
+            "nds_rate_id": nomen_map[i["nomenklatura_id"]].nds_rate_id,
         }
         for i in items
     ]
 
-    # Очищаем корзину перед созданием документа (коммитится вместе с ним).
-    cart = await get_cart(session, customer.id)
-    cart_items = (
-        await session.execute(select(CartItem).where(CartItem.cart_id == cart.id))
-    ).scalars().all()
-    for ci in cart_items:
-        await session.delete(ci)
+    try:
+        # Очищаем корзину перед созданием документа (коммитится вместе с ним).
+        cart = await get_cart(session, customer.id)
+        cart_items = (
+            await session.execute(select(CartItem).where(CartItem.cart_id == cart.id))
+        ).scalars().all()
+        for ci in cart_items:
+            await session.delete(ci)
 
-    doc = await document_service.create_document(
-        session,
-        doc_type=DocType.ZAKAZ,
-        doc_date=date.today(),
-        kontragent_id=kontragent.id if kontragent else None,
-        extra={
-            "state": "new",
-            "source": "customer",
-            "customer_id": customer.id,
-            "customer_phone": customer.phone,
-            "customer_name": customer.name,
-        },
-        items=doc_items,
-        created_by_id=None,
-    )
+        doc = await document_service.create_document(
+            session,
+            doc_type=DocType.ZAKAZ,
+            doc_date=date.today(),
+            kontragent_id=kontragent.id if kontragent else None,
+            extra={
+                "state": "new",
+                "source": "customer",
+                "customer_id": customer.id,
+                "customer_phone": customer.phone,
+                "customer_name": customer.name,
+            },
+            items=doc_items,
+            created_by_id=None,
+        )
+    except Exception:
+        await session.rollback()
+        raise
     logger.info(
         "Заказ покупателя #%s создан (%s, %d позиций)",
         doc.number,
-        customer.phone,
+        _mask_phone(customer.phone),
         len(doc_items),
     )
     return doc

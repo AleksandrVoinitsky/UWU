@@ -51,6 +51,9 @@ class BotManager:
     def start(self, adapter: BotAdapter) -> None:
         """Регистрирует адаптер и запускает его polling фоновой задачей."""
         self.register(adapter)
+        old_task = self._tasks.get(adapter.channel)
+        if old_task is not None and not old_task.done():
+            old_task.cancel()
         self._tasks[adapter.channel] = asyncio.create_task(adapter.run())
 
     async def stop_all(self) -> None:
@@ -59,8 +62,11 @@ class BotManager:
                 await adapter.shutdown()
             except Exception:  # noqa: BLE001
                 logger.exception("Error stopping bot %s", adapter.channel)
-        for task in self._tasks.values():
+        tasks = list(self._tasks.values())
+        for task in tasks:
             task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
         self._adapters.clear()
         self._tasks.clear()
 

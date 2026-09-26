@@ -1,5 +1,6 @@
 {
   "auth.invalid": "Invalid login or password",
+  "auth.rate_limited": "Too many login attempts. Try again later.",
   "auth.login": "Sign in",
   "auth.username": "Login",
   "auth.password": "Password",

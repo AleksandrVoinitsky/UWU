@@ -15,7 +15,7 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,13 +27,48 @@ from app.core.deps import get_current_user_from_cookie
 from app.core.i18n import translate
 from app.models import catalog as cat
 from app.models.document.base_document import Document
-from app.models.enums import DocSubtype, DocType, DocumentStatus
+from app.models.enums import DocSubtype, DocType
 from app.models.users import User
 from app.services import cash_service, catalog_service, document_service, price_service, report_service, stock_service
 from app.services.stock_service import InsufficientStockError
 from app.templates import render
 
-router = APIRouter(tags=["web-trade"])
+# Права чтения по префиксам URL веб-интерфейса (для проверки доступа к страницам).
+_READ_PERMISSION_BY_PREFIX = (
+    ("/catalog", "catalog.read"),
+    ("/documents", "documents.read"),
+    ("/zakazy", "documents.read"),
+    ("/dogovory", "documents.read"),
+    ("/inventarizaciya", "documents.read"),
+    ("/rmk", "documents.read"),
+    ("/reports", "reports.read"),
+)
+
+_ANY_READ_PERMISSIONS = ("catalog.read", "documents.read", "reports.read")
+
+
+async def _require_web_read(
+    request: Request,
+    user: User = Depends(get_current_user_from_cookie),
+) -> User:
+    """Проверяет право чтения для страниц веб-интерфейса по префиксу пути.
+
+    Блокирует доступ пользователей без соответствующего права (иначе любой
+    аутентифицированный пользователь видел бы все справочники/документы/отчёты).
+    """
+    path = request.url.path
+    for prefix, perm in _READ_PERMISSION_BY_PREFIX:
+        if path.startswith(prefix):
+            if not user.has_permission(perm):
+                raise HTTPException(status_code=403, detail="Forbidden")
+            return user
+    # Корневые страницы (дашборд): достаточно любого права чтения.
+    if not any(user.has_permission(p) for p in _ANY_READ_PERMISSIONS):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return user
+
+
+router = APIRouter(tags=["web-trade"], dependencies=[Depends(_require_web_read)])
 
 # Названия документов для отображения.
 DOC_LABELS = {
@@ -62,6 +97,9 @@ ZAKAZ_STATES = {
 _ITEM_DOCS = {"prihod", "rashod", "peremeshenie", "spisanie", "oprihodovanie", "vvod_ostatkov", "vozvrat"}
 # Документы прихода (для подсказки в форме).
 _MONEY_DOCS = {"pko", "rko", "platezhnoe_poruchenie", "vvod_ostatkov_deneg"}
+
+# Максимальный размер загружаемого изображения товара (5 МБ).
+_MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 
 def _lang(request: Request) -> str:
@@ -104,6 +142,24 @@ def _safe_report_range(start: str | None, end: str | None) -> tuple[str, str]:
         except ValueError:
             pass
     return _month_range()
+
+
+def _json_safe(obj) -> str:
+    """Сериализует объект в JSON, безопасный для встраивания в ``<script>``.
+
+    ``json.dumps`` не экранирует ``<``/``>``/``&``, поэтому строка вида
+    ``</script><script>…`` может разорвать script-контекст (stored XSS).
+    Экранирование этих символов в ``\\uXXXX`` нейтрализует атаку, сохраняя
+    валидный JSON. Используется вместе с ``| safe`` в шаблонах.
+    """
+    return (
+        json.dumps(obj, ensure_ascii=False)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
 
 
 # --- Периоды дашборда ---
@@ -312,17 +368,17 @@ async def dashboard(
         reorder_lookback=reorder_lookback,
         reorder_lead=reorder_lead,
         reorder_safety=reorder_safety,
-        chart_labels_json=json.dumps([r["date"] for r in daily]),
-        chart_revenue_json=json.dumps([float(r["revenue"]) for r in daily]),
-        chart_profit_json=json.dumps([float(r["profit"]) for r in daily]),
-        chart_orders_json=json.dumps([r["orders"] for r in daily]),
-        chart_money_labels_json=json.dumps([r["date"] for r in daily_money]),
-        chart_income_json=json.dumps([float(r["income"]) for r in daily_money]),
-        chart_expense_json=json.dumps([float(r["expense"]) for r in daily_money]),
-        top_items_json=json.dumps(
+        chart_labels_json=_json_safe([r["date"] for r in daily]),
+        chart_revenue_json=_json_safe([float(r["revenue"]) for r in daily]),
+        chart_profit_json=_json_safe([float(r["profit"]) for r in daily]),
+        chart_orders_json=_json_safe([r["orders"] for r in daily]),
+        chart_money_labels_json=_json_safe([r["date"] for r in daily_money]),
+        chart_income_json=_json_safe([float(r["income"]) for r in daily_money]),
+        chart_expense_json=_json_safe([float(r["expense"]) for r in daily_money]),
+        top_items_json=_json_safe(
             [{"name": r["name"], "amount": float(r["amount"])} for r in top_items]
         ),
-        top_clients_json=json.dumps(
+        top_clients_json=_json_safe(
             [{"name": r["name"], "amount": float(r["amount"])} for r in top_clients]
         ),
     )
@@ -686,11 +742,30 @@ async def upload_nomenklatura_image(
     if matched is None:
         return JSONResponse({"detail": "Неподдерживаемый формат изображения"}, status_code=400)
 
+    # Читаем с ограничением размера (защита от memory-DoS) и проверяем
+    # сигнатуру файла, а не только клиентский content_type.
+    data = await file.read(_MAX_IMAGE_BYTES + 1)
+    if len(data) > _MAX_IMAGE_BYTES:
+        return JSONResponse({"detail": "Изображение слишком большое"}, status_code=400)
+    magic = {
+        ".png": b"\x89PNG\r\n\x1a\n",
+        ".jpg": b"\xff\xd8\xff",
+        ".gif": b"GIF8",
+        ".webp": b"RIFF",
+    }
+    actual_ext = None
+    for ext_name, signature in magic.items():
+        if data.startswith(signature):
+            actual_ext = ext_name
+            break
+    if actual_ext is None:
+        return JSONResponse({"detail": "Файл не является изображением"}, status_code=400)
+
     uploads = Path(settings.uploads_dir)
     uploads.mkdir(parents=True, exist_ok=True)
-    filename = f"nomen_{item_id}_{uuid.uuid4().hex[:8]}{matched}"
+    filename = f"nomen_{item_id}_{uuid.uuid4().hex[:8]}{actual_ext}"
     dest = uploads / filename
-    dest.write_bytes(await file.read())
+    dest.write_bytes(data)
 
     # Удаляем старое изображение.
     if obj.image_path:
@@ -777,10 +852,12 @@ async def update_valyuta(
     if obj:
         obj.code = code
         obj.name = name
-        await session.commit()
+        # Устанавливаем курс в той же транзакции, чтобы при ошибке не остался
+        # частично сохранённый код/наименование.
         parsed_rate = _or_decimal(rate)
         if parsed_rate is not None:
             await catalog_service.set_rate(session, item_id, date.today(), parsed_rate)
+        await session.commit()
     return RedirectResponse("/catalog/valyuty", status_code=303)
 
 
@@ -983,7 +1060,7 @@ async def rmk_page(
 
     return _page(
         request, user, "trade/rmk.html",
-        items_json=json.dumps(items, ensure_ascii=False),
+        items_json=_json_safe(items),
         sklady=sklady, kassy=kassy,
         shift=shift, revenue=revenue, expenses=expenses,
     )
@@ -996,6 +1073,9 @@ async def rmk_shift_open(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "documents.write")
+    if denied:
+        return denied
     existing = await cash_service.get_open_shift(session)
     if existing is None:
         await cash_service.open_shift(
@@ -1013,6 +1093,9 @@ async def rmk_shift_close(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "documents.write")
+    if denied:
+        return denied
     shift = await cash_service.get_open_shift(session)
     if shift:
         await cash_service.close_shift(session, shift, _or_decimal(closing_amount) or Decimal("0"))
@@ -1025,6 +1108,9 @@ async def rmk_sell(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "documents.write")
+    if denied:
+        return denied
     data = await request.json()
     items = data.get("items") or []
     if not items:
@@ -1066,7 +1152,7 @@ async def rmk_sell(
             items=parsed_items,
             created_by_id=user.id,
         )
-        await document_service.post_document(session, document)
+        await document_service.post_document(session, document, user_id=user.id)
     except InsufficientStockError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=409)
     except document_service.DocumentError as exc:
@@ -1274,7 +1360,7 @@ async def zakaz_ship(
             items=items,
             created_by_id=user.id,
         )
-        await document_service.post_document(session, document)
+        await document_service.post_document(session, document, user_id=user.id)
         # Снимаем резерв и закрываем заявку.
         await stock_service.release_for_zakaz(session, zakaz_id)
         extra = dict(zakaz.extra or {})
@@ -1340,6 +1426,9 @@ async def inventarizaciya_submit(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "documents.write")
+    if denied:
+        return denied
     form = await request.form()
     items = []
     for key, value in form.items():
@@ -1485,11 +1574,22 @@ async def document_create_submit(
     if base_document_id:
         extra["base_document_id"] = _to_int(base_document_id)
     try:
+        parsed_date = date.fromisoformat(doc_date)
+    except ValueError:
+        return _page(request, user, "trade/error.html", error="Некорректная дата", back="/documents")
+    # Контроль будущих дат (константа allow_future_dates).
+    constants = await catalog_service.get_constants(session)
+    if not constants.get("allow_future_dates") and parsed_date > date.today():
+        return _page(
+            request, user, "trade/error.html",
+            error="Документы будущей датой запрещены настройкой", back="/documents",
+        )
+    try:
         document = await document_service.create_document(
             session,
             doc_type=DocType(doc_type),
             subtype=DocSubtype(subtype) if subtype else None,
-            doc_date=date.fromisoformat(doc_date),
+            doc_date=parsed_date,
             sklad_id=_to_int(sklad_id),
             sklad_to_id=_to_int(sklad_to_id),
             kontragent_id=_to_int(kontragent_id),
@@ -1501,7 +1601,7 @@ async def document_create_submit(
             items=items,
             created_by_id=user.id,
         )
-        await document_service.post_document(session, document)
+        await document_service.post_document(session, document, user_id=user.id)
     except (InsufficientStockError, document_service.DocumentError) as exc:
         return _page(request, user, "trade/error.html", error=str(exc), back="/documents")
     except (ValueError, InvalidOperation):
@@ -1580,6 +1680,9 @@ async def document_edit_submit(
     document = await document_service.get_document(session, document_id)
     if document is None:
         return RedirectResponse("/documents", status_code=303)
+    if document.status == "posted":
+        # Нельзя редактировать проведённый документ (иначе рассинхрон остатков).
+        return RedirectResponse("/documents", status_code=303)
     form = await request.form()
     items = _parse_items(form)
     await document_service.update_document_items(session, document, items)
@@ -1618,7 +1721,7 @@ async def document_post(document_id: int, session=Depends(get_session), user=Dep
     document = await document_service.get_document(session, document_id)
     if document:
         try:
-            await document_service.post_document(session, document)
+            await document_service.post_document(session, document, user_id=user.id)
         except (InsufficientStockError, document_service.DocumentError):
             pass
     return RedirectResponse("/documents", status_code=303)
@@ -1631,7 +1734,7 @@ async def document_unpost(document_id: int, session=Depends(get_session), user=D
         return denied
     document = await document_service.get_document(session, document_id)
     if document:
-        await document_service.unpost_document(session, document)
+        await document_service.unpost_document(session, document, user_id=user.id)
     return RedirectResponse("/documents", status_code=303)
 
 
@@ -1642,7 +1745,7 @@ async def document_delete(document_id: int, session=Depends(get_session), user=D
         return denied
     document = await document_service.get_document(session, document_id)
     if document:
-        await document_service.mark_for_deletion(session, document)
+        await document_service.mark_for_deletion(session, document, user_id=user.id)
     return RedirectResponse("/documents", status_code=303)
 
 

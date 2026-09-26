@@ -25,6 +25,10 @@ async def get_open_shift(session: AsyncSession, kassa_id: int | None = None) -> 
 async def open_shift(
     session: AsyncSession, *, kassa_id: int | None, opening_amount: Decimal, user_id: int | None
 ) -> CashShift:
+    # Запрещаем вторую открытую смену той же кассы.
+    existing = await get_open_shift(session, kassa_id)
+    if existing is not None:
+        return existing
     shift = CashShift(
         kassa_id=kassa_id,
         status="open",

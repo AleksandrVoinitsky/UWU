@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
@@ -19,6 +19,19 @@ from app.services import report_service
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 READ = Depends(require_permission("reports.read"))
+
+MAX_RANGE_DAYS = 366
+
+
+def _validate_period(start: date, end: date) -> None:
+    """Проверка периода: start <= end и диапазон не более MAX_RANGE_DAYS."""
+    if start > end:
+        raise HTTPException(status_code=400, detail="start must be less than or equal to end")
+    if (end - start).days > MAX_RANGE_DAYS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"period must not exceed {MAX_RANGE_DAYS} days",
+        )
 
 
 @router.get("/stock/balances")
@@ -37,6 +50,7 @@ async def stock_movements(
     session: AsyncSession = Depends(get_session),
     _user: User = READ,
 ):
+    _validate_period(start, end)
     return await report_service.stock_movements(session, start, end, nomenklatura_id)
 
 
@@ -47,6 +61,7 @@ async def sales(
     session: AsyncSession = Depends(get_session),
     _user: User = READ,
 ):
+    _validate_period(start, end)
     return await report_service.sales_report(session, start, end)
 
 
@@ -73,4 +88,5 @@ async def money_movements(
     session: AsyncSession = Depends(get_session),
     _user: User = READ,
 ):
+    _validate_period(start, end)
     return await report_service.money_movements(session, start, end)

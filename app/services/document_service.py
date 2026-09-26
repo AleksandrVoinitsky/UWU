@@ -39,11 +39,20 @@ _STOCK_DOC_TYPES = {
 _INCOMING = {DocType.PRIHOD, DocType.OPRIHODOVANIE, DocType.VVOD_OSTATKOV, DocType.VOZVRAT}
 
 
-def _log(session: AsyncSession, document: Document, action: str) -> None:
-    """Записывает действие над документом в журнал (история изменений)."""
+def _log(
+    session: AsyncSession,
+    document: Document,
+    action: str,
+    user_id: int | None = None,
+) -> None:
+    """Записывает действие над документом в журнал (история изменений).
+
+    ``user_id`` — пользователь, выполнивший действие; если не передан,
+    используется автор документа (``created_by_id``).
+    """
     session.add(
         AuditLog(
-            user_id=document.created_by_id,
+            user_id=user_id if user_id is not None else document.created_by_id,
             entity_type="document",
             entity_id=document.id,
             action=action,
@@ -58,6 +67,11 @@ class DocumentError(Exception):
 # Пространство advisory-lock PostgreSQL для нумерации документов.
 # Защищает от гонок при одновременном создании документов одного вида.
 _DOCNUM_LOCK_NAMESPACE = 42
+
+# Пространство advisory-lock для проведения/отмены проведения документа.
+# Сериализует параллельные post/unpost одного документа (защита от
+# двойного проведения и гонок при отмене).
+_POST_LOCK_NAMESPACE = 43
 
 
 async def next_document_number(session: AsyncSession, doc_type: DocType) -> str:
@@ -274,40 +288,63 @@ async def update_document_items(
     return result.scalar_one()
 
 
-async def post_document(session: AsyncSession, document: Document) -> Document:
+async def post_document(
+    session: AsyncSession, document: Document, user_id: int | None = None
+) -> Document:
     """Проводит документ: контроль остатков + формирование движений."""
-    if document.status == DocumentStatus.POSTED:
-        return document
-    if document.status == DocumentStatus.MARKED_DELETED:
+    # Сериализуем проведение документа: параллельный запрос на тот же документ
+    # заблокируется здесь до завершения текущего (защита от двойного проведения).
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(:ns, :key)"),
+        {"ns": _POST_LOCK_NAMESPACE, "key": document.id},
+    )
+    # Перечитываем актуальный статус под блокировкой — другой поток мог уже
+    # провести документ, пока мы ждали блокировку.
+    status_row = (
+        await session.execute(
+            select(Document.status).where(Document.id == document.id)
+        )
+    ).scalar_one_or_none()
+    if status_row == DocumentStatus.POSTED:
+        return await get_document(session, document.id)
+    if status_row == DocumentStatus.MARKED_DELETED:
         raise DocumentError("Cannot post a document marked for deletion")
 
     doc_type = DocType(document.doc_type)
 
-    if doc_type in _STOCK_DOC_TYPES:
-        items = await _load_items(session, document)
-        if not items:
-            raise DocumentError("Document has no items")
+    try:
+        if doc_type in _STOCK_DOC_TYPES:
+            items = await _load_items(session, document)
+            if not items:
+                raise DocumentError("Document has no items")
 
-        restock = await _get_restock_control(session)
+            restock = await _get_restock_control(session)
 
-        if doc_type == DocType.RASHOD and restock != RestockControl.NONE:
-            await _check_stock(session, document, items, restock)
+            if doc_type == DocType.RASHOD and restock != RestockControl.NONE:
+                await _check_stock(session, document, items, restock)
 
-        cost_method = await _get_cost_method(session)
+            cost_method = await _get_cost_method(session)
 
-        if doc_type == DocType.INVENTARIZACIYA:
-            await _apply_inventory(session, document, items, cost_method)
-        else:
-            for item in items:
-                await _apply_stock_movement(session, document, item, doc_type, cost_method)
+            if doc_type == DocType.INVENTARIZACIYA:
+                await _apply_inventory(session, document, items, cost_method)
+            else:
+                for item in items:
+                    await _apply_stock_movement(
+                        session, document, item, doc_type, cost_method, restock
+                    )
 
-    await _apply_money_and_settlement(session, document, doc_type)
-    await _apply_accounting(session, document, doc_type)
+        await _apply_money_and_settlement(session, document, doc_type)
+        await _apply_accounting(session, document, doc_type)
 
-    document.status = DocumentStatus.POSTED
-    document.posted_at = datetime.now(timezone.utc)
-    _log(session, document, "post")
-    await session.commit()
+        document.status = DocumentStatus.POSTED
+        document.posted_at = datetime.now(timezone.utc)
+        _log(session, document, "post", user_id=user_id)
+        await session.commit()
+    except Exception:
+        # Явный откат: не оставляем сессию в «грязном» состоянии и снимаем
+        # advisory-lock до завершения обработки ошибки.
+        await session.rollback()
+        raise
     return await get_document(session, document.id)
 
 
@@ -336,11 +373,20 @@ async def _apply_stock_movement(
     item: DocumentItem,
     doc_type: DocType,
     cost_method: CostMethod,
+    restock: RestockControl,
 ) -> None:
     """Применяет движение товара по строке документа."""
     source_sklad = item.sklad_id or document.sklad_id
     if source_sklad is None:
         raise DocumentError("Warehouse is required for stock documents")
+
+    # Разрешаем отрицательный остаток при продаже, когда контроль отключён
+    # (NONE) или ведётся по фирме (BY_FIRM): в этих режимах недостаток на
+    # конкретном складе не должен блокировать отгрузку.
+    allow_negative = doc_type == DocType.RASHOD and restock in (
+        RestockControl.NONE,
+        RestockControl.BY_FIRM,
+    )
 
     if doc_type in _INCOMING:
         # Принятые на реализацию учитываются раздельно (не собственность).
@@ -374,6 +420,7 @@ async def _apply_stock_movement(
             sklad_id=source_sklad,
             quantity=item.quantity,
             amount=amount,
+            consumed=consumed,
         )
         unit_cost = (amount / item.quantity).quantize(Decimal("0.0001")) if item.quantity else Decimal("0")
         await stock_service.create_incoming(
@@ -392,6 +439,8 @@ async def _apply_stock_movement(
             sklad_id=source_sklad,
             quantity=item.quantity,
             method=cost_method,
+            allow_negative=allow_negative,
+            source_document_id=document.id,
         )
         await stock_service.register_outgoing(
             session,
@@ -401,6 +450,7 @@ async def _apply_stock_movement(
             sklad_id=source_sklad,
             quantity=item.quantity,
             amount=amount,
+            consumed=consumed,
         )
 
 
@@ -449,6 +499,7 @@ async def _apply_inventory(
                 sklad_id=sklad,
                 quantity=-deviation,
                 amount=amount,
+                consumed=consumed,
             )
 
 
@@ -485,6 +536,29 @@ async def _apply_money_and_settlement(
                     amount=-document.total,
                 )
             )
+
+    # Наличные накладные: движение денег по кассе (продажа — приход,
+    # покупка — расход). Взаиморасчёты при наличной оплате не возникают.
+    if doc_type == DocType.RASHOD and subtype == DocSubtype.CASH:
+        session.add(
+            MoneyMovement(
+                document_id=document.id,
+                date=document.date,
+                kassa_id=document.kassa_id,
+                kontragent_id=document.kontragent_id,
+                amount=document.total,
+            )
+        )
+    elif doc_type == DocType.PRIHOD and subtype == DocSubtype.CASH:
+        session.add(
+            MoneyMovement(
+                document_id=document.id,
+                date=document.date,
+                kassa_id=document.kassa_id,
+                kontragent_id=document.kontragent_id,
+                amount=-document.total,
+            )
+        )
 
     # Денежные документы.
     if doc_type == DocType.PRIHODNY_KASSOVY_ORDER:
@@ -542,6 +616,10 @@ async def _apply_money_and_settlement(
 
 async def _apply_accounting(session: AsyncSession, document: Document, doc_type: DocType) -> None:
     """Формирует автоматические бухгалтерские проводки при проведении."""
+    # Сбрасываем накопленные движения в БД, чтобы SELECT ниже (расчёт
+    # себестоимости по StockMovement) видел только что созданные строки.
+    # При autoflush=False без этого flush сумма списания была бы нулевой.
+    await session.flush()
 
     def entry(debit: str, credit: str, amount: Decimal, *, kontragent_id: int | None = None):
         if amount == 0:
@@ -586,23 +664,37 @@ async def _apply_accounting(session: AsyncSession, document: Document, doc_type:
         entry("60", "51", document.total, kontragent_id=document.kontragent_id)
 
 
-async def unpost_document(session: AsyncSession, document: Document) -> Document:
+async def unpost_document(
+    session: AsyncSession, document: Document, user_id: int | None = None
+) -> Document:
     """Отменяет проведение: удаляет движения и восстанавливает партии."""
-    if document.status != DocumentStatus.POSTED:
-        return document
+    # Сериализуем с post_document (общий advisory-lock на документ).
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(:ns, :key)"),
+        {"ns": _POST_LOCK_NAMESPACE, "key": document.id},
+    )
+    status_row = (
+        await session.execute(
+            select(Document.status).where(Document.id == document.id)
+        )
+    ).scalar_one_or_none()
+    if status_row != DocumentStatus.POSTED:
+        return await get_document(session, document.id)
 
-    doc_type = DocType(document.doc_type)
+    try:
+        if DocType(document.doc_type) in _STOCK_DOC_TYPES:
+            await _rollback_stock(session, document)
 
-    if doc_type in _STOCK_DOC_TYPES:
-        await _rollback_stock(session, document)
+        # Удаляем движения денег и взаиморасчётов.
+        await _delete_movements(session, document.id)
 
-    # Удаляем движения денег и взаиморасчётов.
-    await _delete_movements(session, document.id)
-
-    document.status = DocumentStatus.DRAFT
-    document.posted_at = None
-    _log(session, document, "unpost")
-    await session.commit()
+        document.status = DocumentStatus.DRAFT
+        document.posted_at = None
+        _log(session, document, "unpost", user_id=user_id)
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
     return await get_document(session, document.id)
 
 
@@ -616,56 +708,57 @@ async def _delete_movements(session: AsyncSession, document_id: int) -> None:
 
 
 async def _rollback_stock(session: AsyncSession, document: Document) -> None:
-    """Восстанавливает партии при отмене проведения (обратные движения)."""
-    doc_type = DocType(document.doc_type)
+    """Восстанавливает партии при отмене проведения (обратные движения).
 
-    # Удаляем движения товара.
+    Движения расхода хранят ``batch_id`` (состав списания по партиям), поэтому
+    отмена проведения точно восстанавливает исходные партии без потери
+    себестоимости (FIFO/LIFO).
+    """
     result = await session.execute(
         select(StockMovement).where(StockMovement.document_id == document.id)
     )
     movements = list(result.scalars())
 
-    if doc_type in _INCOMING:
-        # Возврат прихода: уменьшаем партии, созданные документом.
-        for movement in movements:
-            if movement.batch_id:
-                batch = await session.get(stock_service.StockBatch, movement.batch_id)
-                if batch:
-                    batch.quantity -= movement.quantity
-    else:
-        # Расход/перемещение: восстанавливаем списанные партии обратным способом.
-        # Для простоты создаём новую партию с той же себестоимостью.
-        for movement in movements:
-            if movement.quantity < 0:
-                unit_cost = (
-                    (-movement.amount / -movement.quantity).quantize(Decimal("0.0001"))
-                    if movement.quantity
-                    else Decimal("0")
-                )
-                batch = stock_service.StockBatch(
-                    nomenklatura_id=movement.nomenklatura_id,
-                    sklad_id=movement.sklad_id,
-                    quantity=-movement.quantity,
-                    unit_cost=unit_cost,
-                    source_document_id=document.id,
-                )
-                session.add(batch)
-            else:
-                # Приход внутри перемещения — убираем созданную партию.
-                if movement.batch_id:
-                    batch = await session.get(stock_service.StockBatch, movement.batch_id)
-                    if batch:
-                        batch.quantity -= movement.quantity
+    batches_to_delete: list[stock_service.StockBatch] = []
+    for movement in movements:
+        if not movement.batch_id:
+            continue
+        batch = await session.get(stock_service.StockBatch, movement.batch_id)
+        if batch is None:
+            continue
 
+        if movement.quantity < 0:
+            # Списанная партия — возвращаем количество.
+            batch.quantity += -movement.quantity
+            if batch.quantity == 0 and batch.source_document_id == document.id:
+                # Отрицательная партия, созданная при «Без контроля остатков».
+                batches_to_delete.append(batch)
+        else:
+            # Созданная документом партия (приход/приёмка) — убираем её.
+            if batch.quantity < movement.quantity:
+                raise DocumentError(
+                    "Cannot unpost: stock was already consumed by later documents. "
+                    "Unpost dependent documents first."
+                )
+            batch.quantity -= movement.quantity
+            if batch.quantity == 0 and batch.source_document_id == document.id:
+                batches_to_delete.append(batch)
+
+    # Сначала удаляем движения (снимаем FK на партии), затем — опустевшие партии.
     for movement in movements:
         await session.delete(movement)
+    await session.flush()
+    for batch in batches_to_delete:
+        await session.delete(batch)
 
 
-async def mark_for_deletion(session: AsyncSession, document: Document) -> Document:
+async def mark_for_deletion(
+    session: AsyncSession, document: Document, user_id: int | None = None
+) -> Document:
     """Помечает документ на удаление (после отмены проведения)."""
     if document.status == DocumentStatus.POSTED:
-        await unpost_document(session, document)
+        await unpost_document(session, document, user_id=user_id)
     document.status = DocumentStatus.MARKED_DELETED
-    _log(session, document, "delete")
+    _log(session, document, "delete", user_id=user_id)
     await session.commit()
     return await get_document(session, document.id)

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_session
 from app.core.i18n import translate
+from app.core.ratelimit import login_limiter, login_rate_key
 from app.services.auth_service import AuthError, authenticate
 
 router = APIRouter(tags=["web-auth"])
@@ -36,6 +37,9 @@ async def login_submit(
     password: str = Form(...),
     session: AsyncSession = Depends(get_session),
 ):
+    ip = request.client.host if request.client else "unknown"
+    if not login_limiter.hit(login_rate_key(ip, login)):
+        return _render_login(request, translate("auth.rate_limited", _lang(request)))
     try:
         token = await authenticate(session, login, password)
     except AuthError:
@@ -47,7 +51,13 @@ async def login_submit(
     response = RedirectResponse(
         url="/admin" if (user and user.is_admin) else "/", status_code=303
     )
-    response.set_cookie("access_token", token, httponly=True, samesite="lax")
+    response.set_cookie(
+        "access_token",
+        token,
+        httponly=True,
+        samesite="lax",
+        secure=settings.environment == "production",
+    )
     return response
 
 

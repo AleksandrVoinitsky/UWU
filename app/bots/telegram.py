@@ -42,7 +42,8 @@ class TelegramAdapter(BotAdapter):
         try:
             await self._dp.start_polling(self._bot)
         finally:
-            await self._bot.session.close() if self._bot.session else None
+            if self._bot.session:
+                await self._bot.session.close()
 
     async def shutdown(self) -> None:
         await self._dp.stop_polling()

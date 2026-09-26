@@ -1,5 +1,6 @@
 {
   "auth.invalid": "Неверный логин или пароль",
+  "auth.rate_limited": "Слишком много попыток входа. Попробуйте позже.",
   "auth.login": "Вход",
   "auth.username": "Логин",
   "auth.password": "Пароль",

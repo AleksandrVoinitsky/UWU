@@ -33,6 +33,9 @@ async def _current_user(
     user = await get_current_user_optional(request, session)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    # Чат — общий инбокс операторов; доступ по праву чтения документов.
+    if not user.has_permission("documents.read"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     return user
 
 
@@ -77,6 +80,8 @@ async def send_message(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(_current_user),
 ):
+    if not user.has_permission("documents.write"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     chat = await session.get(Chat, chat_id)
     if chat is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")

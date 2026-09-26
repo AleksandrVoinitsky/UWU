@@ -287,7 +287,7 @@ async def test_invoice_print_change_no_type_error(client, seeded_session):
     )
 
     user = await user_service.create_user(
-        seeded_session, login="operator_invoice", password="secret123"
+        seeded_session, login="operator_invoice", password="secret123", is_admin=True
     )
     client.cookies.set("access_token", create_access_token(str(user.id)))
 

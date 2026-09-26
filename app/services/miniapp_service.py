@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import time
 import urllib.parse
 
 from sqlalchemy import select
@@ -26,6 +27,12 @@ logger = get_logger("app.miniapp")
 
 CHANNEL_TELEGRAM = "telegram"
 CHANNEL_MAKS = "maks"
+
+# Белый список каналов (используется в dev-режиме для валидации ``channel``).
+VALID_CHANNELS = {CHANNEL_TELEGRAM, CHANNEL_MAKS}
+
+# Максимально допустимый возраст initData (сутки) — защита от replay-атак.
+MAX_INIT_DATA_AGE_SECONDS = 24 * 3600
 
 
 def _telegram_secret(bot_token: str) -> bytes:
@@ -65,6 +72,12 @@ def validate_init_data(channel: str, init_data: str, secret: str) -> dict | None
         check = "\n".join(f"{k}={v}" for k, v in sorted(raw.items()) if k != "hash")
         if not hmac.compare_digest(_sign(check, _telegram_secret(secret)), provided):
             return None
+        try:
+            auth_date = int(raw.get("auth_date") or 0)
+        except (TypeError, ValueError):
+            auth_date = 0
+        if auth_date <= 0 or abs(time.time() - auth_date) > MAX_INIT_DATA_AGE_SECONDS:
+            return None
         name = " ".join(filter(None, [user.get("first_name"), user.get("last_name")]))
         return {"channel": channel, "external_id": external_id, "name": name}
 
@@ -75,6 +88,12 @@ def validate_init_data(channel: str, init_data: str, secret: str) -> dict | None
             return None
         check = "&".join(f"{k}={v}" for k, v in sorted(raw.items()) if k != "sign")
         if not hmac.compare_digest(_sign(check, secret.encode()), provided):
+            return None
+        try:
+            vk_ts = int(raw.get("vk_ts") or 0)
+        except (TypeError, ValueError):
+            vk_ts = 0
+        if vk_ts <= 0 or abs(time.time() - vk_ts) > MAX_INIT_DATA_AGE_SECONDS:
             return None
         return {"channel": channel, "external_id": external_id, "name": ""}
 
@@ -87,16 +106,17 @@ def make_test_init_data(channel: str, secret: str, user_id: int, name: str = "Т
     Подпись формируется по URL-encoded значениям — так же, как это делает
     мессенджер, — чтобы тесты совпадали с реальным алгоритмом проверки.
     """
+    now = int(time.time())
     if channel == CHANNEL_TELEGRAM:
         user = json.dumps({"id": user_id, "first_name": name}, ensure_ascii=False)
-        params = {"user": user, "auth_date": "1700000000", "query_id": "1"}
+        params = {"user": user, "auth_date": str(now), "query_id": "1"}
         encoded = urllib.parse.urlencode(params)
         raw = dict(s.split("=", 1) for s in encoded.split("&"))
         check = "\n".join(f"{k}={v}" for k, v in sorted(raw.items()))
         params["hash"] = _sign(check, _telegram_secret(secret))
         return urllib.parse.urlencode(params)
 
-    params = {"vk_user_id": str(user_id), "vk_app_id": "1", "vk_ts": "1700000000"}
+    params = {"vk_user_id": str(user_id), "vk_app_id": "1", "vk_ts": str(now)}
     encoded = urllib.parse.urlencode(params)
     raw = dict(s.split("=", 1) for s in encoded.split("&"))
     check = "&".join(f"{k}={v}" for k, v in sorted(raw.items()))

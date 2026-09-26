@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_session
 from app.core.security import create_customer_token
 from app.customer.deps import (
@@ -45,7 +46,13 @@ def _page(request: Request, template: str, customer: Customer | None = None, **c
 
 
 def _auth_redirect(response: RedirectResponse, token: str) -> RedirectResponse:
-    response.set_cookie(CUSTOMER_TOKEN_COOKIE, token, httponly=True, samesite="lax")
+    response.set_cookie(
+        CUSTOMER_TOKEN_COOKIE,
+        token,
+        httponly=True,
+        samesite="lax",
+        secure=settings.environment == "production",
+    )
     return response
 
 

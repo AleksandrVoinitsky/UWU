@@ -139,7 +139,9 @@ async def test_register_phone_too_long(seeded_session):
 
 
 async def test_rmk_sell_invalid_item_returns_400(client, seeded_session):
-    user = await user_service.create_user(seeded_session, login="kassir", password="secret123")
+    user = await user_service.create_user(
+        seeded_session, login="kassir", password="secret123", is_admin=True
+    )
     client.cookies.set("access_token", create_access_token(str(user.id)))
 
     # Нет цены.
