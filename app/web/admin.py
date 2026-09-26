@@ -20,6 +20,7 @@ from app.models.users import PERMISSIONS, User
 from app.models.catalog import Valyuta
 from app.schemas.auth import UserCreate
 from app.services import catalog_service, user_service
+from app.services.auth_service import get_user_by_login
 from app.templates import render
 
 router = APIRouter(tags=["web-admin"])
@@ -83,6 +84,14 @@ async def admin_create_user(
 ):
     if not user.is_admin:
         return RedirectResponse("/", status_code=303)
+    login = (login or "").strip()
+    # Пустой логин ломает user.login[0] в шаблоне; дубликат — IntegrityError.
+    if not login or await get_user_by_login(session, login) is not None:
+        return RedirectResponse("/admin/users", status_code=303)
+    try:
+        role = int(role_id) if role_id else None
+    except (ValueError, TypeError):
+        role = None
     await user_service.create_user(
         session,
         login=login,
@@ -90,7 +99,7 @@ async def admin_create_user(
         full_name=full_name or None,
         email=email or None,
         is_admin=is_admin == "on",
-        role_id=int(role_id) if role_id else None,
+        role_id=role,
     )
     return RedirectResponse("/admin/users", status_code=303)
 

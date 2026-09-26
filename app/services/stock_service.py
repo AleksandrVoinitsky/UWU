@@ -132,6 +132,9 @@ async def consume_batches(
         )
 
     if method == CostMethod.AVERAGE:
+        if total_available == 0:
+            # quantity == 0 при пустом остатке: нечего списывать (иначе 0/0).
+            return [], Decimal("0")
         total_cost = sum((b.quantity * b.unit_cost for b in batches), Decimal("0"))
         avg_cost = (total_cost / total_available).quantize(Decimal("0.0001"))
 

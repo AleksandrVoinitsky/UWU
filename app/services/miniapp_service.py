@@ -41,33 +41,39 @@ def validate_init_data(channel: str, init_data: str, secret: str) -> dict | None
     """Проверяет подпись initData и возвращает ``{channel, external_id, name}``.
 
     Возвращает ``None`` при неверной подписи или неполных данных.
+
+    Подпись считается по **сырым** (URL-encoded) парам ``key=value``, как их
+    отправляет мессенджер; значения декодируются только для извлечения данных
+    (иначе пересчитанный HMAC никогда не совпадёт с присланным ``hash``).
     """
-    try:
-        flat = {k: v[0] for k, v in urllib.parse.parse_qs(init_data).items()}
-    except Exception:  # noqa: BLE001
-        return None
+    raw: dict[str, str] = {}
+    for part in init_data.split("&"):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            raw[k] = v
+    decoded = {k: urllib.parse.unquote_plus(v) for k, v in raw.items()}
 
     if channel == CHANNEL_TELEGRAM:
-        provided = flat.get("hash")
+        provided = raw.get("hash")
         try:
-            user = json.loads(flat.get("user", "{}"))
+            user = json.loads(decoded.get("user", "{}"))
         except json.JSONDecodeError:
             return None
         external_id = str(user.get("id") or "")
         if not external_id or not provided:
             return None
-        check = "\n".join(f"{k}={v}" for k, v in sorted(flat.items()) if k != "hash")
+        check = "\n".join(f"{k}={v}" for k, v in sorted(raw.items()) if k != "hash")
         if not hmac.compare_digest(_sign(check, _telegram_secret(secret)), provided):
             return None
         name = " ".join(filter(None, [user.get("first_name"), user.get("last_name")]))
         return {"channel": channel, "external_id": external_id, "name": name}
 
     if channel == CHANNEL_MAKS:
-        provided = flat.get("sign")
-        external_id = flat.get("vk_user_id") or ""
+        provided = raw.get("sign")
+        external_id = raw.get("vk_user_id") or ""
         if not external_id or not provided:
             return None
-        check = "&".join(f"{k}={v}" for k, v in sorted(flat.items()) if k != "sign")
+        check = "&".join(f"{k}={v}" for k, v in sorted(raw.items()) if k != "sign")
         if not hmac.compare_digest(_sign(check, secret.encode()), provided):
             return None
         return {"channel": channel, "external_id": external_id, "name": ""}
@@ -76,15 +82,24 @@ def validate_init_data(channel: str, init_data: str, secret: str) -> dict | None
 
 
 def make_test_init_data(channel: str, secret: str, user_id: int, name: str = "Тест") -> str:
-    """Собирает валидный initData (для тестов и локальной проверки)."""
+    """Собирает валидный initData (для тестов и локальной проверки).
+
+    Подпись формируется по URL-encoded значениям — так же, как это делает
+    мессенджер, — чтобы тесты совпадали с реальным алгоритмом проверки.
+    """
     if channel == CHANNEL_TELEGRAM:
         user = json.dumps({"id": user_id, "first_name": name}, ensure_ascii=False)
         params = {"user": user, "auth_date": "1700000000", "query_id": "1"}
-        check = "\n".join(f"{k}={v}" for k, v in sorted(params.items()))
+        encoded = urllib.parse.urlencode(params)
+        raw = dict(s.split("=", 1) for s in encoded.split("&"))
+        check = "\n".join(f"{k}={v}" for k, v in sorted(raw.items()))
         params["hash"] = _sign(check, _telegram_secret(secret))
         return urllib.parse.urlencode(params)
+
     params = {"vk_user_id": str(user_id), "vk_app_id": "1", "vk_ts": "1700000000"}
-    check = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+    encoded = urllib.parse.urlencode(params)
+    raw = dict(s.split("=", 1) for s in encoded.split("&"))
+    check = "&".join(f"{k}={v}" for k, v in sorted(raw.items()))
     params["sign"] = _sign(check, secret.encode())
     return urllib.parse.urlencode(params)
 

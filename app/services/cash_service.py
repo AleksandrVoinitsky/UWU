@@ -46,17 +46,32 @@ async def close_shift(session: AsyncSession, shift: CashShift, closing_amount: D
     return shift
 
 
+def _shift_window(shift: CashShift) -> list:
+    """Условия окна смены: по кассе и датам (открытия → закрытия).
+
+    Раньше движения считались только по дате и знаку — без фильтра по кассе и
+    верхней границы, поэтому при нескольких кассах или операциях вне окна
+    смены X/Z-отчёт был неверен.
+    """
+    conds = [MoneyMovement.date >= shift.opened_at.date()]
+    if shift.kassa_id is not None:
+        conds.append(MoneyMovement.kassa_id == shift.kassa_id)
+    if shift.closed_at is not None:
+        conds.append(MoneyMovement.date <= shift.closed_at.date())
+    return conds
+
+
 async def shift_revenue(session: AsyncSession, shift: CashShift) -> Decimal:
-    """Выручка за смену (положительные движения денег с даты открытия)."""
+    """Выручка за смену (положительные движения денег в окне смены)."""
     stmt = select(func.coalesce(func.sum(MoneyMovement.amount), 0)).where(
-        MoneyMovement.date >= shift.opened_at.date(), MoneyMovement.amount > 0
+        *_shift_window(shift), MoneyMovement.amount > 0
     )
     return (await session.execute(stmt)).scalar() or Decimal("0")
 
 
 async def shift_expenses(session: AsyncSession, shift: CashShift) -> Decimal:
-    """Расход за смену (отрицательные движения денег с даты открытия)."""
+    """Расход за смену (отрицательные движения денег в окне смены)."""
     stmt = select(func.coalesce(func.sum(MoneyMovement.amount), 0)).where(
-        MoneyMovement.date >= shift.opened_at.date(), MoneyMovement.amount < 0
+        *_shift_window(shift), MoneyMovement.amount < 0
     )
     return -(await session.execute(stmt)).scalar() or Decimal("0")

@@ -98,7 +98,7 @@
         </div>
         <div class="topbar-actions">
           <span class="user-chip">
-            <span class="avatar">{{ user.login[0] }}</span>
+            <span class="avatar">{{ (user.login or '?')[0] }}</span>
             <span>{{ user.full_name or user.login }}</span>
           </span>
         </div>

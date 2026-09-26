@@ -10,9 +10,10 @@ from decimal import Decimal
 
 import pytest
 
+from app.core.security import create_access_token
 from app.models.catalog import Nomenklatura, Sklad
 from app.models.enums import DocSubtype, DocType
-from app.services import catalog_service, document_service
+from app.services import catalog_service, document_service, user_service
 from app.services.stock_service import InsufficientStockError, get_balance
 
 
@@ -264,3 +265,33 @@ async def test_update_document_items(seeded_session):
             seeded_session, updated,
             [{"nomenklatura_id": item.id, "quantity": Decimal("1"), "price": Decimal("100")}],
         )
+
+
+async def test_invoice_print_change_no_type_error(client, seeded_session):
+    """BUG-01: печать накладной с полученной суммой не падает на float - Decimal.
+
+    ``extra.received`` приходит из JSON как float, ``total`` — Decimal. Расчёт
+    сдачи должен выполняться в Decimal (см. document_print), а не в шаблоне.
+    """
+    item = await _make_item(seeded_session)
+    sklad = await _make_sklad(seeded_session)
+
+    # Продажа 2 × 500 = 1000; получено 1050.5 → сдача 50.50.
+    rashod = await document_service.create_document(
+        seeded_session,
+        doc_type=DocType.RASHOD,
+        doc_date=date(2025, 1, 2),
+        sklad_id=sklad.id,
+        extra={"received": 1050.5},  # float — как из JSON
+        items=[{"nomenklatura_id": item.id, "quantity": Decimal("2"), "price": Decimal("500")}],
+    )
+
+    user = await user_service.create_user(
+        seeded_session, login="operator_invoice", password="secret123"
+    )
+    client.cookies.set("access_token", create_access_token(str(user.id)))
+
+    resp = await client.get(f"/documents/{rashod.id}/print")
+    assert resp.status_code == 200
+    assert "Сдача" in resp.text
+    assert "50.50" in resp.text

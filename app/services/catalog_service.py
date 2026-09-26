@@ -12,7 +12,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, TypeVar
 
-from sqlalchemy import func, select
+from sqlalchemy import Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import Base
@@ -56,14 +56,19 @@ async def delete_one(session: AsyncSession, obj: ModelT) -> None:
 
 
 async def next_code(session: AsyncSession, model: type[Any], prefix: str = "") -> str:
-    """Генерирует следующий числовой код справочника (001, 002, ...)."""
-    max_code = await session.execute(select(func.max(model.code)))
-    current = max_code.scalar() or "0"
-    # Извлекаем числовую часть (если код числовой).
-    try:
-        number = int(current)
-    except (TypeError, ValueError):
-        number = 0
+    """Генерирует следующий числовой код справочника (001, 002, ...).
+
+    Максимум считается по числовому значению кода (cast в Integer) только среди
+    числовых кодов. Строковый максимум после перехода 999 → 1000 вернул бы
+    «999» и снова сгенерировал «1000» (дубль уникального кода); при этом пустые
+    и нечисловые коды (например «» или «ABC») игнорируются.
+    """
+    max_code = await session.execute(
+        select(func.max(func.cast(model.code, Integer))).where(  # type: ignore[attr-defined]
+            model.code.op("~")(r"^\d+$")  # только чисто числовые коды
+        )
+    )
+    number = max_code.scalar() or 0
     return prefix + str(number + 1).zfill(3)
 
 

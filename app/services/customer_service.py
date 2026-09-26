@@ -55,6 +55,8 @@ async def register(
     phone = (phone or "").strip()
     if not phone:
         raise CustomerError("Укажите номер телефона")
+    if len(phone) > 64:
+        raise CustomerError("Номер телефона слишком длинный")
     if not password or len(password) < 6:
         raise CustomerError("Пароль должен быть не короче 6 символов")
     if await get_customer_by_phone(session, phone) is not None:

@@ -46,5 +46,5 @@ async def test_document_numbers_are_sequential(seeded_session):
     d2 = await document_service.create_document(
         seeded_session, doc_type=DocType.PRIHOD, doc_date=date.today()
     )
-    assert d1.number.startswith("PR-")
+    assert d1.number.startswith("PRIHOD-")
     assert int(d2.number.rsplit("-", 1)[1]) == int(d1.number.rsplit("-", 1)[1]) + 1

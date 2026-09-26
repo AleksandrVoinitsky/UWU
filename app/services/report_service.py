@@ -314,9 +314,16 @@ async def commission_report(session: AsyncSession) -> dict:
             }
         )
 
-    # Долг комитентам (отрицательные суммы взаиморасчётов).
-    debt_stmt = select(func.coalesce(func.sum(SettlementMovement.amount), 0)).where(
-        SettlementMovement.amount < 0
+    # Долг комитентам: отрицательные взаиморасчёты только по принятым на
+    # реализацию приходам (subtype=realization), а не любые долги поставщикам.
+    debt_stmt = (
+        select(func.coalesce(func.sum(SettlementMovement.amount), 0))
+        .join(Document, Document.id == SettlementMovement.document_id)
+        .where(
+            SettlementMovement.amount < 0,
+            Document.doc_type == DocType.PRIHOD.value,
+            Document.subtype == "realization",
+        )
     )
     debt = -(await session.execute(debt_stmt)).scalar() or Decimal("0")
 

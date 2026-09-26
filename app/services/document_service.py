@@ -68,7 +68,10 @@ async def next_document_number(session: AsyncSession, doc_type: DocType) -> str:
     сериализуются advisory-lock'ом PostgreSQL, удерживаемым до конца транзакции.
     """
     prefix = await _get_prefix(session)
-    base = f"{prefix}{doc_type.value[:2].upper()}"
+    # Полное имя вида документа, а не первые 2 буквы: у PEREOCENKA/PEREMESHENIE
+    # и VVOD_OSTATKOV/VVOD_OSTATKOV_DENEG общий 2-символьный префикс, из-за
+    # чего возникали коллизии номеров в журналах.
+    base = f"{prefix}{doc_type.value.upper()}"
 
     # Сериализуем генерацию номера на время транзакции.
     await session.execute(

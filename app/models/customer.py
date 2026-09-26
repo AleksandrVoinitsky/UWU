@@ -21,7 +21,7 @@ class Customer(Base, IdMixin, TimestampMixin):
 
     __tablename__ = "customers"
 
-    phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    phone: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

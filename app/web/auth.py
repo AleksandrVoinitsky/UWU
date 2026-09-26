@@ -65,6 +65,10 @@ async def set_language(lang: str, request: Request):
 
     target = lang if lang in SUPPORTED_LANGUAGES else "ru"
     referer = request.headers.get("referer") or "/"
+    # Разрешаем только относительные пути — защита от открытого редиректа
+    # (Referer контролируется клиентом и может указывать на чужой домен).
+    if not referer.startswith("/") or referer.startswith("//"):
+        referer = "/"
     response = RedirectResponse(url=referer, status_code=303)
     response.set_cookie("lang", target, samesite="lax")
     return response

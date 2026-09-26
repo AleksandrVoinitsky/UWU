@@ -106,7 +106,7 @@ async def register_submit(
         customer = await customer_service.register(session, phone, password, name or None)
     except CustomerError as exc:
         return _page(request, "login", customer=None, mode="register", error=str(exc))
-    return _auth_redirect(RedirectResponse("/", status_code=303), create_customer_token(customer.id))
+    return _auth_redirect(RedirectResponse(f"{SHOP_PREFIX}/", status_code=303), create_customer_token(customer.id))
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -125,12 +125,12 @@ async def login_submit(
         customer = await customer_service.authenticate(session, phone, password)
     except CustomerError as exc:
         return _page(request, "login", customer=None, mode="login", error=str(exc))
-    return _auth_redirect(RedirectResponse("/", status_code=303), create_customer_token(customer.id))
+    return _auth_redirect(RedirectResponse(f"{SHOP_PREFIX}/", status_code=303), create_customer_token(customer.id))
 
 
 @router.get("/logout")
 async def logout():
-    response = RedirectResponse("/", status_code=303)
+    response = RedirectResponse(f"{SHOP_PREFIX}/", status_code=303)
     response.delete_cookie(CUSTOMER_TOKEN_COOKIE)
     return response
 
@@ -161,7 +161,7 @@ async def cart_add(
         await customer_service.add_to_cart(session, customer.id, nomenklatura_id, quantity)
     except CustomerError:
         pass
-    return RedirectResponse("/cart", status_code=303)
+    return RedirectResponse(f"{SHOP_PREFIX}/cart", status_code=303)
 
 
 @router.post("/cart/update")
@@ -176,7 +176,7 @@ async def cart_update(
         await customer_service.set_cart_quantity(session, customer.id, item_id, quantity)
     except CustomerError:
         pass
-    return RedirectResponse("/cart", status_code=303)
+    return RedirectResponse(f"{SHOP_PREFIX}/cart", status_code=303)
 
 
 # --- Заказы ---
@@ -196,7 +196,7 @@ async def checkout(
         return _page(
             request, "cart", customer=customer, items=items, total=total, error=str(exc)
         )
-    return RedirectResponse(f"/orders/{doc.id}", status_code=303)
+    return RedirectResponse(f"{SHOP_PREFIX}/orders/{doc.id}", status_code=303)
 
 
 @router.get("/orders", response_class=HTMLResponse)

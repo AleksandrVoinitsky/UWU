@@ -12,7 +12,7 @@ import io
 import json
 import uuid
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
@@ -88,6 +88,22 @@ def _month_range() -> tuple[str, str]:
     today = date.today()
     start = today.replace(day=1)
     return start.isoformat(), today.isoformat()
+
+
+def _safe_report_range(start: str | None, end: str | None) -> tuple[str, str]:
+    """Строковый диапазон дат для отчёта; невалидный ввод — текущий месяц.
+
+    Защищает от ``date.fromisoformat`` с некорректным query-параметром
+    (иначе ``ValueError`` → HTTP 500).
+    """
+    if start and end:
+        try:
+            date.fromisoformat(start)
+            date.fromisoformat(end)
+            return start, end
+        except ValueError:
+            pass
+    return _month_range()
 
 
 # --- Периоды дашборда ---
@@ -366,13 +382,13 @@ async def create_nomenklatura(
     await catalog_service.create_one(
         session, cat.Nomenklatura, code=code, name=name, full_name=full_name or None,
         vid=vid, artikul=artikul or None,
-        base_unit_id=int(base_unit_id) if base_unit_id else None,
-        nds_rate_id=int(nds_rate_id) if nds_rate_id else None,
+        base_unit_id=_to_int(base_unit_id),
+        nds_rate_id=_to_int(nds_rate_id),
         purchase_price=_or_decimal(purchase_price),
         retail_price=_or_decimal(retail_price),
         price_mode=price_mode if price_mode in ("free", "by_type") else "free",
-        tip_tsen_id=int(tip_tsen_id) if (price_mode == "by_type" and tip_tsen_id) else None,
-        category_id=int(category_id) if category_id else None,
+        tip_tsen_id=_to_int(tip_tsen_id) if (price_mode == "by_type" and tip_tsen_id) else None,
+        category_id=_to_int(category_id),
     )
     return RedirectResponse("/catalog/nomenklatura", status_code=303)
 
@@ -505,7 +521,7 @@ async def create_stavka_nds(
     denied = _deny(user, "catalog.write")
     if denied:
         return denied
-    await catalog_service.create_one(session, cat.StavkaNDS, name=name, rate=Decimal(rate))
+    await catalog_service.create_one(session, cat.StavkaNDS, name=name, rate=_or_decimal(rate))
     return RedirectResponse("/catalog/stavki_nds", status_code=303)
 
 
@@ -587,9 +603,33 @@ def _or_none(value: str) -> str | None:
     return value.strip() if value else None
 
 
-def _or_decimal(value: str) -> Decimal | None:
-    value = value.strip()
-    return Decimal(value) if value else None
+def _to_int(value: str | int | None) -> int | None:
+    """Число в int; пустое/невалидное — None (без исключения).
+
+    Защищает от ``ValueError``/``TypeError`` при передаче нечисловой строки из
+    формы/query-параметра (иначе — необработанный HTTP 500).
+    """
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _or_decimal(value: str | Decimal | None) -> Decimal | None:
+    """Строку в Decimal; пустую/невалидную — None (без исключения).
+
+    ``Decimal("")``/``Decimal("abc")``/``Decimal("1,5")`` бросают
+    ``InvalidOperation``; здесь это не должно ронять запрос в 500.
+    """
+    text = (value or "").strip()
+    if not text:
+        return None
+    try:
+        return Decimal(text)
+    except (InvalidOperation, ValueError, TypeError):
+        return None
 
 
 @router.post("/catalog/nomenklatura/{item_id}/update")
@@ -612,8 +652,8 @@ async def update_nomenklatura(
         obj.purchase_price = _or_decimal(purchase_price)
         obj.retail_price = _or_decimal(retail_price)
         obj.price_mode = price_mode if price_mode in ("free", "by_type") else "free"
-        obj.tip_tsen_id = int(tip_tsen_id) if (price_mode == "by_type" and tip_tsen_id) else None
-        obj.category_id = int(category_id) if category_id else None
+        obj.tip_tsen_id = _to_int(tip_tsen_id) if (price_mode == "by_type" and tip_tsen_id) else None
+        obj.category_id = _to_int(category_id)
         await session.commit()
     return RedirectResponse("/catalog/nomenklatura", status_code=303)
 
@@ -738,8 +778,9 @@ async def update_valyuta(
         obj.code = code
         obj.name = name
         await session.commit()
-        if rate.strip():
-            await catalog_service.set_rate(session, item_id, date.today(), Decimal(rate))
+        parsed_rate = _or_decimal(rate)
+        if parsed_rate is not None:
+            await catalog_service.set_rate(session, item_id, date.today(), parsed_rate)
     return RedirectResponse("/catalog/valyuty", status_code=303)
 
 
@@ -767,7 +808,7 @@ async def update_stavka_nds(
         return denied
     obj = await catalog_service.get_one(session, cat.StavkaNDS, item_id)
     if obj:
-        await catalog_service.update_one(session, obj, name=name, rate=Decimal(rate))
+        await catalog_service.update_one(session, obj, name=name, rate=_or_decimal(rate))
     return RedirectResponse("/catalog/stavki_nds", status_code=303)
 
 
@@ -846,7 +887,7 @@ async def create_schet(
         return denied
     await catalog_service.create_one(
         session, cat.RaschetnySchet,
-        kontragent_id=int(kontragent_id), bank_name=bank_name or None, account=account, bik=bik or None,
+        kontragent_id=_to_int(kontragent_id), bank_name=bank_name or None, account=account, bik=bik or None,
     )
     return RedirectResponse("/catalog/scheta", status_code=303)
 
@@ -862,7 +903,7 @@ async def update_schet(
         return denied
     obj = await catalog_service.get_one(session, cat.RaschetnySchet, item_id)
     if obj:
-        obj.kontragent_id = int(kontragent_id)
+        obj.kontragent_id = _to_int(kontragent_id)
         obj.bank_name = bank_name or None
         obj.account = account
         obj.bik = bik or None
@@ -897,7 +938,9 @@ async def update_nomenklatura_prices(
         key = f"override_{tip.id}"
         raw = str(form.get(key, "") or "").strip()
         if raw:
-            await price_service.set_explicit_price(session, item_id, tip.id, Decimal(raw))
+            parsed = _or_decimal(raw)
+            if parsed is not None:
+                await price_service.set_explicit_price(session, item_id, tip.id, parsed)
         else:
             await price_service.clear_explicit_price(session, item_id, tip.id)
 
@@ -957,8 +1000,8 @@ async def rmk_shift_open(
     if existing is None:
         await cash_service.open_shift(
             session,
-            kassa_id=int(kassa_id) if kassa_id else None,
-            opening_amount=Decimal(opening_amount or "0"),
+            kassa_id=_to_int(kassa_id),
+            opening_amount=_or_decimal(opening_amount) or Decimal("0"),
             user_id=user.id,
         )
     return RedirectResponse("/rmk", status_code=303)
@@ -972,7 +1015,7 @@ async def rmk_shift_close(
 ):
     shift = await cash_service.get_open_shift(session)
     if shift:
-        await cash_service.close_shift(session, shift, Decimal(closing_amount or "0"))
+        await cash_service.close_shift(session, shift, _or_decimal(closing_amount) or Decimal("0"))
     return RedirectResponse("/rmk", status_code=303)
 
 
@@ -991,15 +1034,25 @@ async def rmk_sell(
     doc_type = DocType.VOZVRAT if data.get("return") else DocType.RASHOD
     received = data.get("received")
 
+    # Валидируем строки заранее — невалидный JSON иначе даёт 500 (KeyError/ValueError).
+    parsed_items = []
+    for i in items:
+        nomen_id = _to_int(i.get("nomenklatura_id"))
+        qty = _or_decimal(str(i.get("quantity", "")))
+        price = _or_decimal(str(i.get("price", "")))
+        if nomen_id is None or qty is None or price is None:
+            return JSONResponse({"detail": "Некорректная строка накладной"}, status_code=400)
+        parsed_items.append({"nomenklatura_id": nomen_id, "quantity": qty, "price": price})
+
     # Контроль минимальной цены (продажа не ниже закупочной).
     if doc_type == DocType.RASHOD:
         constants = await catalog_service.get_constants(session)
         if constants.get("enforce_min_price"):
             nomen = await catalog_service.list_all(session, cat.Nomenklatura)
             purchase_map = {n.id: n.purchase_price for n in nomen}
-            for i in items:
-                pp = purchase_map.get(int(i["nomenklatura_id"]))
-                if pp is not None and Decimal(str(i["price"])) < pp:
+            for i in parsed_items:
+                pp = purchase_map.get(i["nomenklatura_id"])
+                if pp is not None and i["price"] < pp:
                     return JSONResponse({"detail": f"Цена ниже закупочной ({pp})"}, status_code=400)
 
     try:
@@ -1010,10 +1063,7 @@ async def rmk_sell(
             doc_date=date.today(),
             sklad_id=sklad_id,
             extra={"received": received} if received is not None else None,
-            items=[
-                {"nomenklatura_id": int(i["nomenklatura_id"]), "quantity": Decimal(str(i["quantity"])), "price": Decimal(str(i["price"]))}
-                for i in items
-            ],
+            items=parsed_items,
             created_by_id=user.id,
         )
         await document_service.post_document(session, document)
@@ -1040,7 +1090,17 @@ async def document_print(
         return _page(request, user, "trade/error.html", error="Документ не найден", back="/documents")
     names = await _resolve_names(session, document)
     constants = await catalog_service.get_constants(session)
-    return _page(request, user, "trade/invoice.html", document=document, names=names, constants=constants)
+
+    # Сдача по наличной продаже. extra.received приходит из JSON как float,
+    # а document.total — Decimal; считаем разницу в Decimal, чтобы не падать
+    # на «float - Decimal» и не терять точность денег.
+    received = document.extra.get("received")
+    change = Decimal(str(received)) - document.total if received is not None else None
+
+    return _page(
+        request, user, "trade/invoice.html",
+        document=document, names=names, constants=constants, change=change,
+    )
 
 
 # --- Заявки покупателя ---
@@ -1098,11 +1158,15 @@ async def zakaz_create(
         return denied
     form = await request.form()
     items = _parse_items(form)
+    try:
+        parsed_date = date.fromisoformat(doc_date)
+    except ValueError:
+        parsed_date = date.today()
     await document_service.create_document(
         session,
         doc_type=DocType.ZAKAZ,
-        doc_date=date.fromisoformat(doc_date),
-        kontragent_id=int(kontragent_id),
+        doc_date=parsed_date,
+        kontragent_id=_to_int(kontragent_id),
         comment=comment or None,
         extra={"state": "new"},
         items=items,
@@ -1118,6 +1182,9 @@ async def zakaz_state(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
+    denied = _deny(user, "documents.write")
+    if denied:
+        return denied
     doc = await document_service.get_document(session, zakaz_id)
     if doc:
         extra = dict(doc.extra or {})
@@ -1139,11 +1206,14 @@ async def zakaz_reserve(
     user: User = Depends(get_current_user_from_cookie),
 ):
     """Резервирует товар по заявке на складе (по умолчанию — основной склад)."""
+    denied = _deny(user, "documents.write")
+    if denied:
+        return denied
     zakaz = await document_service.get_document(session, zakaz_id)
     if zakaz and zakaz.items:
         sklady = await catalog_service.list_all(session, cat.Sklad)
         target = (
-            int(sklad_id)
+            _to_int(sklad_id)
             if sklad_id
             else next((s.id for s in sklady if s.is_default), sklady[0].id if sklady else None)
         )
@@ -1172,13 +1242,16 @@ async def zakaz_ship(
     user: User = Depends(get_current_user_from_cookie),
 ):
     """Отгружает заявку: создаёт расходную накладную, снимает резерв, закрывает заявку."""
+    denied = _deny(user, "documents.write")
+    if denied:
+        return denied
     zakaz = await document_service.get_document(session, zakaz_id)
     if not (zakaz and zakaz.items):
         return RedirectResponse("/zakazy", status_code=303)
 
     sklady = await catalog_service.list_all(session, cat.Sklad)
     target = (
-        int(sklad_id)
+        _to_int(sklad_id)
         if sklad_id
         else next((s.id for s in sklady if s.is_default), sklady[0].id if sklady else None)
     )
@@ -1240,8 +1313,8 @@ async def dogovor_create(
         return denied
     await catalog_service.create_one(
         session, cat.Dogovor,
-        kontragent_id=int(kontragent_id), name=name, number=number or None,
-        payment_term_days=int(payment_term_days) if payment_term_days else None,
+        kontragent_id=_to_int(kontragent_id), name=name, number=number or None,
+        payment_term_days=_to_int(payment_term_days),
     )
     return RedirectResponse("/dogovory", status_code=303)
 
@@ -1275,11 +1348,11 @@ async def inventarizaciya_submit(
         parts = key.split("_")  # actual_{nomen_id}_{sklad_id}
         if len(parts) < 3:
             continue
-        nomen_id = int(parts[1])
-        item_sklad = int(parts[2])
-        if not value.strip():
+        nomen_id = _to_int(parts[1])
+        item_sklad = _to_int(parts[2])
+        actual = _or_decimal(str(value))
+        if nomen_id is None or item_sklad is None or actual is None:
             continue
-        actual = Decimal(value)
         items.append(
             {"nomenklatura_id": nomen_id, "sklad_id": item_sklad, "quantity": actual, "price": Decimal("0")}
         )
@@ -1291,7 +1364,7 @@ async def inventarizaciya_submit(
         session,
         doc_type=DocType.INVENTARIZACIYA,
         doc_date=date.today(),
-        sklad_id=int(sklad_id) if sklad_id else None,
+        sklad_id=_to_int(sklad_id),
         items=items,
         created_by_id=user.id,
     )
@@ -1318,9 +1391,15 @@ async def documents_journal(
     if doc_type:
         filters.append(Document.doc_type == doc_type)
     if start:
-        filters.append(Document.date >= date.fromisoformat(start))
+        try:
+            filters.append(Document.date >= date.fromisoformat(start))
+        except ValueError:
+            pass
     if end:
-        filters.append(Document.date <= date.fromisoformat(end))
+        try:
+            filters.append(Document.date <= date.fromisoformat(end))
+        except ValueError:
+            pass
     if status:
         filters.append(Document.status == status)
 
@@ -1400,22 +1479,22 @@ async def document_create_submit(
     form = await request.form()
     items = _parse_items(form)
     amount = form.get("amount")
-    total = Decimal(amount) if amount else None
+    total = _or_decimal(amount)
     base_document_id = form.get("base_document_id")
     extra = {}
     if base_document_id:
-        extra["base_document_id"] = int(base_document_id)
+        extra["base_document_id"] = _to_int(base_document_id)
     try:
         document = await document_service.create_document(
             session,
             doc_type=DocType(doc_type),
             subtype=DocSubtype(subtype) if subtype else None,
             doc_date=date.fromisoformat(doc_date),
-            sklad_id=int(sklad_id) if sklad_id else None,
-            sklad_to_id=int(sklad_to_id) if sklad_to_id else None,
-            kontragent_id=int(kontragent_id) if kontragent_id else None,
-            kassa_id=int(kassa_id) if kassa_id else None,
-            firma_id=int(firma_id) if firma_id else None,
+            sklad_id=_to_int(sklad_id),
+            sklad_to_id=_to_int(sklad_to_id),
+            kontragent_id=_to_int(kontragent_id),
+            kassa_id=_to_int(kassa_id),
+            firma_id=_to_int(firma_id),
             comment=comment or None,
             total=total,
             extra=extra,
@@ -1425,6 +1504,8 @@ async def document_create_submit(
         await document_service.post_document(session, document)
     except (InsufficientStockError, document_service.DocumentError) as exc:
         return _page(request, user, "trade/error.html", error=str(exc), back="/documents")
+    except (ValueError, InvalidOperation):
+        return _page(request, user, "trade/error.html", error="Некорректные данные документа", back="/documents")
     return RedirectResponse("/documents", status_code=303)
 
 
@@ -1435,13 +1516,16 @@ def _parse_items(form) -> list[dict]:
     prices = form.getlist("item_price")
     items = []
     for nomen_id, qty, price in zip(nomen_ids, qtys, prices):
-        if not nomen_id or not qty:
+        nid = _to_int(nomen_id)
+        q = _or_decimal(qty)
+        p = _or_decimal(price)
+        if nid is None or q is None or p is None:
             continue
         items.append(
             {
-                "nomenklatura_id": int(nomen_id),
-                "quantity": Decimal(qty),
-                "price": Decimal(price),
+                "nomenklatura_id": nid,
+                "quantity": q,
+                "price": p,
             }
         )
     return items
@@ -1584,7 +1668,7 @@ async def report_movements(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
-    s, e = _month_range() if not (start and end) else (start, end)
+    s, e = _safe_report_range(start, end)
     rows = await report_service.stock_movements(session, date.fromisoformat(s), date.fromisoformat(e))
     return _page(request, user, "trade/report_movements.html", rows=rows, start=s, end=e)
 
@@ -1597,7 +1681,7 @@ async def report_sales(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
-    s, e = _month_range() if not (start and end) else (start, end)
+    s, e = _safe_report_range(start, end)
     rows = await report_service.sales_report(session, date.fromisoformat(s), date.fromisoformat(e))
     total = sum((r["total"] for r in rows), Decimal("0"))
     total_cost = sum((r["cost"] for r in rows), Decimal("0"))
@@ -1623,7 +1707,7 @@ async def report_money(
     user: User = Depends(get_current_user_from_cookie),
 ):
     balance = await report_service.money_balance(session)
-    s, e = _month_range() if not (start and end) else (start, end)
+    s, e = _safe_report_range(start, end)
     rows = await report_service.money_movements(session, date.fromisoformat(s), date.fromisoformat(e))
     return _page(request, user, "trade/report_money.html", balance=balance, rows=rows, start=s, end=e)
 
@@ -1637,10 +1721,10 @@ async def report_settlement_movements(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
-    s, e = _month_range() if not (start and end) else (start, end)
+    s, e = _safe_report_range(start, end)
     rows = await report_service.settlement_movements(
         session, date.fromisoformat(s), date.fromisoformat(e),
-        int(kontragent_id) if kontragent_id else None,
+        _to_int(kontragent_id),
     )
     kontragenty = await catalog_service.list_all(session, cat.Kontragent)
     return _page(
@@ -1657,7 +1741,7 @@ async def report_abc(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
-    s, e = _month_range() if not (start and end) else (start, end)
+    s, e = _safe_report_range(start, end)
     rows = await report_service.abc_analysis(session, date.fromisoformat(s), date.fromisoformat(e))
     return _page(request, user, "trade/report_abc.html", rows=rows, start=s, end=e)
 
@@ -1670,7 +1754,7 @@ async def report_accounting(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
-    s, e = _month_range() if not (start and end) else (start, end)
+    s, e = _safe_report_range(start, end)
     rows = await report_service.accounting_entries(session, date.fromisoformat(s), date.fromisoformat(e))
     total = sum((r["amount"] for r in rows), Decimal("0"))
     return _page(request, user, "trade/report_accounting.html", rows=rows, start=s, end=e, total=total)
@@ -1694,7 +1778,7 @@ async def report_invoices(
     user: User = Depends(get_current_user_from_cookie),
 ):
     rows = await report_service.open_invoices(
-        session, int(kontragent_id) if kontragent_id else None
+        session, _to_int(kontragent_id)
     )
     kontragenty = await catalog_service.list_all(session, cat.Kontragent)
     return _page(
@@ -1712,7 +1796,7 @@ async def report_turnover(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
-    s, e = _month_range() if not (start and end) else (start, end)
+    s, e = _safe_report_range(start, end)
     rows = await report_service.turnover_statement(session, date.fromisoformat(s), date.fromisoformat(e))
     if format == "csv":
         return _csv_response(rows, "turnover.csv")
@@ -1745,7 +1829,7 @@ async def report_purchase_sales(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
-    s, e = _month_range() if not (start and end) else (start, end)
+    s, e = _safe_report_range(start, end)
     rows = await report_service.purchase_sales_book(session, date.fromisoformat(s), date.fromisoformat(e))
     if format == "csv":
         return _csv_response(rows, "purchase_sales.csv")
@@ -1770,6 +1854,6 @@ async def report_cash_book(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
-    s, e = _month_range() if not (start and end) else (start, end)
+    s, e = _safe_report_range(start, end)
     rows = await report_service.cash_book(session, date.fromisoformat(s), date.fromisoformat(e))
     return _page(request, user, "trade/report_cash_book.html", rows=rows, start=s, end=e)
