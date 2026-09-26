@@ -49,10 +49,27 @@ async def stock_balances(session: AsyncSession) -> list[dict]:
     res_result = await session.execute(res_stmt)
     reserved_map = {(r[0], r[1]): r[2] for r in res_result.all()}
 
+    data = result.all()
+    nomen_map = {
+        n.id: n
+        for n in (
+            await session.execute(
+                select(Nomenklatura).where(Nomenklatura.id.in_({r[0] for r in data}))
+            )
+        ).scalars()
+    }
+    sklad_map = {
+        s.id: s
+        for s in (
+            await session.execute(
+                select(Sklad).where(Sklad.id.in_({r[1] for r in data}))
+            )
+        ).scalars()
+    }
     rows = []
-    for nomen_id, sklad_id, ownership, qty, cost in result.all():
-        nomen = await session.get(Nomenklatura, nomen_id)
-        sklad = await session.get(Sklad, sklad_id)
+    for nomen_id, sklad_id, ownership, qty, cost in data:
+        nomen = nomen_map.get(nomen_id)
+        sklad = sklad_map.get(sklad_id)
         # Резерв учитывается только для собственных товаров.
         is_own = ownership == "own"
         reserved = reserved_map.get((nomen_id, sklad_id), Decimal("0")) if is_own else Decimal("0")
@@ -84,11 +101,38 @@ async def stock_movements(
         stmt = stmt.where(StockMovement.nomenklatura_id == nomenklatura_id)
     stmt = stmt.order_by(StockMovement.date, StockMovement.id)
     result = await session.execute(stmt)
+    movements = result.scalars().all()
+    nomen_map = {
+        n.id: n
+        for n in (
+            await session.execute(
+                select(Nomenklatura).where(
+                    Nomenklatura.id.in_({m.nomenklatura_id for m in movements})
+                )
+            )
+        ).scalars()
+    }
+    sklad_map = {
+        s.id: s
+        for s in (
+            await session.execute(
+                select(Sklad).where(Sklad.id.in_({m.sklad_id for m in movements}))
+            )
+        ).scalars()
+    }
+    doc_map = {
+        d.id: d
+        for d in (
+            await session.execute(
+                select(Document).where(Document.id.in_({m.document_id for m in movements}))
+            )
+        ).scalars()
+    }
     rows = []
-    for m in result.scalars():
-        nomen = await session.get(Nomenklatura, m.nomenklatura_id)
-        sklad = await session.get(Sklad, m.sklad_id)
-        doc = await session.get(Document, m.document_id)
+    for m in movements:
+        nomen = nomen_map.get(m.nomenklatura_id)
+        sklad = sklad_map.get(m.sklad_id)
+        doc = doc_map.get(m.document_id)
         rows.append(
             {
                 "date": m.date,
@@ -138,7 +182,7 @@ async def sales_report(
     return rows
 
 
-async def settlement_balances(session: AsyncSession) -> list[dict]:
+async def settlement_balances(session: AsyncSession, firma_id: int | None = None) -> list[dict]:
     """Задолженность контрагентов (положительная — должны нам)."""
     stmt = (
         select(
@@ -148,10 +192,21 @@ async def settlement_balances(session: AsyncSession) -> list[dict]:
         .group_by(SettlementMovement.kontragent_id)
         .having(func.sum(SettlementMovement.amount) != 0)
     )
+    if firma_id:
+        stmt = stmt.where(SettlementMovement.firma_id == firma_id)
     result = await session.execute(stmt)
+    data = result.all()
+    kontragent_map = {
+        k.id: k
+        for k in (
+            await session.execute(
+                select(Kontragent).where(Kontragent.id.in_({r[0] for r in data}))
+            )
+        ).scalars()
+    }
     rows = []
-    for kontragent_id, amount in result.all():
-        kontragent = await session.get(Kontragent, kontragent_id)
+    for kontragent_id, amount in data:
+        kontragent = kontragent_map.get(kontragent_id)
         rows.append(
             {
                 "kontragent_id": kontragent_id,
@@ -162,24 +217,48 @@ async def settlement_balances(session: AsyncSession) -> list[dict]:
     return rows
 
 
-async def money_balance(session: AsyncSession) -> Decimal:
+async def money_balance(session: AsyncSession, firma_id: int | None = None) -> Decimal:
     """Суммарный остаток денежных средств."""
     stmt = select(func.coalesce(func.sum(MoneyMovement.amount), 0))
+    if firma_id:
+        stmt = stmt.where(MoneyMovement.firma_id == firma_id)
     return (await session.execute(stmt)).scalar() or Decimal("0")
 
 
-async def money_movements(session: AsyncSession, start: date, end: date) -> list[dict]:
+async def money_movements(
+    session: AsyncSession, start: date, end: date, firma_id: int | None = None
+) -> list[dict]:
     """Движения денежных средств за период."""
     stmt = (
         select(MoneyMovement)
         .where(MoneyMovement.date >= start, MoneyMovement.date <= end)
         .order_by(MoneyMovement.date, MoneyMovement.id)
     )
+    if firma_id:
+        stmt = stmt.where(MoneyMovement.firma_id == firma_id)
     result = await session.execute(stmt)
+    movements = result.scalars().all()
+    doc_map = {
+        d.id: d
+        for d in (
+            await session.execute(
+                select(Document).where(Document.id.in_({m.document_id for m in movements}))
+            )
+        ).scalars()
+    }
+    kontragent_ids = {m.kontragent_id for m in movements if m.kontragent_id}
+    kontragent_map = {
+        k.id: k
+        for k in (
+            await session.execute(
+                select(Kontragent).where(Kontragent.id.in_(kontragent_ids))
+            )
+        ).scalars()
+    }
     rows = []
-    for m in result.scalars():
-        doc = await session.get(Document, m.document_id)
-        kontragent = await session.get(Kontragent, m.kontragent_id) if m.kontragent_id else None
+    for m in movements:
+        doc = doc_map.get(m.document_id)
+        kontragent = kontragent_map.get(m.kontragent_id) if m.kontragent_id else None
         rows.append(
             {
                 "date": m.date,
@@ -192,7 +271,11 @@ async def money_movements(session: AsyncSession, start: date, end: date) -> list
 
 
 async def settlement_movements(
-    session: AsyncSession, start: date, end: date, kontragent_id: int | None = None
+    session: AsyncSession,
+    start: date,
+    end: date,
+    kontragent_id: int | None = None,
+    firma_id: int | None = None,
 ) -> list[dict]:
     """Движения по взаиморасчётам за период (детально)."""
     stmt = (
@@ -202,11 +285,30 @@ async def settlement_movements(
     )
     if kontragent_id:
         stmt = stmt.where(SettlementMovement.kontragent_id == kontragent_id)
+    if firma_id:
+        stmt = stmt.where(SettlementMovement.firma_id == firma_id)
     result = await session.execute(stmt)
+    movements = result.scalars().all()
+    doc_map = {
+        d.id: d
+        for d in (
+            await session.execute(
+                select(Document).where(Document.id.in_({m.document_id for m in movements}))
+            )
+        ).scalars()
+    }
+    kontragent_map = {
+        k.id: k
+        for k in (
+            await session.execute(
+                select(Kontragent).where(Kontragent.id.in_({m.kontragent_id for m in movements}))
+            )
+        ).scalars()
+    }
     rows = []
-    for m in result.scalars():
-        doc = await session.get(Document, m.document_id)
-        kontragent = await session.get(Kontragent, m.kontragent_id)
+    for m in movements:
+        doc = doc_map.get(m.document_id)
+        kontragent = kontragent_map.get(m.kontragent_id)
         rows.append(
             {
                 "date": m.date,
@@ -242,10 +344,18 @@ async def abc_analysis(session: AsyncSession, start: date, end: date) -> list[di
     data = [(nomen_id, amount) for nomen_id, amount in result.all()]
 
     total = sum((a for _, a in data), Decimal("0"))
+    nomen_map = {
+        n.id: n
+        for n in (
+            await session.execute(
+                select(Nomenklatura).where(Nomenklatura.id.in_({nid for nid, _ in data}))
+            )
+        ).scalars()
+    }
     rows: list[dict] = []
     cumulative = Decimal("0")
     for nomen_id, amount in data:
-        nomen = await session.get(Nomenklatura, nomen_id)
+        nomen = nomen_map.get(nomen_id)
         prev_cumulative = cumulative
         cumulative += amount
         pct = (amount / total * Decimal("100")).quantize(Decimal("0.01")) if total else Decimal("0")
@@ -279,10 +389,28 @@ async def accounting_entries(session: AsyncSession, start: date, end: date) -> l
         .order_by(AccountingEntry.date, AccountingEntry.id)
     )
     result = await session.execute(stmt)
+    entries = result.scalars().all()
+    doc_map = {
+        d.id: d
+        for d in (
+            await session.execute(
+                select(Document).where(Document.id.in_({e.document_id for e in entries}))
+            )
+        ).scalars()
+    }
+    kontragent_ids = {e.kontragent_id for e in entries if e.kontragent_id}
+    kontragent_map = {
+        k.id: k
+        for k in (
+            await session.execute(
+                select(Kontragent).where(Kontragent.id.in_(kontragent_ids))
+            )
+        ).scalars()
+    }
     rows = []
-    for e in result.scalars():
-        doc = await session.get(Document, e.document_id)
-        kontragent = await session.get(Kontragent, e.kontragent_id) if e.kontragent_id else None
+    for e in entries:
+        doc = doc_map.get(e.document_id)
+        kontragent = kontragent_map.get(e.kontragent_id) if e.kontragent_id else None
         rows.append(
             {
                 "date": e.date,
@@ -308,10 +436,27 @@ async def commission_report(session: AsyncSession) -> dict:
         .group_by(StockBatch.nomenklatura_id, StockBatch.sklad_id)
     )
     result = await session.execute(stmt)
+    data = result.all()
+    nomen_map = {
+        n.id: n
+        for n in (
+            await session.execute(
+                select(Nomenklatura).where(Nomenklatura.id.in_({r[0] for r in data}))
+            )
+        ).scalars()
+    }
+    sklad_map = {
+        s.id: s
+        for s in (
+            await session.execute(
+                select(Sklad).where(Sklad.id.in_({r[1] for r in data}))
+            )
+        ).scalars()
+    }
     received = []
-    for nomen_id, sklad_id, qty in result.all():
-        nomen = await session.get(Nomenklatura, nomen_id)
-        sklad = await session.get(Sklad, sklad_id)
+    for nomen_id, sklad_id, qty in data:
+        nomen = nomen_map.get(nomen_id)
+        sklad = sklad_map.get(sklad_id)
         received.append(
             {
                 "nomenklatura": nomen.name if nomen else f"#{nomen_id}",
@@ -355,14 +500,32 @@ async def open_invoices(
         .having(func.sum(SettlementMovement.amount) != 0)
     )
     result = await session.execute(stmt)
+    data = result.all()
+    doc_map = {
+        d.id: d
+        for d in (
+            await session.execute(
+                select(Document).where(Document.id.in_({r[0] for r in data}))
+            )
+        ).scalars()
+    }
+    kontragent_ids = {d.kontragent_id for d in doc_map.values() if d.kontragent_id}
+    kontragent_map = {
+        k.id: k
+        for k in (
+            await session.execute(
+                select(Kontragent).where(Kontragent.id.in_(kontragent_ids))
+            )
+        ).scalars()
+    }
     rows = []
-    for base_id, open_amount in result.all():
-        doc = await session.get(Document, base_id)
+    for base_id, open_amount in data:
+        doc = doc_map.get(base_id)
         if doc is None:
             continue
         if kontragent_id and doc.kontragent_id != kontragent_id:
             continue
-        kontragent = await session.get(Kontragent, doc.kontragent_id) if doc.kontragent_id else None
+        kontragent = kontragent_map.get(doc.kontragent_id) if doc.kontragent_id else None
         rows.append(
             {
                 "document_id": base_id,
@@ -386,10 +549,27 @@ async def batch_report(session: AsyncSession) -> list[dict]:
         .order_by(StockBatch.nomenklatura_id, StockBatch.created_at)
     )
     result = await session.execute(stmt)
+    batches = result.scalars().all()
+    nomen_map = {
+        n.id: n
+        for n in (
+            await session.execute(
+                select(Nomenklatura).where(Nomenklatura.id.in_({b.nomenklatura_id for b in batches}))
+            )
+        ).scalars()
+    }
+    sklad_map = {
+        s.id: s
+        for s in (
+            await session.execute(
+                select(Sklad).where(Sklad.id.in_({b.sklad_id for b in batches}))
+            )
+        ).scalars()
+    }
     rows = []
-    for b in result.scalars():
-        nomen = await session.get(Nomenklatura, b.nomenklatura_id)
-        sklad = await session.get(Sklad, b.sklad_id)
+    for b in batches:
+        nomen = nomen_map.get(b.nomenklatura_id)
+        sklad = sklad_map.get(b.sklad_id)
         rows.append(
             {
                 "nomenklatura": nomen.name if nomen else f"#{b.nomenklatura_id}",
@@ -487,12 +667,29 @@ async def turnover_statement(
         .group_by(StockMovement.nomenklatura_id, StockMovement.sklad_id)
     )
     result = await session.execute(stmt)
+    data = result.all()
+    nomen_map = {
+        n.id: n
+        for n in (
+            await session.execute(
+                select(Nomenklatura).where(Nomenklatura.id.in_({r[0] for r in data}))
+            )
+        ).scalars()
+    }
+    sklad_map = {
+        s.id: s
+        for s in (
+            await session.execute(
+                select(Sklad).where(Sklad.id.in_({r[1] for r in data}))
+            )
+        ).scalars()
+    }
     rows = []
-    for nomen_id, sklad_id, opening, incoming, outgoing in result.all():
+    for nomen_id, sklad_id, opening, incoming, outgoing in data:
         if opening == 0 and incoming == 0 and outgoing == 0:
             continue
-        nomen = await session.get(Nomenklatura, nomen_id)
-        sklad = await session.get(Sklad, sklad_id)
+        nomen = nomen_map.get(nomen_id)
+        sklad = sklad_map.get(sklad_id)
         rows.append(
             {
                 "nomenklatura": nomen.name if nomen else f"#{nomen_id}",
@@ -518,10 +715,27 @@ async def item_card(
         stmt = stmt.where(StockMovement.date <= end)
     stmt = stmt.order_by(StockMovement.date, StockMovement.id)
     result = await session.execute(stmt)
+    movements = result.scalars().all()
+    doc_map = {
+        d.id: d
+        for d in (
+            await session.execute(
+                select(Document).where(Document.id.in_({m.document_id for m in movements}))
+            )
+        ).scalars()
+    }
+    sklad_map = {
+        s.id: s
+        for s in (
+            await session.execute(
+                select(Sklad).where(Sklad.id.in_({m.sklad_id for m in movements}))
+            )
+        ).scalars()
+    }
     rows = []
-    for m in result.scalars():
-        doc = await session.get(Document, m.document_id)
-        sklad = await session.get(Sklad, m.sklad_id)
+    for m in movements:
+        doc = doc_map.get(m.document_id)
+        sklad = sklad_map.get(m.sklad_id)
         rows.append(
             {
                 "date": m.date,
@@ -550,9 +764,19 @@ async def purchase_sales_book(
         .order_by(Document.date)
     )
     result = await session.execute(stmt)
+    docs = result.scalars().all()
+    kontragent_ids = {d.kontragent_id for d in docs if d.kontragent_id}
+    kontragent_map = {
+        k.id: k
+        for k in (
+            await session.execute(
+                select(Kontragent).where(Kontragent.id.in_(kontragent_ids))
+            )
+        ).scalars()
+    }
     rows = []
-    for doc in result.scalars():
-        kontragent = await session.get(Kontragent, doc.kontragent_id) if doc.kontragent_id else None
+    for doc in docs:
+        kontragent = kontragent_map.get(doc.kontragent_id) if doc.kontragent_id else None
         rows.append(
             {
                 "date": doc.date,

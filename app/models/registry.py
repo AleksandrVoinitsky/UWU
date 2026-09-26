@@ -31,7 +31,9 @@ class StockBatch(Base, IdMixin):
     quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False)
     unit_cost: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
     # Раздельный учёт: own (собственные), received (принятые на реализацию), transferred (переданные на реализацию).
-    ownership: Mapped[str] = mapped_column(String(20), default="own", nullable=False)
+    ownership: Mapped[str] = mapped_column(
+        String(20), default="own", server_default="own", nullable=False
+    )
     source_document_id: Mapped[int | None] = mapped_column(
         ForeignKey("documents.id"), nullable=True
     )
@@ -70,11 +72,14 @@ class MoneyMovement(Base, IdMixin):
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     kassa_id: Mapped[int | None] = mapped_column(ForeignKey("kassy.id"), nullable=True)
     kontragent_id: Mapped[int | None] = mapped_column(ForeignKey("kontragenty.id"), nullable=True)
+    # Фирма (юрлицо) — для многофирменного учёта и отчётности по фирме.
+    firma_id: Mapped[int | None] = mapped_column(ForeignKey("firmy.id"), nullable=True, index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)  # + приход / - расход
 
     document: Mapped["Document"] = relationship()  # noqa: F821
     kassa: Mapped["Kassa | None"] = relationship()  # noqa: F821
     kontragent: Mapped["Kontragent | None"] = relationship()  # noqa: F821
+    firma: Mapped["Firma | None"] = relationship()  # noqa: F821
 
 
 class SettlementMovement(Base, IdMixin):
@@ -88,6 +93,8 @@ class SettlementMovement(Base, IdMixin):
     dogovor_id: Mapped[int | None] = mapped_column(ForeignKey("dogovory.id"), nullable=True)
     # Основание: документ-накладная, которую погашает данное движение (для оплат).
     base_document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"), nullable=True)
+    # Фирма (юрлицо) — для многофирменного учёта.
+    firma_id: Mapped[int | None] = mapped_column(ForeignKey("firmy.id"), nullable=True, index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)  # + долг нам / - долг мы
 
     document: Mapped["Document"] = relationship(foreign_keys=[document_id])  # noqa: F821
@@ -132,11 +139,11 @@ class CashShift(Base, IdMixin):
     __tablename__ = "cash_shifts"
 
     kassa_id: Mapped[int | None] = mapped_column(ForeignKey("kassy.id"), nullable=True)
-    status: Mapped[str] = mapped_column(String(10), default="open", nullable=False)  # open | closed
+    status: Mapped[str] = mapped_column(String(10), default="open", server_default="open", nullable=False)  # open | closed
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     opened_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    opening_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    opening_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), server_default="0", nullable=False)
     closing_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
 
 

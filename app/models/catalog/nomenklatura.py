@@ -49,7 +49,9 @@ class Nomenklatura(Base, IdMixin, TimestampMixin):
     retail_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
 
     # Режим цены: "free" — свободная цена, "by_type" — по виду цен (наценка от закупочной).
-    price_mode: Mapped[str] = mapped_column(String(10), default="free", nullable=False)
+    price_mode: Mapped[str] = mapped_column(
+        String(10), default="free", server_default="free", nullable=False
+    )
     tip_tsen_id: Mapped[int | None] = mapped_column(ForeignKey("tipy_tsen.id"), nullable=True)
 
     tip_tsen: Mapped["TipTsen | None"] = relationship()

@@ -67,26 +67,29 @@ async def sales(
 
 @router.get("/settlements")
 async def settlements(
+    firma_id: int | None = None,
     session: AsyncSession = Depends(get_session),
     _user: User = READ,
 ):
-    return await report_service.settlement_balances(session)
+    return await report_service.settlement_balances(session, firma_id)
 
 
 @router.get("/money/balance")
 async def money_balance(
+    firma_id: int | None = None,
     session: AsyncSession = Depends(get_session),
     _user: User = READ,
 ):
-    return {"balance": str(await report_service.money_balance(session))}
+    return {"balance": str(await report_service.money_balance(session, firma_id))}
 
 
 @router.get("/money/movements")
 async def money_movements(
     start: date,
     end: date,
+    firma_id: int | None = None,
     session: AsyncSession = Depends(get_session),
     _user: User = READ,
 ):
     _validate_period(start, end)
-    return await report_service.money_movements(session, start, end)
+    return await report_service.money_movements(session, start, end, firma_id)

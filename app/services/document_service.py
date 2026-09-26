@@ -19,7 +19,14 @@ from sqlalchemy.orm import selectinload
 from app.models.constants import Constant
 from app.models.document.base_document import Document, DocumentItem
 from app.models.enums import CostMethod, DocSubtype, DocType, DocumentStatus, RestockControl
-from app.models.registry import AccountingEntry, AuditLog, MoneyMovement, SettlementMovement, StockMovement
+from app.models.registry import (
+    AccountingEntry,
+    AuditLog,
+    MoneyMovement,
+    SettlementMovement,
+    StockBatch,
+    StockMovement,
+)
 from app.services import stock_service
 from app.services.stock_service import InsufficientStockError
 
@@ -333,6 +340,14 @@ async def post_document(
                         session, document, item, doc_type, cost_method, restock
                     )
 
+        # Переоценка товаров: не меняет количество, а переоценивает учётную
+        # стоимость партий (разница отражается проводкой).
+        if doc_type == DocType.PEREOCENKA:
+            items = await _load_items(session, document)
+            if not items:
+                raise DocumentError("Document has no items")
+            await _apply_revaluation(session, document, items)
+
         await _apply_money_and_settlement(session, document, doc_type)
         await _apply_accounting(session, document, doc_type)
 
@@ -503,6 +518,73 @@ async def _apply_inventory(
             )
 
 
+async def _apply_revaluation(
+    session: AsyncSession, document: Document, items: list[DocumentItem]
+) -> None:
+    """Переоценка товаров: меняет учётную стоимость партий без изменения количества.
+
+    Разница стоимости отражается проводкой (дооценка → Дт 41 / Кт 91.1,
+    уценка → Дт 91.2 / Кт 41). Исходные цены сохраняются в ``extra`` для
+    корректной отмены проведения.
+    """
+    reval_log: list[dict] = []
+    total_diff = Decimal("0")
+    for item in items:
+        sklad = item.sklad_id or document.sklad_id
+        if sklad is None:
+            raise DocumentError("Склад обязателен для переоценки")
+        new_price = item.price
+        result = await session.execute(
+            select(StockBatch)
+            .where(
+                StockBatch.nomenklatura_id == item.nomenklatura_id,
+                StockBatch.sklad_id == sklad,
+                StockBatch.quantity != 0,
+            )
+            .with_for_update()
+        )
+        batches = list(result.scalars())
+        for batch in batches:
+            reval_log.append({"batch_id": batch.id, "old_unit_cost": str(batch.unit_cost)})
+            total_diff += (new_price - batch.unit_cost) * batch.quantity
+            batch.unit_cost = new_price
+
+    # Сохраняем историю для отмены проведения.
+    extra = dict(document.extra or {})
+    extra["_revaluation"] = reval_log
+    document.extra = extra
+
+    if total_diff > 0:
+        session.add(
+            AccountingEntry(
+                document_id=document.id,
+                date=document.date,
+                account_debit="41",
+                account_credit="91.1",
+                amount=total_diff.quantize(Decimal("0.01")),
+            )
+        )
+    elif total_diff < 0:
+        session.add(
+            AccountingEntry(
+                document_id=document.id,
+                date=document.date,
+                account_debit="91.2",
+                account_credit="41",
+                amount=(-total_diff).quantize(Decimal("0.01")),
+            )
+        )
+
+
+async def _rollback_revaluation(session: AsyncSession, document: Document) -> None:
+    """Восстанавливает исходные учётные цены партий при отмене переоценки."""
+    reval_log = (document.extra or {}).get("_revaluation") or []
+    for record in reval_log:
+        batch = await session.get(StockBatch, record["batch_id"])
+        if batch is not None:
+            batch.unit_cost = Decimal(record["old_unit_cost"])
+
+
 async def _apply_money_and_settlement(
     session: AsyncSession, document: Document, doc_type: DocType
 ) -> None:
@@ -521,6 +603,7 @@ async def _apply_money_and_settlement(
                     kontragent_id=document.kontragent_id,
                     dogovor_id=document.dogovor_id,
                     base_document_id=document.id,
+                    firma_id=document.firma_id,
                     amount=document.total,
                 )
             )
@@ -533,6 +616,7 @@ async def _apply_money_and_settlement(
                     kontragent_id=document.kontragent_id,
                     dogovor_id=document.dogovor_id,
                     base_document_id=document.id,
+                    firma_id=document.firma_id,
                     amount=-document.total,
                 )
             )
@@ -546,6 +630,7 @@ async def _apply_money_and_settlement(
                 date=document.date,
                 kassa_id=document.kassa_id,
                 kontragent_id=document.kontragent_id,
+                firma_id=document.firma_id,
                 amount=document.total,
             )
         )
@@ -556,6 +641,7 @@ async def _apply_money_and_settlement(
                 date=document.date,
                 kassa_id=document.kassa_id,
                 kontragent_id=document.kontragent_id,
+                firma_id=document.firma_id,
                 amount=-document.total,
             )
         )
@@ -568,6 +654,7 @@ async def _apply_money_and_settlement(
                 date=document.date,
                 kassa_id=document.kassa_id,
                 kontragent_id=document.kontragent_id,
+                firma_id=document.firma_id,
                 amount=document.total,
             )
         )
@@ -579,6 +666,7 @@ async def _apply_money_and_settlement(
                     kontragent_id=document.kontragent_id,
                     dogovor_id=document.dogovor_id,
                     base_document_id=base_document_id,
+                    firma_id=document.firma_id,
                     amount=-document.total,
                 )
             )
@@ -589,6 +677,7 @@ async def _apply_money_and_settlement(
                 date=document.date,
                 kassa_id=document.kassa_id,
                 kontragent_id=document.kontragent_id,
+                firma_id=document.firma_id,
                 amount=-document.total,
             )
         )
@@ -600,6 +689,7 @@ async def _apply_money_and_settlement(
                     kontragent_id=document.kontragent_id,
                     dogovor_id=document.dogovor_id,
                     base_document_id=base_document_id,
+                    firma_id=document.firma_id,
                     amount=document.total,
                 )
             )
@@ -609,9 +699,32 @@ async def _apply_money_and_settlement(
                 document_id=document.id,
                 date=document.date,
                 kassa_id=document.kassa_id,
+                firma_id=document.firma_id,
                 amount=document.total,
             )
         )
+
+
+async def _outgoing_stock_cost(session: AsyncSession, document_id: int) -> Decimal:
+    """Сумма себестоимости списанных (отрицательных) движений документа."""
+    result = await session.execute(
+        select(func.coalesce(func.sum(StockMovement.amount), 0)).where(
+            StockMovement.document_id == document_id,
+            StockMovement.quantity < 0,
+        )
+    )
+    return -(result.scalar() or Decimal("0"))
+
+
+async def _incoming_stock_cost(session: AsyncSession, document_id: int) -> Decimal:
+    """Сумма стоимости приходных (положительных) движений документа."""
+    result = await session.execute(
+        select(func.coalesce(func.sum(StockMovement.amount), 0)).where(
+            StockMovement.document_id == document_id,
+            StockMovement.quantity > 0,
+        )
+    )
+    return result.scalar() or Decimal("0")
 
 
 async def _apply_accounting(session: AsyncSession, document: Document, doc_type: DocType) -> None:
@@ -645,14 +758,23 @@ async def _apply_accounting(session: AsyncSession, document: Document, doc_type:
         # Продажа: Дт 62 «Покупатели» / Кт 90.1 «Выручка».
         entry("62", "90.1", document.total, kontragent_id=document.kontragent_id)
         # Себестоимость: Дт 90.2 / Кт 41 (по сумме списанных партий).
-        result = await session.execute(
-            select(func.coalesce(func.sum(StockMovement.amount), 0)).where(
-                StockMovement.document_id == document.id,
-                StockMovement.quantity < 0,
-            )
-        )
-        cost = -(result.scalar() or Decimal("0"))
-        entry("90.2", "41", cost)
+        entry("90.2", "41", await _outgoing_stock_cost(session, document.id))
+    elif doc_type == DocType.SPISANIE:
+        # Списание ТМЦ: Дт 91.2 «Прочие расходы» / Кт 41.
+        entry("91.2", "41", await _outgoing_stock_cost(session, document.id))
+    elif doc_type == DocType.OPRIHODOVANIE:
+        # Оприходование излишков: Дт 41 / Кт 91.1 «Прочие доходы».
+        entry("41", "91.1", document.total)
+    elif doc_type == DocType.INVENTARIZACIYA:
+        # Инвентаризация: излишек → доход, недостача → недостачи.
+        entry("41", "91.1", await _incoming_stock_cost(session, document.id))
+        entry("94", "41", await _outgoing_stock_cost(session, document.id))
+    elif doc_type == DocType.VVOD_OSTATKOV:
+        # Ввод начальных остатков ТМЦ: Дт 41 / Кт 00 «Вспомогательный счёт».
+        entry("41", "00", document.total)
+    elif doc_type == DocType.VVOD_OSTATKOV_DENEG:
+        # Ввод начальных остатков денег: Дт 50 / Кт 00.
+        entry("50", "00", document.total)
     elif doc_type == DocType.PRIHODNY_KASSOVY_ORDER:
         # Приход наличных: Дт 50 «Касса» / Кт 62 «Покупатели».
         entry("50", "62", document.total, kontragent_id=document.kontragent_id)
@@ -682,8 +804,11 @@ async def unpost_document(
         return await get_document(session, document.id)
 
     try:
-        if DocType(document.doc_type) in _STOCK_DOC_TYPES:
+        doc_type = DocType(document.doc_type)
+        if doc_type in _STOCK_DOC_TYPES:
             await _rollback_stock(session, document)
+        elif doc_type == DocType.PEREOCENKA:
+            await _rollback_revaluation(session, document)
 
         # Удаляем движения денег и взаиморасчётов.
         await _delete_movements(session, document.id)

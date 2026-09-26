@@ -22,7 +22,7 @@ class Chat(Base, IdMixin, TimestampMixin):
     __tablename__ = "chats"
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    channel: Mapped[str] = mapped_column(String(30), default="internal", nullable=False)  # internal | telegram | maks | site
+    channel: Mapped[str] = mapped_column(String(30), default="internal", server_default="internal", nullable=False)  # internal | telegram | maks | site
     # Внешний идентификатор чата в мессенджере (chat_id Telegram, user_id MAX) —
     # нужен для отправки ответа оператора обратно в мессенджер.
     external_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
@@ -44,7 +44,7 @@ class Message(Base, IdMixin):
     __tablename__ = "messages"
 
     chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id"), nullable=False, index=True)
-    direction: Mapped[str] = mapped_column(String(10), default="out", nullable=False)  # in | out
+    direction: Mapped[str] = mapped_column(String(10), default="out", server_default="out", nullable=False)  # in | out
     text: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

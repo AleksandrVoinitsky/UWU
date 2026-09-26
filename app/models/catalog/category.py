@@ -24,7 +24,7 @@ class Category(Base, IdMixin, TimestampMixin):
         ForeignKey("categories.id"), nullable=True
     )
     # Порядок отображения внутри родителя.
-    sort: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sort: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
 
     parent: Mapped["Category | None"] = relationship(remote_side="Category.id")
     children: Mapped[list["Category"]] = relationship(

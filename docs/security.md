@@ -35,4 +35,21 @@
 
 - Задать сильный `SECRET_KEY` и `ADMIN_PASSWORD` через переменные окружения.
 - Служба не отдаёт хеши паролей наружу (схема `UserOut` исключает `password_hash`).
-- Cookie `access_token` имеет флаги `httponly` и `samesite=lax`.
+- Cookie `access_token` имеет флаги `httponly`, `samesite=lax` и `secure`
+  (в `ENVIRONMENT=production`).
+
+## Защиты, реализованные в сервисе
+
+- **Rate limiting** (`app/core/ratelimit.py`) — лимит попыток входа (10 за 60 с
+  по ключу IP + логин) на `/api/auth/login` и веб-входе; превышение → 429.
+- **CSRF-защита** (`app/main.py`, middleware) — для state-changing запросов
+  проверяется same-origin (`Origin`/`Referer` против `Host`); cross-site → 403.
+- **Fail-fast секретов** (`app/core/security.py`) — при `ENVIRONMENT=production`
+  небезопасный `SECRET_KEY`/`ADMIN_PASSWORD`/включённый `MINIAPP_DEV` блокируют
+  запуск (`RuntimeError`).
+- **Проверка свежести initData** (`app/services/miniapp_service.py`) — подпись
+  MiniApp принимается только при `auth_date`/`vk_ts` в пределах 24 часов.
+- **Экранирование JSON в `<script>`** — пользовательские данные в шаблонах
+  сериализуются через `_json_safe` (защита от stored XSS).
+- **Проверка прав** — применяется и на REST API, и на веб-слое
+  (`_require_web_read` в `app/web/trade.py`).

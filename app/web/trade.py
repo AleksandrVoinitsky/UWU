@@ -7,9 +7,6 @@
 """
 from __future__ import annotations
 
-import csv
-import io
-import json
 import uuid
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
@@ -32,6 +29,7 @@ from app.models.users import User
 from app.services import cash_service, catalog_service, document_service, price_service, report_service, stock_service
 from app.services.stock_service import InsufficientStockError
 from app.templates import render
+from app.web.helpers import _csv_response, _json_safe, _sanitize_csv_cell
 
 # Права чтения по префиксам URL веб-интерфейса (для проверки доступа к страницам).
 _READ_PERMISSION_BY_PREFIX = (
@@ -84,6 +82,7 @@ DOC_LABELS = {
     "vvod_ostatkov_deneg": "Ввод остатков денег",
     "zakaz": "Заявка покупателя",
     "vozvrat": "Возврат товара",
+    "pereocenka": "Переоценка товаров",
 }
 
 ZAKAZ_STATES = {
@@ -94,7 +93,7 @@ ZAKAZ_STATES = {
 }
 
 # Виды документов, у которых есть табличная часть.
-_ITEM_DOCS = {"prihod", "rashod", "peremeshenie", "spisanie", "oprihodovanie", "vvod_ostatkov", "vozvrat"}
+_ITEM_DOCS = {"prihod", "rashod", "peremeshenie", "spisanie", "oprihodovanie", "vvod_ostatkov", "vozvrat", "pereocenka"}
 # Документы прихода (для подсказки в форме).
 _MONEY_DOCS = {"pko", "rko", "platezhnoe_poruchenie", "vvod_ostatkov_deneg"}
 
@@ -142,24 +141,6 @@ def _safe_report_range(start: str | None, end: str | None) -> tuple[str, str]:
         except ValueError:
             pass
     return _month_range()
-
-
-def _json_safe(obj) -> str:
-    """Сериализует объект в JSON, безопасный для встраивания в ``<script>``.
-
-    ``json.dumps`` не экранирует ``<``/``>``/``&``, поэтому строка вида
-    ``</script><script>…`` может разорвать script-контекст (stored XSS).
-    Экранирование этих символов в ``\\uXXXX`` нейтрализует атаку, сохраняя
-    валидный JSON. Используется вместе с ``| safe`` в шаблонах.
-    """
-    return (
-        json.dumps(obj, ensure_ascii=False)
-        .replace("<", "\\u003c")
-        .replace(">", "\\u003e")
-        .replace("&", "\\u0026")
-        .replace("\u2028", "\\u2028")
-        .replace("\u2029", "\\u2029")
-    )
 
 
 # --- Периоды дашборда ---
@@ -228,37 +209,6 @@ def _deny(user: User, perm: str) -> Response | None:
     if not user.has_permission(perm):
         return RedirectResponse("/", status_code=303)
     return None
-
-
-# Символы, с которых Excel/Google Sheets трактуют ячейку как формулу.
-# Экранируем их, чтобы пользовательские данные не превращались в формулы
-# (CSV/формульная инъекция). Минус не экранируем — отрицательные суммы легитимны.
-_CSV_FORMULA_PREFIXES = ("=", "+", "@", "\t", "\r")
-
-
-def _sanitize_csv_cell(value: object) -> str:
-    """Экранирует значение ячейки CSV от формульной инъекции."""
-    text = str(value)
-    stripped = text.lstrip()
-    if stripped.startswith(_CSV_FORMULA_PREFIXES):
-        return "'" + text
-    return text
-
-
-def _csv_response(rows: list[dict], filename: str) -> Response:
-    """Формирует CSV-ответ для экспорта отчёта (с UTF-8 BOM для Excel)."""
-    output = io.StringIO()
-    output.write("\ufeff")  # BOM: корректная кириллица при открытии в Excel.
-    if rows:
-        writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
-        writer.writeheader()
-        for r in rows:
-            writer.writerow({k: _sanitize_csv_cell(v) for k, v in r.items()})
-    return Response(
-        output.getvalue(),
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
 
 
 # --- Главная ---
