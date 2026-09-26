@@ -260,31 +260,35 @@
   var topItems = {{ top_items_json | safe }};
   var topClients = {{ top_clients_json | safe }};
 
-  var cs = getComputedStyle(document.documentElement);
-  function css(v) { return cs.getPropertyValue(v).trim(); }
-  var C = {
-    text: css('--text-secondary'),
-    tertiary: css('--text-tertiary'),
-    grid: css('--border'),
-    blue: css('--blue'),
-    green: css('--green'),
-    orange: css('--orange'),
-    indigo: css('--indigo'),
-    accent: css('--accent'),
-  };
+  var charts = [];
 
-  var tick = { color: C.tertiary, font: { family: '-apple-system, "SF Pro Text", sans-serif' } };
-  var legend = { labels: { color: C.text, boxWidth: 10, boxHeight: 10, usePointStyle: true } };
-  var tooltip = {
-    backgroundColor: css('--surface'),
-    titleColor: css('--text'),
-    bodyColor: css('--text'),
-    borderColor: css('--border'),
-    borderWidth: 1,
-    padding: 10,
-    cornerRadius: 10,
-    displayColors: true,
-  };
+  function readColors() {
+    var cs = getComputedStyle(document.documentElement);
+    function css(v) { return cs.getPropertyValue(v).trim(); }
+    return {
+      text: css('--text-secondary'),
+      textMain: css('--text'),
+      tertiary: css('--text-tertiary'),
+      grid: css('--border'),
+      surface: css('--surface'),
+      blue: css('--blue'),
+      green: css('--green'),
+      orange: css('--orange'),
+      indigo: css('--indigo'),
+    };
+  }
+  var C = readColors();
+
+  function opts() {
+    var tick = { color: C.tertiary, font: { family: '-apple-system, "SF Pro Text", sans-serif' } };
+    var legend = { labels: { color: C.text, boxWidth: 10, boxHeight: 10, usePointStyle: true } };
+    var tooltip = {
+      backgroundColor: C.surface, titleColor: C.textMain, bodyColor: C.textMain,
+      borderColor: C.grid, borderWidth: 1, padding: 10, cornerRadius: 10, displayColors: true,
+    };
+    return { tick: tick, legend: legend, tooltip: tooltip };
+  }
+  var o = opts();
 
   function line(id, labels, datasets) {
     return new Chart(document.getElementById(id), {
@@ -292,10 +296,10 @@
       data: { labels: labels, datasets: datasets },
       options: { responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
-        plugins: { legend: legend, tooltip: tooltip },
+        plugins: { legend: o.legend, tooltip: o.tooltip },
         scales: {
-          x: { ticks: { ...tick, maxTicksLimit: 12 }, grid: { display: false } },
-          y: { ticks: tick, grid: { color: C.grid }, border: { display: false } }
+          x: { ticks: { ...o.tick, maxTicksLimit: 12 }, grid: { display: false } },
+          y: { ticks: o.tick, grid: { color: C.grid }, border: { display: false } }
         } }
     });
   }
@@ -304,10 +308,10 @@
       type: 'bar',
       data: { labels: labels, datasets: datasets },
       options: { responsive: true, maintainAspectRatio: false,
-        plugins: { legend: legend, tooltip: tooltip },
+        plugins: { legend: o.legend, tooltip: o.tooltip },
         scales: {
-          x: { ticks: { ...tick, maxTicksLimit: 12 }, grid: { display: false } },
-          y: { ticks: tick, grid: { color: C.grid }, border: { display: false } }
+          x: { ticks: { ...o.tick, maxTicksLimit: 12 }, grid: { display: false } },
+          y: { ticks: o.tick, grid: { color: C.grid }, border: { display: false } }
         } }
     });
   }
@@ -316,30 +320,51 @@
       type: 'bar',
       data: { labels: labels, datasets: [{ data: data, backgroundColor: color, borderRadius: 6, maxBarThickness: 22 }] },
       options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: tooltip },
+        plugins: { legend: { display: false }, tooltip: o.tooltip },
         scales: {
-          x: { ticks: tick, grid: { color: C.grid }, border: { display: false } },
-          y: { ticks: { ...tick, autoSkip: false }, grid: { display: false } }
+          x: { ticks: o.tick, grid: { color: C.grid }, border: { display: false } },
+          y: { ticks: { ...o.tick, autoSkip: false }, grid: { display: false } }
         } }
     });
   }
 
-  line('daily-chart', labels, [
+  charts.push(line('daily-chart', labels, [
     { label: {{ t('dashboard.revenue', lang) | tojson }}, data: revenue, borderColor: C.blue, backgroundColor: 'rgba(10,132,255,0.10)', tension: 0.35, fill: true, pointRadius: 0, borderWidth: 2.5 },
     { label: {{ t('dashboard.profit', lang) | tojson }}, data: profit, borderColor: C.green, backgroundColor: 'rgba(48,209,88,0.08)', tension: 0.35, fill: true, pointRadius: 0, borderWidth: 2.5 }
-  ]);
+  ]));
 
-  bar('orders-chart', labels, [
+  charts.push(bar('orders-chart', labels, [
     { label: {{ t('dashboard.sales_count', lang) | tojson }}, data: orders, backgroundColor: C.indigo, borderRadius: 5, maxBarThickness: 34 }
-  ]);
+  ]));
 
-  bar('money-chart', moneyLabels, [
+  charts.push(bar('money-chart', moneyLabels, [
     { label: {{ t('dashboard.income', lang) | tojson }}, data: income, backgroundColor: C.green, borderRadius: 5, maxBarThickness: 20 },
     { label: {{ t('dashboard.expense', lang) | tojson }}, data: expense, backgroundColor: C.orange, borderRadius: 5, maxBarThickness: 20 }
-  ]);
+  ]));
 
-  if (topItems.length) hbar('items-chart', topItems.map(function (r) { return r.name; }), topItems.map(function (r) { return r.amount; }), C.blue);
-  if (topClients.length) hbar('clients-chart', topClients.map(function (r) { return r.name; }), topClients.map(function (r) { return r.amount; }), C.green);
+  if (topItems.length) charts.push(hbar('items-chart', topItems.map(function (r) { return r.name; }), topItems.map(function (r) { return r.amount; }), C.blue));
+  if (topClients.length) charts.push(hbar('clients-chart', topClients.map(function (r) { return r.name; }), topClients.map(function (r) { return r.amount; }), C.green));
+
+  // Перекраска графиков при смене темы (без перезагрузки страницы).
+  document.documentElement.addEventListener('themechange', function () {
+    C = readColors();
+    o = opts();
+    charts.forEach(function (ch) {
+      ['x', 'y'].forEach(function (ax) {
+        var s = ch.options.scales && ch.options.scales[ax];
+        if (s && s.ticks) s.ticks.color = C.tertiary;
+        if (s && s.grid) s.grid.color = C.grid;
+      });
+      if (ch.options.plugins.legend && ch.options.plugins.legend.labels) ch.options.plugins.legend.labels.color = C.text;
+      if (ch.options.plugins.tooltip) {
+        ch.options.plugins.tooltip.backgroundColor = C.surface;
+        ch.options.plugins.tooltip.titleColor = C.textMain;
+        ch.options.plugins.tooltip.bodyColor = C.textMain;
+        ch.options.plugins.tooltip.borderColor = C.grid;
+      }
+      ch.update('none');
+    });
+  });
 })();
 </script>
 {% endblock %}

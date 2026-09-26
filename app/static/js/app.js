@@ -48,6 +48,9 @@
   function applyTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
     try { localStorage.setItem("uwu-theme", theme); } catch (e) {}
+    document.documentElement.dispatchEvent(
+      new CustomEvent("themechange", { detail: { theme: theme } })
+    );
   }
 
   if (themeToggle) {
