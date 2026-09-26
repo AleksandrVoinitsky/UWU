@@ -23,7 +23,13 @@
 
   <div class="login-wrap">
     <div class="login-card">
-      <div class="logo"><span class="brand-mark">U</span>{{ app_name }}</div>
+      <div class="logo">
+        <span class="brand-mark">U</span>
+        <div>
+          <div class="brand-name">{{ app_name }}</div>
+          <div class="brand-sub">AI CRM</div>
+        </div>
+      </div>
       <p class="subtitle">{{ t('auth.login', lang) }}</p>
       {% if error %}<div class="error">{{ error }}</div>{% endif %}
       <form method="post" action="/login">
