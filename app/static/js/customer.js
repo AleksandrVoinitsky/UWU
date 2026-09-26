@@ -132,6 +132,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var opened = false;
   var pollTimer = null;
   var lastId = 0;
+  var loadedOnce = false;
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -149,10 +150,20 @@ document.addEventListener('DOMContentLoaded', function () {
     opened = open !== undefined ? open : !opened;
     popup.classList.toggle('open', opened);
     backdrop.classList.toggle('open', opened);
-    if (opened) { load(); startPolling(); } else { stopPolling(); }
+    if (opened) {
+      // Полная перерисовка только при первом открытии; дальше — дописывание,
+      // чтобы сообщения не «мигали» анимацией появления при каждом открытии.
+      if (loadedOnce) { refresh(); } else { load(); loadedOnce = true; }
+      startPolling();
+    } else {
+      stopPolling();
+    }
   }
 
   function appendMsg(m) {
+    // Убираем заглушку «Напишите нам…», если появилось первое сообщение.
+    var empty = messagesEl.querySelector('.shop-chat-empty');
+    if (empty) empty.remove();
     var el = document.createElement('div');
     // Для покупателя его сообщения — справа, ответы продавца — слева.
     el.className = 'msg ' + (m.direction === 'in' ? 'outgoing' : 'incoming');
