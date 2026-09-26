@@ -10,7 +10,7 @@
   {% else %}<span class="delta neutral">—</span>{% endif %}
 {%- endmacro %}
 
-{% macro kpi(label, value, suffix, delta_val, icon_name, accent='') -%}
+{% macro kpi(label, value, suffix, delta_val, icon_name, accent='', spark=None) -%}
   <div class="kpi-card {{ accent }}">
     <div class="kpi-top">
       <span class="kpi-label">{{ label }}</span>
@@ -20,6 +20,7 @@
       <span data-counter="{{ '%.2f'|format(value) }}" data-counter-decimals="2">{{ "%.2f"|format(value) }}</span>
       {% if suffix %}<span class="kpi-suffix">{{ suffix }}</span>{% endif %}
     </div>
+    {% if spark %}<div class="sparkline" data-values="{{ spark }}" data-color="var(--accent)"></div>{% endif %}
     <div class="kpi-foot">{{ delta(delta_val) }}</div>
   </div>
 {%- endmacro %}
@@ -57,6 +58,7 @@
     <span class="delta neutral">{{ icon('receipt', 12) }} {{ cur.orders_count }} {{ t('dashboard.sales_count', lang) }}</span>
     <span class="delta neutral">{{ icon('bar-chart', 12) }} {{ t('dashboard.avg_check', lang) }} {{ "%.0f"|format(cur.avg_check) }} ₽</span>
   </div>
+  <div class="sparkline hero-spark" data-values="{{ chart_revenue_json }}" data-color="var(--accent)"></div>
 
   <div class="card dash-period" style="margin:18px 0 0;border:none;box-shadow:none;padding:0;background:transparent">
     <div class="flex-between flex-wrap" style="gap:12px">
@@ -73,12 +75,8 @@
       </form>
     </div>
   </div>
-</div>
 
-<!-- Быстрые действия -->
-<div class="card">
-  <div class="card-header"><h2>{{ t('dashboard.quick_actions', lang) }}</h2></div>
-  <div class="quick-actions">
+  <div class="quick-actions" style="margin-top:18px">
     <a class="qa qa-primary" href="/documents/new?doc_type=rashod">
       <span class="qa-icon">{{ icon('arrow-up-right') }}</span><span>{{ t('doc.rashod', lang) }}</span>
     </a>
@@ -102,8 +100,8 @@
 <!-- Торговля за период -->
 {{ section(t('dashboard.period_trade', lang)) }}
 <div class="kpi-grid">
-  {{ kpi(t('dashboard.revenue', lang), cur.revenue, '₽', deltas.revenue, 'trending-up', 'accent-blue') }}
-  {{ kpi(t('dashboard.profit', lang), cur.profit, '₽', deltas.profit, 'sparkles', 'accent-green') }}
+  {{ kpi(t('dashboard.revenue', lang), cur.revenue, '₽', deltas.revenue, 'trending-up', 'accent-blue', chart_revenue_json) }}
+  {{ kpi(t('dashboard.profit', lang), cur.profit, '₽', deltas.profit, 'sparkles', 'accent-green', chart_profit_json) }}
   {{ kpi(t('dashboard.avg_check', lang), cur.avg_check, '₽', deltas.avg_check, 'receipt', '') }}
   {{ kpi_int(t('dashboard.sales_count', lang), cur.orders_count, '', deltas.orders_count, 'cart', '') }}
   {{ kpi(t('dashboard.purchases', lang), cur.purchases, '₽', deltas.purchases, 'truck', 'accent-orange') }}

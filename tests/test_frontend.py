@@ -153,3 +153,15 @@ async def test_css_has_dark_mode_tokens(client):
     assert 'data-theme="dark"' in resp.text
     assert "prefers-reduced-motion" in resp.text
     assert "backdrop-filter" in resp.text
+    # Дизайн-система «Aurora»: тёмный фон по умолчанию + анимированная аврора.
+    assert ".aurora" in resp.text
+    assert "--accent-grad" in resp.text
+
+
+async def test_dashboard_has_sparkline_and_aurora(client, seeded_session):
+    await _operator(client, seeded_session, "sparkop")
+    resp = await client.get("/")
+    assert resp.status_code == 200
+    assert "sparkline" in resp.text
+    assert 'class="aurora"' in resp.text
+    assert "AI CRM" in resp.text

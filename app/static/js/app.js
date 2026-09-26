@@ -32,17 +32,56 @@
   }
 
   window.animateCounters = animateCounters;
+
+  /* ---------- Спарклайны (data-values) ---------- */
+  function renderSparklines(root) {
+    var els = (root || document).querySelectorAll(".sparkline[data-values]");
+    els.forEach(function (el) {
+      var values;
+      try { values = JSON.parse(el.getAttribute("data-values")); } catch (e) { return; }
+      if (!Array.isArray(values) || values.length < 2) return;
+      var w = 140, h = 36, pad = 2;
+      var min = Math.min.apply(null, values), max = Math.max.apply(null, values);
+      var range = (max - min) || 1;
+      function px(i) { return pad + (i / (values.length - 1)) * (w - pad * 2); }
+      function py(v) { return h - pad - ((v - min) / range) * (h - pad * 2); }
+      var pts = values.map(function (v, i) { return px(i).toFixed(1) + "," + py(v).toFixed(1); }).join(" ");
+      var color = el.getAttribute("data-color") || "var(--accent)";
+      var NS = "http://www.w3.org/2000/svg";
+      var svg = document.createElementNS(NS, "svg");
+      svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.classList.add("sparkline-svg");
+      var area = document.createElementNS(NS, "polygon");
+      area.setAttribute("points", (pad + "," + (h - pad)) + " " + pts + " " + ((w - pad) + "," + (h - pad)));
+      area.setAttribute("fill", color);
+      area.setAttribute("opacity", "0.16");
+      var line = document.createElementNS(NS, "polyline");
+      line.setAttribute("points", pts);
+      line.setAttribute("fill", "none");
+      line.setAttribute("stroke", color);
+      line.setAttribute("stroke-width", "2");
+      line.setAttribute("stroke-linecap", "round");
+      line.setAttribute("stroke-linejoin", "round");
+      svg.appendChild(area);
+      svg.appendChild(line);
+      el.appendChild(svg);
+    });
+  }
+  window.renderSparklines = renderSparklines;
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () { animateCounters(); });
+    document.addEventListener("DOMContentLoaded", function () { animateCounters(); renderSparklines(); });
   } else {
     animateCounters();
+    renderSparklines();
   }
 
   /* ---------- Переключение темы (light / dark) ---------- */
   var themeToggle = document.getElementById("theme-toggle");
 
   function currentTheme() {
-    return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    // Без явного атрибута тема — тёмная (по умолчанию).
+    return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
   }
 
   function applyTheme(theme) {

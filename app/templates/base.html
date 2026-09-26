@@ -16,10 +16,17 @@
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
+  <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
   <div class="app">
     {% if user %}
     <aside class="sidebar" id="sidebar">
-      <div class="brand"><span class="brand-mark">U</span> UWU</div>
+      <div class="brand">
+        <span class="brand-mark">U</span>
+        <div>
+          <div class="brand-name">UWU</div>
+          <div class="brand-sub">AI CRM</div>
+        </div>
+      </div>
 
       {% if section == 'admin' %}
         <div class="nav-group">{{ t('menu.settings', lang) }}</div>
