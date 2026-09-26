@@ -131,6 +131,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var opened = false;
   var pollTimer = null;
+  var lastId = 0;
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -151,20 +152,24 @@ document.addEventListener('DOMContentLoaded', function () {
     if (opened) { load(); startPolling(); } else { stopPolling(); }
   }
 
+  function appendMsg(m) {
+    var el = document.createElement('div');
+    // Для покупателя его сообщения — справа, ответы продавца — слева.
+    el.className = 'msg ' + (m.direction === 'in' ? 'outgoing' : 'incoming');
+    el.innerHTML = '<span></span><span class="time">' + fmtTime(m.created_at) + '</span>';
+    el.querySelector('span').textContent = m.text;
+    messagesEl.appendChild(el);
+    if (m.id > lastId) lastId = m.id;
+  }
+
   function render(messages) {
     messagesEl.innerHTML = '';
+    lastId = 0;
     if (!messages || !messages.length) {
       messagesEl.innerHTML = '<div class="shop-chat-empty">Напишите нам — мы на связи</div>';
       return;
     }
-    messages.forEach(function (m) {
-      var el = document.createElement('div');
-      // Для покупателя его сообщения — справа, ответы продавца — слева.
-      el.className = 'msg ' + (m.direction === 'in' ? 'outgoing' : 'incoming');
-      el.innerHTML = '<span></span><span class="time">' + fmtTime(m.created_at) + '</span>';
-      el.querySelector('span').textContent = m.text;
-      messagesEl.appendChild(el);
-    });
+    messages.forEach(appendMsg);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
@@ -172,6 +177,19 @@ document.addEventListener('DOMContentLoaded', function () {
     fetch('/shop/api/chat')
       .then(function (r) { if (!r.ok) throw new Error('load failed'); return r.json(); })
       .then(function (data) { render(data.messages); })
+      .catch(function () {});
+  }
+
+  function refresh() {
+    fetch('/shop/api/chat')
+      .then(function (r) { if (!r.ok) throw new Error('load failed'); return r.json(); })
+      .then(function (data) {
+        var hadNew = false;
+        (data.messages || []).forEach(function (m) {
+          if (m.id > lastId) { appendMsg(m); hadNew = true; }
+        });
+        if (hadNew) messagesEl.scrollTop = messagesEl.scrollHeight;
+      })
       .catch(function () {});
   }
 
@@ -185,13 +203,13 @@ document.addEventListener('DOMContentLoaded', function () {
       body: JSON.stringify({ text: text })
     })
       .then(function (r) { if (!r.ok) throw new Error('send failed'); return r.json(); })
-      .then(function () { load(); })
+      .then(function () { refresh(); })
       .catch(function () { input.value = text; });
   }
 
   function startPolling() {
     stopPolling();
-    pollTimer = setInterval(load, 4000);
+    pollTimer = setInterval(refresh, 4000);
   }
   function stopPolling() {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }

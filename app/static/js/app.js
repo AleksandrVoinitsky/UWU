@@ -156,6 +156,8 @@
 
   var allChats = [];
   var currentChatId = null;
+  var lastMessageId = 0;
+  var pollTimer = null;
 
   function toggleChat(open) {
     if (!popup) return;
@@ -164,9 +166,11 @@
       popup.classList.add("open");
       if (chatBackdrop) chatBackdrop.classList.add("open");
       loadChats();
+      startPolling();
     } else {
       popup.classList.remove("open");
       if (chatBackdrop) chatBackdrop.classList.remove("open");
+      stopPolling();
     }
   }
 
@@ -228,21 +232,52 @@
       .catch(function () {});
   }
 
+  function appendMessage(m) {
+    if (!chatMessages) return;
+    var el = document.createElement("div");
+    el.className = "msg " + (m.direction === "in" ? "incoming" : "outgoing");
+    el.innerHTML = '<span></span><span class="time">' + fmtTime(m.created_at) + "</span>";
+    el.querySelector("span").textContent = m.text;
+    chatMessages.appendChild(el);
+    if (m.id > lastMessageId) lastMessageId = m.id;
+  }
+
   function renderMessages(msgs) {
     if (!chatMessages) return;
     chatMessages.innerHTML = "";
+    lastMessageId = 0;
     if (!msgs.length) {
       chatMessages.innerHTML = '<div class="messenger-empty">Нет сообщений</div>';
       return;
     }
-    msgs.forEach(function (m) {
-      var el = document.createElement("div");
-      el.className = "msg " + (m.direction === "in" ? "incoming" : "outgoing");
-      el.innerHTML = '<span></span><span class="time">' + fmtTime(m.created_at) + "</span>";
-      el.querySelector("span").textContent = m.text;
-      chatMessages.appendChild(el);
-    });
+    msgs.forEach(appendMessage);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function refreshMessages() {
+    if (!currentChatId) return;
+    fetch("/api/chats/" + currentChatId + "/messages")
+      .then(function (r) { return r.json(); })
+      .then(function (msgs) {
+        var hadNew = false;
+        (msgs || []).forEach(function (m) {
+          if (m.id > lastMessageId) { appendMessage(m); hadNew = true; }
+        });
+        if (hadNew) chatMessages.scrollTop = chatMessages.scrollHeight;
+      })
+      .catch(function () {});
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(function () {
+      loadChats();
+      refreshMessages();
+    }, 3000);
+  }
+
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   }
 
   function send() {
@@ -255,14 +290,7 @@
       body: JSON.stringify({ text: text }),
     })
       .then(function (r) { return r.json(); })
-      .then(function (m) {
-        var el = document.createElement("div");
-        el.className = "msg outgoing";
-        el.innerHTML = '<span></span><span class="time">' + fmtTime(m.created_at) + "</span>";
-        el.querySelector("span").textContent = m.text;
-        chatMessages.appendChild(el);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      })
+      .then(function () { refreshMessages(); })
       .catch(function () {});
   }
 

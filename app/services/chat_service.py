@@ -41,6 +41,7 @@ async def list_customer_messages(session: AsyncSession, customer: Customer) -> l
     )
     return [
         {
+            "id": m.id,
             "direction": m.direction,
             "text": m.text,
             "created_at": m.created_at.isoformat(),
@@ -72,6 +73,7 @@ async def send_customer_message(
     await session.commit()
     await session.refresh(message)
     return {
+        "id": message.id,
         "direction": message.direction,
         "text": message.text,
         "created_at": message.created_at.isoformat(),
