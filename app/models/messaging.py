@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -46,6 +46,9 @@ class Message(Base, IdMixin):
     chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id"), nullable=False, index=True)
     direction: Mapped[str] = mapped_column(String(10), default="out", server_default="out", nullable=False)  # in | out
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    # Прочитано ли получателем. Получатель определяется направлением:
+    # "in" (от покупателя) читает оператор; "out" (от оператора) читает покупатель.
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

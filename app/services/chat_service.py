@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.customer import Customer
@@ -38,10 +38,24 @@ async def _get_customer_chat(session: AsyncSession, customer: Customer) -> Chat 
 
 
 async def list_customer_messages(session: AsyncSession, customer: Customer) -> list[dict]:
-    """Сообщения чата покупателя в хронологическом порядке (пусто, если чата нет)."""
+    """Сообщения чата покупателя в хронологическом порядке (пусто, если чата нет).
+
+    Ответы оператора (``direction="out"``) помечаются прочитанными покупателем —
+    просмотр чата считается прочтением.
+    """
     chat = await _get_customer_chat(session, customer)
     if chat is None:
         return []
+    await session.execute(
+        update(Message)
+        .where(
+            Message.chat_id == chat.id,
+            Message.direction == "out",
+            Message.is_read.is_(False),
+        )
+        .values(is_read=True)
+    )
+    await session.commit()
     result = await session.execute(
         select(Message).where(Message.chat_id == chat.id).order_by(Message.id)
     )
@@ -54,6 +68,23 @@ async def list_customer_messages(session: AsyncSession, customer: Customer) -> l
         }
         for m in result.scalars()
     ]
+
+
+async def count_customer_unread(session: AsyncSession, customer: Customer) -> int:
+    """Непрочитанные ответы оператора для покупателя."""
+    chat = await _get_customer_chat(session, customer)
+    if chat is None:
+        return 0
+    result = await session.execute(
+        select(func.count())
+        .select_from(Message)
+        .where(
+            Message.chat_id == chat.id,
+            Message.direction == "out",
+            Message.is_read.is_(False),
+        )
+    )
+    return result.scalar() or 0
 
 
 async def send_customer_message(

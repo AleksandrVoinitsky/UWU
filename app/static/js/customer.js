@@ -155,6 +155,7 @@ document.addEventListener('DOMContentLoaded', function () {
       // чтобы сообщения не «мигали» анимацией появления при каждом открытии.
       if (loadedOnce) { refresh(); } else { load(); loadedOnce = true; }
       startPolling();
+      setTimeout(pollUnread, 500);
     } else {
       stopPolling();
     }
@@ -231,4 +232,47 @@ document.addEventListener('DOMContentLoaded', function () {
   if (backdrop) backdrop.addEventListener('click', function () { toggle(false); });
   if (sendBtn) sendBtn.addEventListener('click', send);
   if (input) input.addEventListener('keydown', function (e) { if (e.key === 'Enter') send(); });
+
+  /* ---------- Непрочитанные ответы продавца: бейдж, пульс, тост ---------- */
+  var badge = document.getElementById('shop-chat-badge');
+  var toast = document.getElementById('shop-chat-toast');
+  var lastUnread = 0;
+  var toastTimer = null;
+
+  function updateBadge(unread) {
+    if (badge) {
+      badge.textContent = unread > 99 ? '99+' : String(unread);
+      badge.hidden = unread <= 0;
+    }
+    fab.classList.toggle('unread', unread > 0);
+  }
+
+  function showToast() {
+    if (!toast) return;
+    toast.innerHTML = '<div class="t-title">Новое сообщение от продавца</div>';
+    toast.hidden = false;
+    requestAnimationFrame(function () { toast.classList.add('show'); });
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      toast.classList.remove('show');
+      setTimeout(function () { toast.hidden = true; }, 300);
+    }, 4000);
+  }
+
+  function pollUnread() {
+    fetch('/shop/api/chat/unread')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) return;
+        var unread = data.unread || 0;
+        updateBadge(unread);
+        if (unread > lastUnread && !opened) showToast();
+        lastUnread = unread;
+      })
+      .catch(function () {});
+  }
+
+  pollUnread();
+  setInterval(pollUnread, 8000);
+  if (toast) toast.addEventListener('click', function () { toggle(true); });
 })();

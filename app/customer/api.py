@@ -187,6 +187,15 @@ async def order_detail(
 # --- Чат с продавцом ---
 
 
+@router.get("/chat/unread")
+async def chat_unread(
+    session: AsyncSession = Depends(get_session),
+    customer: Customer = Depends(get_current_customer),
+):
+    """Непрочитанные ответы оператора для покупателя."""
+    return {"unread": await chat_service.count_customer_unread(session, customer)}
+
+
 @router.get("/chat")
 async def chat_messages(
     session: AsyncSession = Depends(get_session),

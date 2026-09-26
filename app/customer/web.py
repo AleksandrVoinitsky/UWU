@@ -23,7 +23,7 @@ from app.customer.deps import (
     get_current_customer_optional,
 )
 from app.models.customer import Customer
-from app.services import customer_service
+from app.services import customer_service, site_service
 from app.services.customer_service import CustomerError
 from app.templates import render
 
@@ -67,9 +67,11 @@ async def catalog_page(
     customer = await get_current_customer_optional(request, session)
     categories = await customer_service.list_categories(session)
     products = await customer_service.available_products(session)
+    site_settings = await site_service.get_settings(session)
     return _page(
         request, "catalog",
         customer=customer, categories=categories, products=products,
+        site_settings=site_settings,
     )
 
 
@@ -83,10 +85,12 @@ async def catalog_filtered(
     customer = await get_current_customer_optional(request, session)
     categories = await customer_service.list_categories(session)
     products = await customer_service.available_products(session, category_id, search)
+    site_settings = await site_service.get_settings(session)
     return _page(
         request, "catalog",
         customer=customer, categories=categories, products=products,
         category_id=category_id, search=search or "",
+        site_settings=site_settings,
     )
 
 

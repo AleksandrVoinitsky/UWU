@@ -43,6 +43,8 @@ class Nomenklatura(Base, IdMixin, TimestampMixin):
     image_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Категория для каталога покупателя.
     category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"), nullable=True)
+    # Опубликован ли товар на клиентском сайте/MiniApp (видим покупателю).
+    is_published: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
 
     # Цены: закупочная (база для наценки) и свободная розничная (без видов цен).
     purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)

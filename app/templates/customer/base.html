@@ -18,7 +18,11 @@
 <body>
   <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
   <header class="shop-header">
+    {% if site_settings is defined and site_settings.logo_path %}
+    <a class="shop-brand" href="{{ prefix }}/"><img src="/uploads/{{ site_settings.logo_path }}" alt="UWU Shop" class="shop-logo"></a>
+    {% else %}
     <a class="shop-brand" href="{{ prefix }}/">UWU Shop</a>
+    {% endif %}
     <nav class="shop-nav">
       <a href="{{ prefix }}/">Каталог</a>
       {% if customer %}
@@ -42,7 +46,9 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
     </svg>
+    <span id="shop-chat-badge" class="chat-count" hidden>0</span>
   </button>
+  <div id="shop-chat-toast" class="chat-toast" role="status" aria-live="polite" hidden></div>
   <div id="shop-chat-backdrop" class="shop-chat-backdrop"></div>
   <div id="shop-chat-popup" class="shop-chat-popup" role="dialog" aria-label="Чат с продавцом">
     <div class="shop-chat-header">

@@ -14,6 +14,15 @@
   </aside>
 
   <div class="shop-content">
+    {% if site_settings.banner_enabled and (site_settings.banner_image_path or site_settings.banner_text) %}
+    <div class="shop-banner">
+      {% if site_settings.banner_link %}<a href="{{ site_settings.banner_link }}" target="_blank" rel="noopener">{% endif %}
+      {% if site_settings.banner_image_path %}<img src="/uploads/{{ site_settings.banner_image_path }}" alt="">{% endif %}
+      {% if site_settings.banner_text %}<span class="banner-text">{{ site_settings.banner_text }}</span>{% endif %}
+      {% if site_settings.banner_link %}</a>{% endif %}
+    </div>
+    {% endif %}
+
     <form class="shop-search" method="get" action="{{ prefix }}/catalog">
       <input type="text" name="search" value="{{ search or '' }}" placeholder="Поиск товара…">
       {% if category_id %}<input type="hidden" name="category_id" value="{{ category_id }}">{% endif %}
@@ -21,17 +30,24 @@
     </form>
 
     {% if products %}
-    <div class="product-grid">
+    <div class="product-grid style-{{ site_settings.card_style }}">
       {% for p in products %}
       <div class="product-card" data-nomenklatura-id="{{ p.id }}" onclick="addToCart(this, {{ p.id }})" role="button" tabindex="0" title="Добавить в корзину">
         <div class="product-img">
           {% if p.image_path %}<img src="/uploads/{{ p.image_path }}" alt="{{ p.name }}">{% else %}<div class="product-img-empty">⌕</div>{% endif %}
+          {% if p.promo_name %}<span class="product-badge">Акция</span>{% endif %}
         </div>
         <div class="product-body">
           <div class="product-name">{{ p.name }}</div>
-          {% if p.full_name %}<div class="product-desc">{{ p.full_name }}</div>{% endif %}
+          {% if site_settings.show_description and p.full_name %}<div class="product-desc">{{ p.full_name }}</div>{% endif %}
           <div class="product-foot">
-            <span class="product-price">{{ "%.2f"|format(p.price) }} ₽</span>
+            {% if site_settings.show_prices %}
+              {% if p.price_old %}
+              <span class="product-price"><s class="price-old">{{ "%.2f"|format(p.price_old) }} ₽</s> <span class="price-now">{{ "%.2f"|format(p.price) }} ₽</span></span>
+              {% else %}
+              <span class="product-price">{{ "%.2f"|format(p.price) }} ₽</span>
+              {% endif %}
+            {% endif %}
             <span class="product-add">+</span>
           </div>
         </div>

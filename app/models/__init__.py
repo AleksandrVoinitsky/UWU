@@ -47,6 +47,7 @@ from app.models.users import PERMISSIONS, Role, User  # noqa: F401
 from app.models.messaging import Chat, Message  # noqa: F401
 from app.models.bot import BotConfig  # noqa: F401
 from app.models.customer import Cart, CartItem, Customer, CustomerBinding  # noqa: F401
+from app.models.site import DEFAULT_SITE_SETTINGS, DISCOUNT_TYPES, Promotion, SiteSetting  # noqa: F401
 from app.models.agent import (  # noqa: F401
     AGENT_PERMISSIONS,
     APPROVAL_POLICIES,

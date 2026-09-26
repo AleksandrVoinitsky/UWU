@@ -391,6 +391,34 @@ initData (для тестов и локальной проверки).
 
 См. [ai-agent](ai-agent.md).
 
+## app/models/site.py — управление сайтом/MiniApp
+
+| Модель | Таблица | Назначение |
+| --- | --- | --- |
+| `SiteSetting` | `site_settings` | настройки видимости (логотип, баннер, оформление карточек) |
+| `Promotion` | `promotions` | акция: скидка (`percent`/`fixed`) на товар/категорию/всё |
+
+Константы: `DEFAULT_SITE_SETTINGS`, `DISCOUNT_TYPES`. Также добавлено поле
+`Nomenklatura.is_published` (публикация товара на сайте) и `Message.is_read`
+(непрочитанные сообщения чата).
+
+## app/services/site_service.py
+
+| Функция | Назначение |
+| --- | --- |
+| `get_settings` / `set_settings` | настройки сайта (с дефолтами) |
+| `list_promotions` / `get_promotion` / `create_promotion` / `update_promotion` / `delete_promotion` | CRUD акций |
+| `find_promotion(promos, nomenklatura_id, category_id, on)` | чистая функция выбора активной акции (товар → категория → глобальная) |
+| `promotion_for(...)` | обёртка `find_promotion` с загрузкой из БД |
+| `apply_discount(base_price, promo)` | цена после скидки (не ниже нуля) |
+
+## app/web/site_admin.py — админка сайта/MiniApp
+
+Маршруты (только администратор): `/admin/site` (обзор), `/admin/site/settings`,
+`/admin/site/logo`, `/admin/site/banner` (загрузка изображений),
+`/admin/site/promotions` (+ `/{id}/toggle`, `/{id}/delete`),
+`/admin/site/products/{id}/toggle` (публикация товара).
+
 ## app/static/js/app.js — фронтенд-диалоги
 
 ### `confirmDialog(message, opts) -> Promise<boolean>`

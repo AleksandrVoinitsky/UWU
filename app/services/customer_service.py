@@ -24,7 +24,7 @@ from app.models.customer import Cart, CartItem, Customer
 from app.models.document.base_document import Document
 from app.models.enums import DocType
 from app.models.registry import StockBatch
-from app.services import document_service, stock_service
+from app.services import document_service, site_service, stock_service
 
 logger = get_logger("app.customer")
 
@@ -137,7 +137,7 @@ async def available_products(
     category_id: int | None = None,
     search: str | None = None,
 ) -> list[dict]:
-    """Товары, доступные к заказу (есть остаток на складах)."""
+    """Опубликованные товары в наличии, с учётом активных акций (скидок)."""
     stock_map: dict[int, Decimal] = {
         nid: qty
         for nid, qty in (
@@ -149,7 +149,14 @@ async def available_products(
         ).all()
     }
 
-    stmt = select(Nomenklatura).order_by(Nomenklatura.name)
+    # Акции загружаем один раз (чистая функция find_promotion — без N+1).
+    promos = await site_service.list_promotions(session)
+
+    stmt = (
+        select(Nomenklatura)
+        .where(Nomenklatura.is_published.is_(True))
+        .order_by(Nomenklatura.name)
+    )
     if category_id is not None:
         stmt = stmt.where(Nomenklatura.category_id == category_id)
     if search:
@@ -161,6 +168,17 @@ async def available_products(
         stock = stock_map.get(p.id, Decimal("0"))
         if stock <= 0:
             continue
+        base_price = p.retail_price or Decimal("0")
+        promo = site_service.find_promotion(promos, p.id, p.category_id)
+        price = base_price
+        price_old = None
+        promo_name = None
+        if promo is not None:
+            discounted = site_service.apply_discount(base_price, promo)
+            if discounted < base_price:
+                price = discounted
+                price_old = base_price
+                promo_name = promo.name
         products.append(
             {
                 "id": p.id,
@@ -169,7 +187,9 @@ async def available_products(
                 "artikul": p.artikul,
                 "image_path": p.image_path,
                 "category_id": p.category_id,
-                "price": p.retail_price or Decimal("0"),
+                "price": price,
+                "price_old": price_old,
+                "promo_name": promo_name,
                 "stock": stock,
             }
         )

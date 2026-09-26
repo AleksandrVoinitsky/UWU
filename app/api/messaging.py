@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
@@ -54,6 +54,34 @@ async def list_chats(
     ]
 
 
+@router.get("/unread")
+async def unread_count(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(_current_user),
+):
+    """Непрочитанные входящие сообщения (от покупателей/ботов) + последнее."""
+    count = (
+        await session.execute(
+            select(func.count())
+            .select_from(Message)
+            .where(Message.direction == "in", Message.is_read.is_(False))
+        )
+    ).scalar() or 0
+    last_row = (
+        await session.execute(
+            select(Message, Chat.name)
+            .join(Chat, Chat.id == Message.chat_id)
+            .where(Message.direction == "in", Message.is_read.is_(False))
+            .order_by(Message.id.desc())
+            .limit(1)
+        )
+    ).first()
+    last = None
+    if last_row is not None:
+        last = {"name": last_row[1], "text": last_row[0].text}
+    return {"unread": count, "last": last}
+
+
 @router.get("/{chat_id}/messages")
 async def get_messages(
     chat_id: int,
@@ -63,6 +91,17 @@ async def get_messages(
     chat = await session.get(Chat, chat_id)
     if chat is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
+    # Просмотр чата оператором помечает входящие сообщения прочитанными.
+    await session.execute(
+        update(Message)
+        .where(
+            Message.chat_id == chat_id,
+            Message.direction == "in",
+            Message.is_read.is_(False),
+        )
+        .values(is_read=True)
+    )
+    await session.commit()
     result = await session.execute(
         select(Message).where(Message.chat_id == chat_id).order_by(Message.id)
     )

@@ -324,7 +324,7 @@
     renderChatList();
     fetch("/api/chats/" + c.id + "/messages")
       .then(function (r) { return r.json(); })
-      .then(function (msgs) { renderMessages(msgs || []); })
+      .then(function (msgs) { renderMessages(msgs || []); pollUnread(); })
       .catch(function () {});
   }
 
@@ -398,6 +398,57 @@
     chatInput.addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
   }
   if (chatSearch) chatSearch.addEventListener("input", renderChatList);
+
+  /* ---------- Непрочитанные сообщения: бейдж, пульс и тост ---------- */
+  var chatBadge = document.getElementById("chat-badge");
+  var chatToast = document.getElementById("chat-toast");
+  var lastUnreadCount = 0;
+  var toastTimer = null;
+
+  function showChatToast(data) {
+    if (!chatToast) return;
+    var name = (data && data.last && data.last.name) || "";
+    var text = (data && data.last && data.last.text) || "";
+    chatToast.innerHTML =
+      '<div class="t-title">Новое сообщение' + (name ? " · " + escapeHtml(name) : "") + "</div>" +
+      (text ? '<div class="t-text">' + escapeHtml(text) + "</div>" : "");
+    chatToast.hidden = false;
+    requestAnimationFrame(function () { chatToast.classList.add("show"); });
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      chatToast.classList.remove("show");
+      setTimeout(function () { chatToast.hidden = true; }, 300);
+    }, 4000);
+  }
+
+  function updateChatBadge(unread) {
+    if (chatBadge) {
+      chatBadge.textContent = unread > 99 ? "99+" : String(unread);
+      chatBadge.hidden = unread <= 0;
+    }
+    var fabEl = document.getElementById("chat-fab");
+    if (fabEl) fabEl.classList.toggle("unread", unread > 0);
+  }
+
+  function pollUnread() {
+    fetch("/api/chats/unread")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) return;
+        var unread = data.unread || 0;
+        updateChatBadge(unread);
+        var chatOpen = popup && popup.classList.contains("open");
+        if (unread > lastUnreadCount && !chatOpen) showChatToast(data);
+        lastUnreadCount = unread;
+      })
+      .catch(function () {});
+  }
+
+  if (fab) {
+    pollUnread();
+    setInterval(pollUnread, 8000);
+  }
+  if (chatToast) chatToast.addEventListener("click", function () { toggleChat(true); });
 
   /* ---------- Боковое меню: клик-переключатель (для тач-устройств) ---------- */
   document.querySelectorAll(".nav-group-header").forEach(function (header) {

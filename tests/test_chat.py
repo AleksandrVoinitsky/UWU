@@ -105,3 +105,39 @@ async def test_chat_reuses_same_chat(client, seeded_session):
     assert len(chats) == 1  # один чат на покупателя
     msgs = (await seeded_session.execute(select(Message).order_by(Message.id))).scalars().all()
     assert [m.text for m in msgs] == ["Первое", "Второе"]
+
+
+async def test_operator_unread_count(client, seeded_session):
+    """Непрочитанные входящие считаются для оператора и сбрасываются при просмотре."""
+    headers = await _register_customer(client)
+    await client.post("/shop/api/chat", json={"text": "Вопрос"}, headers=headers)
+
+    await _seller_headers(seeded_session, client)
+    r = await client.get("/api/chats/unread")
+    assert r.status_code == 200
+    assert r.json()["unread"] == 1
+    assert r.json()["last"]["text"] == "Вопрос"
+
+    # Оператор открывает чат → сообщение помечается прочитанным.
+    chat_id = (await client.get("/api/chats")).json()[0]["id"]
+    await client.get(f"/api/chats/{chat_id}/messages")
+    r = await client.get("/api/chats/unread")
+    assert r.json()["unread"] == 0
+
+
+async def test_customer_unread_count(client, seeded_session):
+    """Непрочитанные ответы продавца считаются для покупателя и сбрасываются при просмотре."""
+    headers = await _register_customer(client)
+    await client.post("/shop/api/chat", json={"text": "Вопрос"}, headers=headers)
+
+    await _seller_headers(seeded_session, client)
+    chat_id = (await client.get("/api/chats")).json()[0]["id"]
+    await client.post(f"/api/chats/{chat_id}/messages", json={"text": "Ответ"})
+
+    r = await client.get("/shop/api/chat/unread", headers=headers)
+    assert r.json()["unread"] == 1
+
+    # Покупатель открывает чат → ответ помечается прочитанным.
+    await client.get("/shop/api/chat", headers=headers)
+    r = await client.get("/shop/api/chat/unread", headers=headers)
+    assert r.json()["unread"] == 0

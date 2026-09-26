@@ -38,6 +38,7 @@
         <a class="nav-link" href="/admin/audit">{{ icon('alert') }}Журнал действий</a>
         <a class="nav-link" href="/admin/bots">{{ icon('bot') }}Боты</a>
         <a class="nav-link" href="/admin/agent">{{ icon('sparkles') }}AI-агент</a>
+        <a class="nav-link" href="/admin/site">{{ icon('globe') }}Сайт и MiniApp</a>
         <a class="nav-link" href="/admin/customers">{{ icon('users') }}Покупатели</a>
       {% else %}
         <a class="nav-link" href="/">{{ icon('grid') }}{{ t('menu.dashboard', lang) }}</a>
@@ -137,7 +138,10 @@
   <button id="chat-fab" class="chat-fab" title="{{ t('chat.title', lang) }}" aria-label="{{ t('chat.title', lang) }}">
     <span class="dot"></span>
     {{ icon('chat', 24) }}
+    <span id="chat-badge" class="chat-count" hidden>0</span>
   </button>
+
+  <div id="chat-toast" class="chat-toast" role="status" aria-live="polite" hidden></div>
 
   <div id="chat-backdrop" class="chat-backdrop"></div>
   <div id="chat-popup" class="chat-popup">

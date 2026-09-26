@@ -16,6 +16,7 @@
 }
 .shop-brand { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
 .shop-brand:hover { text-decoration: none; }
+.shop-logo { height: 36px; max-width: 220px; object-fit: contain; display: block; }
 .shop-nav { display: flex; align-items: center; gap: 18px; font-size: 14px; }
 .shop-nav a { color: var(--text-secondary); }
 .shop-nav a:hover { color: var(--text); }
@@ -56,9 +57,36 @@
   transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
 .product-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-.product-img { height: 160px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.product-img { height: 160px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
 .product-img img { width: 100%; height: 100%; object-fit: cover; }
 .product-img-empty { font-size: 40px; color: var(--text-tertiary); }
+
+/* Баннер и акции */
+.shop-banner {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 16px;
+  border-radius: var(--radius-lg); overflow: hidden;
+  border: 1px solid var(--border); background: var(--surface);
+}
+.shop-banner img { height: 84px; object-fit: cover; flex-shrink: 0; }
+.shop-banner .banner-text { font-size: 16px; font-weight: 700; padding: 0 16px; }
+
+.product-badge {
+  position: absolute; top: 8px; left: 8px;
+  background: var(--bad); color: #fff;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
+  padding: 3px 9px; border-radius: 999px;
+}
+.price-old { color: var(--text-tertiary); font-size: 12px; font-weight: 500; }
+.price-now { color: var(--bad); font-weight: 700; }
+
+/* Варианты оформления карточек */
+.product-grid.style-compact { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.product-grid.style-compact .product-img { height: 120px; }
+.product-grid.style-list { grid-template-columns: 1fr; }
+.product-grid.style-list .product-card { display: flex; align-items: center; }
+.product-grid.style-list .product-img { width: 130px; height: 96px; flex-shrink: 0; }
+.product-grid.style-list .product-body { flex: 1; }
+.product-grid.style-list .product-desc { min-height: 0; }
 .product-body { padding: 14px 16px; }
 .product-name { font-weight: 600; font-size: 14px; }
 .product-desc { color: var(--text-secondary); font-size: 12px; margin-top: 4px; min-height: 32px; }
