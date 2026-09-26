@@ -61,6 +61,13 @@ AI-агент — **отдельный репозиторий и отдельн�
 3. По необходимости — компактные tool-friendly эндпоинты
    (`search_nomenklatura`, `get_stock`, `get_zakaz`).
 
+> ✅ **Контракт ядра реализован полностью** (см. `uwu-ai-agent` →
+> `docs/CORE_CONTRACT.md`): API-key auth (`get_current_agent`), эндпоинты
+> `/api/agent/*`, write-инструменты `add_to_cart`/`create_order`, персонализация
+> (`/api/agent/customer/{id}`), семантический поиск (`/api/agent/search_semantic`,
+> pgvector + эмбеддинги), права `agent.*`. Детали — [ai-agent](docs/ai-agent.md)
+> и [reference](docs/reference.md).
+
 ### Решения (зафиксированы)
 
 - **Надзор** — по порогу суммы/типа (чтение авто; запись ниже порога авто; выше — одобрение).

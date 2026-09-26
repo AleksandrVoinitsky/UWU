@@ -10,9 +10,9 @@ TDD: тесты пишутся как часть системы и исполь�
 ## Запуск
 
 ```bash
-# Тестовая БД (Docker)
+# Тестовая БД (Docker) — с pgvector (для семантического поиска)
 docker run -d --name uwu-test-pg -e POSTGRES_USER=uwu -e POSTGRES_PASSWORD=uwu \
-  -e POSTGRES_DB=uwu_test -p 5433:5432 postgres:16-alpine
+  -e POSTGRES_DB=uwu_test -p 5433:5432 pgvector/pgvector:pg16
 
 # Создать схему и прогнать тесты
 export DATABASE_URL=postgresql+asyncpg://uwu:uwu@localhost:5433/uwu_test
@@ -38,6 +38,9 @@ pytest tests/ -v
 | `tests/test_prices.py` | Ценообразование (автонаценка, явные цены) |
 | `tests/test_dashboard.py` | Дашборд, KPI, графики |
 | `tests/test_customer.py` | Покупатель: регистрация, вход, корзина, заказ |
+| `tests/test_agent_admin.py` | Управление AI-агентом (промпты, инструменты, ключи, одобрения) |
+| `tests/test_agent_api.py` | API, потребляемое агентом (auth, чтение, HITL) |
+| `tests/test_agent_tools.py` | Write-инструменты, персонализация, семантический поиск, клиент эмбеддингов |
 | `tests/test_miniapp.py` | MiniApp (Telegram/MAX) initData, привязка |
 | `tests/test_bots.py` | Боты: фабрика, чаты, доставка сообщений |
 | `tests/test_chat.py` | Мессенджер (чаты, сообщения) |

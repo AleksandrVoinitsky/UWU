@@ -62,6 +62,7 @@ from app.models.agent import (  # noqa: F401
     AgentRun,
     AgentTool,
 )
+from app.models.embeddings import EMBEDDING_DIM, NomenklaturaEmbedding  # noqa: F401
 
 __all__ = [
     "Base",

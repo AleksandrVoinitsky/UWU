@@ -12,22 +12,22 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_session
 from app.core.deps import get_current_agent
 from app.models.agent import AgentApiKey, AgentApproval, AgentRun
-from app.models.catalog import Nomenklatura
 from app.models.customer import Customer
 from app.models.document.base_document import Document
 from app.models.enums import DocType
 from app.models.messaging import Chat, Message
-from app.services import agent_service, customer_service, stock_service
+from app.services import agent_service, customer_service, search_service, stock_service
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
@@ -318,31 +318,7 @@ async def search_catalog(
 ):
     """Поиск товаров по названию/артикулу (с остатком и ценой)."""
     _require_perm(key, "catalog.read")
-    result = await session.execute(
-        select(Nomenklatura)
-        .where(
-            or_(
-                Nomenklatura.name.ilike(f"%{query}%"),
-                Nomenklatura.artikul.ilike(f"%{query}%"),
-            )
-        )
-        .order_by(Nomenklatura.name)
-        .limit(50)
-    )
-    out = []
-    for n in result.scalars():
-        stock = await stock_service.get_balance(session, n.id)
-        out.append(
-            {
-                "id": n.id,
-                "name": n.name,
-                "full_name": n.full_name,
-                "artikul": n.artikul,
-                "price": str(n.retail_price) if n.retail_price is not None else None,
-                "stock": str(stock),
-            }
-        )
-    return out
+    return await search_service.keyword_search(session, query, limit=50)
 
 
 @router.get("/get_stock")
@@ -392,3 +368,122 @@ async def get_zakaz(
     if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     return await customer_service.order_context(session, doc)
+
+
+# --- Tool-friendly запись (выполняется после одобрения оператора) ---------------
+
+
+class AddToCartRequest(BaseModel):
+    customer_id: int
+    nomenklatura_id: int
+    quantity: Decimal
+
+
+class OrderItemRequest(BaseModel):
+    nomenklatura_id: int
+    quantity: Decimal
+
+
+class CreateOrderRequest(BaseModel):
+    customer_id: int
+    items: list[OrderItemRequest]
+
+
+@router.post("/add_to_cart", status_code=status.HTTP_201_CREATED)
+async def agent_add_to_cart(
+    payload: AddToCartRequest,
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Добавляет товар в корзину покупателя (после одобрения оператора).
+
+    Право — ``documents.write`` (проверяется по API-ключу). Бизнес-логику
+    выполняет ядро (:func:`app.services.customer_service.add_to_cart`), агент
+    её не дублирует.
+    """
+    _require_perm(key, "documents.write")
+    customer = await session.get(Customer, payload.customer_id)
+    if customer is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
+    try:
+        await customer_service.add_to_cart(
+            session, payload.customer_id, payload.nomenklatura_id, payload.quantity
+        )
+    except customer_service.CustomerError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    items = await customer_service.get_cart_items(session, payload.customer_id)
+    total = await customer_service.cart_total(session, payload.customer_id)
+    return {"customer_id": payload.customer_id, "items": items, "total": str(total)}
+
+
+@router.post("/create_order", status_code=status.HTTP_201_CREATED)
+async def agent_create_order(
+    payload: CreateOrderRequest,
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Создаёт заявку покупателя (ZAKAZ) в статусе DRAFT (после одобрения).
+
+    Право — ``documents.write``. Позиции передаются как
+    ``[{nomenklatura_id, quantity}]``; цены и ставки НДС ядро берёт из
+    номенклатуры. Проведение документа остаётся за оператором.
+    """
+    _require_perm(key, "documents.write")
+    customer = await session.get(Customer, payload.customer_id)
+    if customer is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
+    try:
+        doc = await customer_service.create_draft_order(
+            session,
+            customer,
+            [i.model_dump() for i in payload.items],
+            source="agent",
+        )
+    except customer_service.CustomerError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return await customer_service.order_context(session, doc)
+
+
+# --- Персонализация (история / рекомендации / память) ----------------------------
+
+
+@router.get("/customer/{customer_id}")
+async def customer_insights(
+    customer_id: int,
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Сводка покупателя для персонализации (промпт ``reorder_suggestion``).
+
+    Возвращает профиль, историю покупок, рекомендации к заказу и «память»
+    (любимые категории). Право — ``reports.read`` (аналитика по продажам).
+    """
+    _require_perm(key, "reports.read")
+    insights = await agent_service.customer_insights(session, customer_id)
+    if insights is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
+    return insights
+
+
+# --- Семантический поиск по каталогу (RAG) -------------------------------------
+
+
+class SemanticSearchRequest(BaseModel):
+    query: str
+    limit: int = 10
+
+
+@router.post("/search_semantic")
+async def search_semantic(
+    payload: SemanticSearchRequest,
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Семантический поиск товаров (pgvector + эмбеддинги) с fallback по словам.
+
+    Право — ``catalog.read``. Возвращает релевантные товары с остатком и ценой
+    (и оценкой сходства ``similarity`` для векторного поиска).
+    """
+    _require_perm(key, "catalog.read")
+    limit = max(1, min(payload.limit, 50))
+    return await search_service.search_semantic(session, payload.query.strip(), limit)

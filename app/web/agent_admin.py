@@ -18,7 +18,7 @@ from app.core.deps import get_current_user_from_cookie
 from app.core.i18n import translate
 from app.models.agent import APPROVAL_POLICIES, APPROVAL_STATUSES, AgentApiKey
 from app.models.users import User
-from app.services import agent_service
+from app.services import agent_service, search_service
 from app.templates import render
 
 router = APIRouter(tags=["web-admin-agent"])
@@ -89,6 +89,8 @@ async def agent_overview(
     keys = await agent_service.list_keys(session)
     pending = await agent_service.list_approvals(session, status="pending", limit=20)
     runs = await agent_service.list_runs(session, limit=10)
+    embeddings = await search_service.embeddings_status(session)
+    embedding_status = request.query_params.get("embedding_status")
     return _page(
         request,
         user,
@@ -99,6 +101,8 @@ async def agent_overview(
         keys=keys,
         pending=pending,
         runs=runs,
+        embeddings=embeddings,
+        embedding_status=embedding_status,
     )
 
 
@@ -113,6 +117,23 @@ async def agent_save_config(
     form = await request.form()
     await agent_service.set_configs(session, {k: str(v) for k, v in form.items()})
     return RedirectResponse("/admin/agent", status_code=303)
+
+
+@router.post("/admin/agent/embeddings/rebuild", response_class=HTMLResponse)
+async def agent_rebuild_embeddings(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user_from_cookie),
+):
+    """Пересобирает эмбеддинги каталога (семантический поиск)."""
+    if _require_admin(user):
+        return RedirectResponse("/", status_code=303)
+    try:
+        count = await search_service.rebuild_embeddings(session)
+        status = f"Пересобрано эмбеддингов: {count}"
+    except Exception as exc:  # noqa: BLE001 — показываем причину в UI
+        status = f"Ошибка: {exc}"
+    return RedirectResponse(f"/admin/agent?embedding_status={status}", status_code=303)
 
 
 # --- Промпты ------------------------------------------------------------------

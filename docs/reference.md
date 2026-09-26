@@ -297,6 +297,7 @@ SF Symbols / Lucide, `viewBox="0 0 24 24"`). Имя → paths.
 | `available_products(session, category_id, search)` | товары в наличии (с остатком) |
 | `get_cart`, `get_cart_items`, `cart_total`, `add_to_cart`, `set_cart_quantity`, `clear_cart` | корзина |
 | `checkout(session, customer)` | подтверждение → создание `ZAKAZ` + очистка корзины |
+| `create_draft_order(session, customer, items)` | черновик `ZAKAZ` из позиций (для AI-агента, после одобрения) |
 | `match_kontragent_by_phone(session, phone)` | привязка к контрагенту по телефону |
 | `order_context(session, doc)` | контекст заказа для отображения/PDF |
 
@@ -374,6 +375,7 @@ initData (для тестов и локальной проверки).
 | `list_tools` / `get_tool` / `update_tool` | инструменты |
 | `list_keys` / `create_key` / `set_key_enabled` / `delete_key` / `verify_key` | API-ключи (SHA-256) |
 | `list_runs` / `list_approvals` / `get_approval` / `decide_approval` | журнал и одобрения |
+| `customer_insights(session, customer_id)` | персонализация: история покупок, рекомендации к заказу, «память» (любимые категории) |
 | `seed_agent` | идемпотентный сид дефолтных промптов/инструментов |
 
 ## app/web/agent_admin.py — админка AI-агента
@@ -388,6 +390,36 @@ initData (для тестов и локальной проверки).
 | `/admin/agent/keys` (+ `/{id}/toggle`, `/{id}/delete`) | API-ключи |
 | `/admin/agent/runs` | журнал запусков |
 | `/admin/agent/approvals` (+ `/{id}/decide`) | одобрения |
+| `POST /admin/agent/embeddings/rebuild` | пересобрать эмбеддинги каталога (семантический поиск) |
+
+## app/services/search_service.py — семантический поиск (RAG)
+
+| Функция | Назначение |
+| --- | --- |
+| `build_nomenklatura_text(nomen)` | текст для эмбеддинга (наименование + полное + артикул) |
+| `keyword_search(session, query, limit)` | fallback-поиск по ключевым словам (ILIKE) |
+| `search_semantic(session, query, limit)` | поиск по смыслу (pgvector) с fallback на ключевые слова |
+| `rebuild_embeddings(session)` | пересборка эмбеддингов всей номенклатуры (батчами) |
+| `embeddings_status(session)` | статус: настроен ли провайдер, сколько векторов |
+
+## app/services/embedding_service.py — провайдер эмбеддингов
+
+| Класс / функция | Назначение |
+| --- | --- |
+| `EmbeddingClient(base_url, api_key, model)` | клиент OpenAI-совместимого `/embeddings` |
+| `EmbeddingClient.embed_texts(texts)` | векторы для списка текстов (порядок сохраняется) |
+| `is_configured()` / `embed_texts()` | модульные обёртки над клиентом из настроек (`EMBEDDING_*`) |
+
+Провайдер задаётся конфигурацией (`EMBEDDING_BASE_URL`/`EMBEDDING_API_KEY`/
+`EMBEDDING_MODEL`), а не зашит в коде. Если не настроен — семантический поиск
+работает в fallback-режиме (по ключевым словам).
+
+## app/models/embeddings.py — эмбеддинги номенклатуры
+
+### `class NomenklaturaEmbedding` (таблица `nomenklatura_embeddings`)
+**Назначение:** векторное представление (pgvector) текстового описания товара,
+1:1 с `Nomenklatura`. Колонка `embedding` — тип `vector(EMBEDDING_DIM)`;
+расширение `vector` создаётся миграцией `b1c2d3e4f5a6_embeddings.py`.
 
 ## app/api/agent.py — API, потребляемое агентом
 
@@ -404,10 +436,14 @@ initData (для тестов и локальной проверки).
 | `POST /api/agent/approvals` | создать запрос одобрения (HITL) |
 | `GET /api/agent/approvals/{id}` | статус одобрения (resume) |
 | `POST /api/agent/runs` | записать результат запуска (аудит) |
-| `GET /api/agent/search_catalog` | поиск товаров (tool) |
+| `GET /api/agent/search_catalog` | поиск товаров по ключевым словам (tool) |
+| `POST /api/agent/search_semantic` | семантический поиск товаров (pgvector, tool) |
 | `GET /api/agent/get_stock` | остаток товара (tool) |
 | `GET /api/agent/get_cart` | корзина покупателя (tool) |
 | `GET /api/agent/get_zakaz` | статус/состав заявки (tool) |
+| `POST /api/agent/add_to_cart` | добавить в корзину (write-tool, после одобрения) |
+| `POST /api/agent/create_order` | создать заявку `ZAKAZ` как DRAFT (write-tool, после одобрения) |
+| `GET /api/agent/customer/{customer_id}` | персонализация: история/рекомендации/память |
 
 Зависимость `get_current_agent` читает `Authorization: Bearer <key>` (или
 `X-Api-Key`) и проверяет ключ через `agent_service.verify_key` (SHA-256,

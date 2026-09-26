@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: uwu
       POSTGRES_PASSWORD: uwu
@@ -29,6 +29,10 @@ services:
       DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-ru}
       UPLOADS_DIR: /app/uploads
       MINIAPP_DEV: ${MINIAPP_DEV:-false}
+      # Семантический поиск (pgvector + OpenAI-совместимые эмбеддинги).
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       # production — небезопасные SECRET_KEY/пароль блокируют запуск (fail-fast).
       ENVIRONMENT: ${ENVIRONMENT:-production}
     ports:

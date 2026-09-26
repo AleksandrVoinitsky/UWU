@@ -59,6 +59,24 @@
   </form>
 </div>
 
+<!-- Семантический поиск -->
+<div class="card">
+  <div class="card-header">
+    <h2>Семантический поиск</h2>
+    <span class="muted small">pgvector + эмбеддинги каталога (RAG)</span>
+  </div>
+  {% if embedding_status %}<div class="notice">{{ embedding_status }}</div>{% endif %}
+  <p class="muted small" style="margin:0 0 12px">
+    Провайдер эмбеддингов:
+    {% if embeddings.configured %}{{ badge('posted', 'настроен') }}{% else %}{{ badge('deleted', 'не настроен') }}{% endif %}
+    &nbsp;·&nbsp; Векторов: {{ embeddings.count }} / {{ embeddings.total }}
+  </p>
+  <form method="post" action="/admin/agent/embeddings/rebuild">
+    <button type="submit" class="btn primary" {% if not embeddings.configured %}disabled title="Настройте EMBEDDING_BASE_URL/EMBEDDING_API_KEY"{% endif %}>Пересобрать эмбеддинги</button>
+    {% if not embeddings.configured %}<span class="muted small"> — задайте EMBEDDING_BASE_URL и EMBEDDING_API_KEY в окружении.</span>{% endif %}
+  </form>
+</div>
+
 <!-- Последние запуски -->
 <div class="card">
   <div class="card-header"><h2>Последние запуски</h2><a class="btn text small" href="/admin/agent/runs">Все →</a></div>

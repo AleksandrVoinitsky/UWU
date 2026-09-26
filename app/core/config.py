@@ -53,6 +53,16 @@ class Settings(BaseSettings):
     # локального тестирования). В проде должен быть выключен.
     miniapp_dev: bool = False
 
+    # --- Семантический поиск (pgvector + эмбеддинги) ---
+    # OpenAI-совместимый эндпоинт эмбеддингов (пустая строка — семантический
+    # поиск выключен, работает fallback по ключевым словам).
+    embedding_base_url: str = ""
+    embedding_api_key: str = ""
+    embedding_model: str = "text-embedding-3-small"
+    # Размерность вектора эмбеддингов (должна совпадать с колонкой pgvector;
+    # при смене модели — новая миграция).
+    embedding_dim: int = 1536
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -1,11 +1,14 @@
 # AI-агент (консультант покупателей и чат-ассистент)
 
-> **Статус**: спецификация/дизайн + **реализована плоскость управления**.
+> **Статус**: реализована плоскость управления + **полный контракт ядра**
+> (write-инструменты, персонализация, семантический поиск pgvector).
 > Агент выполняется в отдельном репозитории `uwu-ai-agent` и отдельном
 > Docker-контейнере. Управление (промпты, действия, ключи, одобрения,
 > наблюдение) реализовано в админке UWU (`/admin/agent/*`) — см. §8–§9 и
 > [reference](reference.md). Ядро учёта UWU остаётся единственным источником
 > бизнес-логики и данных.
+>
+> Контракт для ядра зафиксирован в `uwu-ai-agent` → `docs/CORE_CONTRACT.md`.
 
 ## 1. Назначение
 
@@ -256,6 +259,15 @@ START → classify_intent
   размеры) + **векторный индекс (pgvector)** по описаниям товаров и по памяти
   покупателей для RAG-поиска (решение №5: каталог товаров + память покупателей).
 
+> ✅ **Реализовано в ядре (фаза 4, персональная часть):** эндпоинт
+> `GET /api/agent/customer/{customer_id}` (`app/api/agent.py`) возвращает сводку
+> покупателя — историю покупок, рекомендации к заказу
+> (`report_service.replenishment_recommendations` / `top_items`) и «память»
+> (любимые категории, число заказов, сумма) через
+> `agent_service.customer_insights()` (`app/services/agent_service.py`).
+> Семантический поиск по каталогу — `POST /api/agent/search_semantic`
+> (`app/services/search_service.py` + pgvector, `app/models/embeddings.py`).
+
 ## 8. Изменения в БД ядра UWU
 
 > ✅ **Реализовано.** Таблицы и модель данных — в
@@ -329,6 +341,19 @@ START → classify_intent
 | `decided_by`, `decided_at` | кто и когда решил |
 | `resume_value` | ответ оператора для возобновления графа |
 
+### `nomenklatura_embeddings`
+Векторные представления товаров (RAG-поиск, фаза 4). Модель —
+[`app/models/embeddings.py`](../app/models/embeddings.py), миграция —
+`alembic/versions/b1c2d3e4f5a6_embeddings.py` (создаёт расширение `vector`).
+
+| Поле | Тип | Описание |
+| --- | --- | --- |
+| `id` | int PK | |
+| `nomenklatura_id` | FK | товар (1:1, unique) |
+| `text` | text | исходный текст для эмбеддинга (отладка/пересборка) |
+| `embedding` | `vector(1536)` | вектор pgvector (размерность `EMBEDDING_DIM`) |
+| `created_at`, `updated_at` | datetime | |
+
 ### Изменения существующих таблиц
 
 - **`Message`** — ✅ добавлены `author` (`operator | agent | customer`; по
@@ -366,12 +391,18 @@ START → classify_intent
 | `/api/agent/approvals` | POST | агент создаёт запрос одобрения |
 | `/api/agent/approvals/{id}/decide` | POST | оператор решает (админка/чат) |
 | `/api/agent/runs` | POST | агент пишет результат запуска (аудит) |
+| `/api/agent/add_to_cart` | POST | добавить в корзину (write-tool, после одобрения) |
+| `/api/agent/create_order` | POST | создать `ZAKAZ` как DRAFT (write-tool, после одобрения) |
+| `/api/agent/customer/{id}` | GET | персонализация: история/рекомендации/память |
+| `/api/agent/search_semantic` | POST | семантический поиск по каталогу (pgvector) |
 | `/admin/agent/...` | GET/POST | страницы админки (промпты, инструменты, одобрения, наблюдение) |
 
 Для тулзов — компактные tool-friendly эндпоинты (по необходимости):
 `/api/agent/search_catalog`, `/api/agent/get_stock`, `/api/agent/get_cart`,
 `/api/agent/get_zakaz` (тонкие, только чтение; запись — через существующие
-`documents`/`customer` API с одобрением).
+`documents`/`customer` API с одобрением). Write-инструменты (`add_to_cart`/
+`create_order`) требуют права `documents.write` по API-ключу и выполняются
+**после** одобрения оператора (§2.6, §5).
 
 ## 10. Технологический стек
 

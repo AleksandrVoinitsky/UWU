@@ -51,6 +51,8 @@ async_session_factory = _test_session_factory
 async def _setup_db():
     """Создаёт схему БД один раз на сессию тестов."""
     async with engine.begin() as conn:
+        # pgvector для семантического поиска (колонка `vector`).
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield

@@ -4,8 +4,15 @@
 
 `docker-compose.yml` поднимает два сервиса:
 
-1. **db** — PostgreSQL 16 (alpine), том `pgdata` для данных.
+1. **db** — PostgreSQL 16 с расширением **pgvector** (образ
+   `pgvector/pgvector:pg16`; нужен для семантического поиска), том `pgdata`.
 2. **app** — UWU (FastAPI + uvicorn), порт 8000.
+
+> ⚠️ Для семантического поиска (`/api/agent/search_semantic`) используется
+> расширение `vector`. При миграции с обычного образа `postgres` на
+> `pgvector/pgvector:pg16` существующий том данных можно сохранить, но нужно
+> вручную выполнить `CREATE EXTENSION IF NOT EXISTS vector` (миграция
+> `b1c2d3e4f5a6_embeddings.py` делает это автоматически).
 
 ## Переменные окружения
 
@@ -21,6 +28,9 @@
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `480` | Срок жизни токена |
 | `DEFAULT_CURRENCY` | `RUB` | Валюта по умолчанию |
 | `DEFAULT_LANGUAGE` | `ru` | Язык интерфейса по умолчанию |
+| `EMBEDDING_BASE_URL` | *(пусто)* | OpenAI-совместимый эндпоинт эмбеддингов (семантический поиск) |
+| `EMBEDDING_API_KEY` | *(пусто)* | Ключ провайдера эмбеддингов |
+| `EMBEDDING_MODEL` | `text-embedding-3-small` | Модель эмбеддингов |
 
 ## Запуск
 

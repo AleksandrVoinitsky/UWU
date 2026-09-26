@@ -80,9 +80,13 @@
 | GET | `/api/agent/approvals/{id}` | Статус одобрения |
 | POST | `/api/agent/runs` | Записать результат запуска (аудит) |
 | GET | `/api/agent/search_catalog?query=` | Поиск товаров (название/артикул) |
+| POST | `/api/agent/search_semantic` | Семантический поиск товаров (pgvector, `{query, limit}`) |
 | GET | `/api/agent/get_stock?nomenklatura_id=` | Остаток товара (учёт/доступно) |
 | GET | `/api/agent/get_cart?customer_id=` | Корзина покупателя |
 | GET | `/api/agent/get_zakaz?order_id=` | Статус/состав заявки покупателя |
+| POST | `/api/agent/add_to_cart` | Добавить в корзину (write-tool, право `documents.write`) |
+| POST | `/api/agent/create_order` | Создать `ZAKAZ` как DRAFT (write-tool, право `documents.write`) |
+| GET | `/api/agent/customer/{customer_id}` | Персонализация: история/рекомендации/память |
 
 ## Пример
 

@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -519,3 +519,128 @@ async def seed_agent(session: AsyncSession) -> None:
             )
         )
     await session.commit()
+
+
+# --- Персонализация (история / рекомендации / память покупателя) ----------------
+
+
+async def customer_insights(
+    session: AsyncSession,
+    customer_id: int,
+    *,
+    lookback_days: int = 90,
+    limit: int = 10,
+) -> dict | None:
+    """Сводка покупателя для персонализации (промпт ``reorder_suggestion``).
+
+    Собирает: профиль, частые покупки (историю), рекомендации к заказу
+    (``replenishment_recommendations``) и топ товаров (``top_items``), а также
+    «память» покупателя — любимые категории и агрегаты (число заказов, сумма).
+
+    Возвращает ``None``, если покупатель не найден. Используется эндпоинтом
+    ``GET /api/agent/customer/{customer_id}`` (см. :mod:`app.api.agent`).
+    """
+    from app.models.catalog import Category, Nomenklatura
+    from app.models.customer import Customer
+    from app.models.document.base_document import Document, DocumentItem
+    from app.models.enums import DocType, DocumentStatus
+    from app.services import customer_service, report_service
+
+    customer = await session.get(Customer, customer_id)
+    if customer is None:
+        return None
+
+    today = date.today()
+    start = today - timedelta(days=lookback_days)
+    kontragent = await customer_service.match_kontragent_by_phone(session, customer.phone)
+    kontragent_id = kontragent.id if kontragent else None
+
+    history: list[dict] = []
+    favorite_categories: dict[int, int] = {}
+    total_spent = Decimal("0")
+    orders_count = 0
+
+    if kontragent_id is not None:
+        # Проведённые продажи (RASHOD) контрагента — источник истории покупок.
+        sale_agg = (
+            await session.execute(
+                select(func.coalesce(func.sum(Document.total), 0), func.count(Document.id))
+                .where(
+                    Document.doc_type == DocType.RASHOD.value,
+                    Document.status == DocumentStatus.POSTED.value,
+                    Document.kontragent_id == kontragent_id,
+                )
+            )
+        ).one()
+        total_spent = sale_agg[0] or Decimal("0")
+        orders_count = int(sale_agg[1] or 0)
+
+        rows = (
+            await session.execute(
+                select(
+                    Nomenklatura.id,
+                    Nomenklatura.name,
+                    Nomenklatura.category_id,
+                    func.sum(DocumentItem.quantity),
+                    func.max(Document.date),
+                )
+                .join(DocumentItem, DocumentItem.nomenklatura_id == Nomenklatura.id)
+                .join(Document, Document.id == DocumentItem.document_id)
+                .where(
+                    Document.doc_type == DocType.RASHOD.value,
+                    Document.status == DocumentStatus.POSTED.value,
+                    Document.kontragent_id == kontragent_id,
+                )
+                .group_by(Nomenklatura.id, Nomenklatura.name, Nomenklatura.category_id)
+                .order_by(func.sum(DocumentItem.quantity).desc())
+                .limit(limit)
+            )
+        ).all()
+        for nid, name, cat_id, qty, last_date in rows:
+            history.append(
+                {
+                    "nomenklatura_id": nid,
+                    "name": name,
+                    "quantity": qty,
+                    "last_purchase": last_date.isoformat() if last_date else None,
+                }
+            )
+            if cat_id is not None:
+                favorite_categories[cat_id] = favorite_categories.get(cat_id, 0) + int(qty)
+
+    # Названия любимых категорий (без N+1 — одним запросом).
+    category_names: dict[int, str] = {}
+    if favorite_categories:
+        cats = (
+            await session.execute(
+                select(Category).where(Category.id.in_(favorite_categories.keys()))
+            )
+        ).scalars()
+        category_names = {c.id: c.name for c in cats}
+
+    # Рекомендации к заказу: только позиции, требующие закупки («пора заказать»).
+    reorder = [
+        r
+        for r in await report_service.replenishment_recommendations(session, lookback_days=30)
+        if r["status"] == "order"
+    ][:limit]
+
+    top_items = await report_service.top_items(session, start, today, limit=limit)
+
+    return {
+        "customer": {
+            "id": customer.id,
+            "name": customer.name,
+        },
+        "history": history,
+        "reorder": reorder,
+        "top_items": top_items,
+        "memory": {
+            "favorite_categories": [
+                {"id": cid, "name": category_names.get(cid), "count": cnt}
+                for cid, cnt in sorted(favorite_categories.items(), key=lambda kv: -kv[1])
+            ],
+            "orders_count": orders_count,
+            "total_spent": str(total_spent.quantize(Decimal("0.01"))),
+        },
+    }

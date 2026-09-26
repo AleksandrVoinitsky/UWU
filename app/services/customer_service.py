@@ -379,6 +379,71 @@ async def checkout(session: AsyncSession, customer: Customer) -> Document:
     return doc
 
 
+async def create_draft_order(
+    session: AsyncSession,
+    customer: Customer,
+    items: list[dict],
+    *,
+    source: str = "agent",
+) -> Document:
+    """Создаёт черновик заявки покупателя (``ZAKAZ``) из переданных позиций.
+
+    Используется AI-агентом (после одобрения оператора): позиции задаются как
+    ``[{nomenklatura_id, quantity}]``; цены и ставки НДС берутся из номенклатуры.
+    Документ создаётся в статусе ``DRAFT`` (``state="draft"`` в ``extra``) —
+    проведение остаётся за оператором (см. :func:`app.services.document_service.post_document`).
+    """
+    if not items:
+        raise CustomerError("Список позиций пуст")
+
+    nomen_ids = [i["nomenklatura_id"] for i in items]
+    nomen_map = {
+        n.id: n
+        for n in (
+            await session.execute(
+                select(Nomenklatura).where(Nomenklatura.id.in_(nomen_ids))
+            )
+        ).scalars()
+    }
+
+    doc_items: list[dict] = []
+    for it in items:
+        nomen = nomen_map.get(it["nomenklatura_id"])
+        if nomen is None:
+            raise CustomerError(f"Товар #{it['nomenklatura_id']} не найден")
+        quantity = Decimal(str(it["quantity"]))
+        if quantity <= 0:
+            raise CustomerError("Количество должно быть положительным")
+        if quantity > MAX_CART_QUANTITY:
+            raise CustomerError(f"Количество не может превышать {MAX_CART_QUANTITY}")
+        doc_items.append(
+            {
+                "nomenklatura_id": nomen.id,
+                "quantity": quantity,
+                "price": nomen.retail_price or Decimal("0"),
+                "nds_rate_id": nomen.nds_rate_id,
+            }
+        )
+
+    kontragent = await match_kontragent_by_phone(session, customer.phone)
+    doc = await document_service.create_document(
+        session,
+        doc_type=DocType.ZAKAZ,
+        doc_date=date.today(),
+        kontragent_id=kontragent.id if kontragent else None,
+        extra={
+            "state": "draft",
+            "source": source,
+            "customer_id": customer.id,
+            "customer_phone": customer.phone,
+            "customer_name": customer.name,
+        },
+        items=doc_items,
+        created_by_id=None,
+    )
+    return doc
+
+
 async def get_customer_order(
     session: AsyncSession, customer_id: int, document_id: int
 ) -> Document | None:
