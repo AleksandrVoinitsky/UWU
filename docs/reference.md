@@ -123,13 +123,15 @@
 ### `create_incoming(session, *, document_id, date, nomenklatura_id, sklad_id, quantity, price) -> StockBatch`
 **Назначение:** оприходование партии + движение прихода.
 
-### `consume_batches(session, *, nomenklatura_id, sklad_id, quantity, method) -> (list[ConsumedLine], Decimal)`
+### `consume_batches(session, *, nomenklatura_id, sklad_id, quantity, method, allow_negative=False, source_document_id=None) -> (list[ConsumedLine], Decimal)`
 **Назначение:** списание партий по методу себестоимости; возвращает строки списания
 и общую себестоимость. **Технически:** FIFO — `id ASC`, LIFO — `id DESC`, средняя —
-средневзвешенная цена. При нехватке — `InsufficientStockError`.
+средневзвешенная цена; строки партий блокируются `SELECT … FOR UPDATE`. При нехватке —
+`InsufficientStockError`, кроме `allow_negative=True` (фиксируется отрицательная партия).
 
-### `register_outgoing(session, *, document_id, date, nomenklatura_id, sklad_id, quantity, amount)`
-**Назначение:** движение расхода (без изменения партий).
+### `register_outgoing(session, *, document_id, date, nomenklatura_id, sklad_id, quantity, amount, consumed=None)`
+**Назначение:** движение расхода (без изменения партий); при `consumed` создаётся
+движение на каждую списанную партию с `batch_id` (для точной отмены проведения).
 
 ### `class InsufficientStockError`
 **Назначение:** исключение контроля остатков (поля `nomenklatura_id`, `sklad_id`,
@@ -148,21 +150,25 @@
 ### `get_document(session, document_id) -> Document | None`
 **Назначение:** получение документа.
 
-### `post_document(session, document) -> Document`
-**Назначение:** проведение документа (контроль остатков + движения).
-**Технически:** для складских документов загружает строки явным запросом
-(`_load_items`), для расхода — `_check_stock`, затем `_apply_stock_movement` и
-`_apply_money_and_settlement`; статус → «Проведён».
+### `post_document(session, document, user_id=None) -> Document`
+**Назначение:** проведение документа (контроль остатков + движения + проводки).
+**Технически:** сериализуется advisory-lock'ом (защита от двойного проведения),
+для складских документов загружает строки явным запросом (`_load_items`), для
+расхода — `_check_stock`, затем `_apply_stock_movement`,
+`_apply_money_and_settlement` и `_apply_accounting`; переоценка — `_apply_revaluation`;
+статус → «Проведён».
 
-### `unpost_document(session, document) -> Document`
+### `unpost_document(session, document, user_id=None) -> Document`
 **Назначение:** отмена проведения (обратные движения, восстановление партий).
 
-### `mark_for_deletion(session, document) -> Document`
+### `mark_for_deletion(session, document, user_id=None) -> Document`
 **Назначение:** пометка на удаление (после отмены проведения).
 
 ### Внутренние: `_compute_item_amounts`, `_load_nds_rates`, `_load_items`,
-`_check_stock`, `_apply_stock_movement`, `_apply_money_and_settlement`,
-`_rollback_stock`, `_delete_movements`
+`_check_stock`, `_apply_stock_movement`, `_apply_inventory`, `_apply_revaluation`,
+`_rollback_revaluation`, `_apply_money_and_settlement`, `_apply_accounting`,
+`_outgoing_stock_cost`, `_incoming_stock_cost`, `_rollback_stock`,
+`_delete_movements`
 
 ## app/services/report_service.py
 
@@ -175,11 +181,13 @@
 ### `sales_report(session, start, end) -> list[dict]`
 **Назначение:** отчёт «Продажи» (проведённые расходные накладные).
 
-### `settlement_balances(session) -> list[dict]`
-**Назначение:** отчёт «Взаиморасчёты» (задолженность контрагентов).
+### `settlement_balances(session, firma_id=None) -> list[dict]`
+**Назначение:** отчёт «Взаиморасчёты» (задолженность контрагентов); опциональный
+фильтр по фирме.
 
-### `money_balance(session) -> Decimal`, `money_movements(session, start, end)`
-**Назначение:** отчёты по денежным средствам.
+### `money_balance(session, firma_id=None) -> Decimal`,
+`money_movements(session, start, end, firma_id=None)`
+**Назначение:** отчёты по денежным средствам; опциональный фильтр по фирме.
 
 ### Сводные показатели дашборда
 
