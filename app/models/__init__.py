@@ -50,12 +50,9 @@ from app.models.customer import Cart, CartItem, Customer, CustomerBinding  # noq
 from app.models.site import DEFAULT_SITE_SETTINGS, DISCOUNT_TYPES, Promotion, SiteSetting  # noqa: F401
 from app.models.agent import (  # noqa: F401
     AGENT_PERMISSIONS,
-    APPROVAL_POLICIES,
-    APPROVAL_STATUSES,
     DEFAULT_AGENT_CONFIG,
     RUN_STATUSES,
     AgentApiKey,
-    AgentApproval,
     AgentConfig,
     AgentPrompt,
     AgentPromptVersion,

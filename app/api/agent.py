@@ -22,7 +22,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_session
 from app.core.deps import get_current_agent
-from app.models.agent import AgentApiKey, AgentApproval, AgentRun
+from app.models.agent import AgentApiKey, AgentRun
 from app.models.customer import Customer
 from app.models.document.base_document import Document
 from app.models.enums import DocType
@@ -83,12 +83,6 @@ async def list_tools(
             "method": t.method,
             "params_schema": t.params_schema,
             "permission": t.permission,
-            "approval_policy": t.approval_policy,
-            "approval_threshold_amount": (
-                str(t.approval_threshold_amount)
-                if t.approval_threshold_amount is not None
-                else None
-            ),
             "rate_limit": t.rate_limit,
         }
         for t in tools
@@ -215,63 +209,6 @@ async def context(
     }
 
 
-# --- Одобрения (human-in-the-loop) ---------------------------------------------
-
-
-class ApprovalCreate(BaseModel):
-    tool_key: str
-    payload: dict = {}
-    chat_id: int | None = None
-    customer_id: int | None = None
-    run_id: int | None = None
-
-
-@router.post("/approvals", status_code=status.HTTP_201_CREATED)
-async def create_approval(
-    payload: ApprovalCreate,
-    session: AsyncSession = Depends(get_session),
-    key: AgentApiKey = AGENT,
-):
-    """Создаёт запрос одобрения действия (агент прерывает граф и ждёт решения)."""
-    approval = AgentApproval(
-        tool_key=payload.tool_key,
-        payload=payload.payload,
-        chat_id=payload.chat_id,
-        customer_id=payload.customer_id,
-        run_id=payload.run_id,
-        status="pending",
-        resume_value={},
-    )
-    session.add(approval)
-    await session.commit()
-    await session.refresh(approval)
-    return {
-        "id": approval.id,
-        "tool_key": approval.tool_key,
-        "status": approval.status,
-    }
-
-
-@router.get("/approvals/{approval_id}")
-async def get_approval(
-    approval_id: int,
-    session: AsyncSession = Depends(get_session),
-    key: AgentApiKey = AGENT,
-):
-    """Статус одобрения (агент опрашивает для возобновления графа)."""
-    approval = await session.get(AgentApproval, approval_id)
-    if approval is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval not found")
-    return {
-        "id": approval.id,
-        "tool_key": approval.tool_key,
-        "status": approval.status,
-        "resume_value": approval.resume_value,
-        "decided_by": approval.decided_by,
-        "decided_at": approval.decided_at.isoformat() if approval.decided_at else None,
-    }
-
-
 # --- Журнал запусков -----------------------------------------------------------
 
 
@@ -367,7 +304,7 @@ async def get_zakaz(
     return await customer_service.order_context(session, doc)
 
 
-# --- Tool-friendly запись (выполняется после одобрения оператора) ---------------
+# --- Tool-friendly запись (агент собирает заказ без одобрения) ------------------
 
 
 class AddToCartRequest(BaseModel):
@@ -377,12 +314,14 @@ class AddToCartRequest(BaseModel):
 
 
 class OrderItemRequest(BaseModel):
-    nomenklatura_id: int
+    nomenklatura_id: int | None = None
+    name: str | None = None
     quantity: Decimal
 
 
 class CreateOrderRequest(BaseModel):
-    customer_id: int
+    customer_phone: str
+    customer_name: str | None = None
     items: list[OrderItemRequest]
 
 
@@ -392,7 +331,7 @@ async def agent_add_to_cart(
     session: AsyncSession = Depends(get_session),
     key: AgentApiKey = AGENT,
 ):
-    """Добавляет товар в корзину покупателя (после одобрения оператора).
+    """Добавляет товар в корзину покупателя.
 
     Право — ``documents.write`` (проверяется по API-ключу). Бизнес-логику
     выполняет ядро (:func:`app.services.customer_service.add_to_cart`), агент
@@ -413,32 +352,77 @@ async def agent_add_to_cart(
     return {"customer_id": payload.customer_id, "items": items, "total": str(total)}
 
 
-@router.post("/create_order", status_code=status.HTTP_201_CREATED)
+@router.get("/match_customer")
+async def match_customer(
+    phone: str = Query(..., min_length=1),
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Ищет покупателя (Customer) или контрагента (Kontragent) по номеру телефона.
+
+    Право — ``documents.read``. Возвращает ``{found: true, ...}`` со сводкой
+    аккаунта или ``{found: false}``, если номер не найден.
+    """
+    _require_perm(key, "documents.read")
+    match = await customer_service.match_customer_by_phone(session, phone)
+    if match is None:
+        return {"found": False}
+    return {"found": True, **match}
+
+
+@router.post("/create_order")
 async def agent_create_order(
     payload: CreateOrderRequest,
     session: AsyncSession = Depends(get_session),
     key: AgentApiKey = AGENT,
 ):
-    """Создаёт заявку покупателя (ZAKAZ) в статусе DRAFT (после одобрения).
+    """Создаёт заявку (ZAKAZ) по телефону и списку позиций — система слотов.
 
-    Право — ``documents.write``. Позиции передаются как
-    ``[{nomenklatura_id, quantity}]``; цены и ставки НДС ядро берёт из
-    номенклатуры. Проведение документа остаётся за оператором.
+    Право — ``documents.write``. Позиции задаются по ``nomenklatura_id`` или по
+    ``name`` (ядро резолвит название в товар). Возвращает ``created=true`` с
+    заказом, либо ``created=false`` с текстом, чего не хватает (телефон, список,
+    количество или товар) — модель заполняет слоты и повторяет вызов.
     """
     _require_perm(key, "documents.write")
-    customer = await session.get(Customer, payload.customer_id)
-    if customer is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
+
+    phone = (payload.customer_phone or "").strip()
+    if not phone:
+        return {"created": False, "error": "Нужен номер телефона покупателя."}
+    match = await customer_service.match_customer_by_phone(session, phone)
+    if match is None:
+        return {
+            "created": False,
+            "error": f"Покупатель с номером {phone} не найден. Уточните номер телефона.",
+        }
+    if not payload.items:
+        return {"created": False, "error": "Укажите список товаров для заказа."}
+
+    resolved: list[dict] = []
+    for it in payload.items:
+        label = it.name or str(it.nomenklatura_id)
+        if it.quantity <= 0:
+            return {"created": False, "error": f"Укажите количество для «{label}»."}
+        nomen_id = it.nomenklatura_id
+        if nomen_id is None and it.name:
+            found = await search_service.keyword_search(session, it.name, limit=1)
+            if found:
+                nomen_id = found[0]["id"]
+        if nomen_id is None:
+            return {"created": False, "error": f"Товар «{label}» не найден. Уточните название."}
+        resolved.append({"nomenklatura_id": nomen_id, "quantity": it.quantity})
+
     try:
-        doc = await customer_service.create_draft_order(
+        doc = await customer_service.create_order_by_phone(
             session,
-            customer,
-            [i.model_dump() for i in payload.items],
+            phone=phone,
+            customer_name=payload.customer_name or match.get("name"),
+            customer_id=match.get("customer_id"),
+            items=resolved,
             source="agent",
         )
     except customer_service.CustomerError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return await customer_service.order_context(session, doc)
+        return {"created": False, "error": str(exc)}
+    return {"created": True, "order": await customer_service.order_context(session, doc)}
 
 
 # --- Персонализация (история / рекомендации / память) ----------------------------

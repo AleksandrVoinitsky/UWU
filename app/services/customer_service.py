@@ -444,6 +444,103 @@ async def create_draft_order(
     return doc
 
 
+async def match_customer_by_phone(session: AsyncSession, phone: str) -> dict | None:
+    """Ищет покупателя (Customer) или контрагента (Kontragent) по телефону.
+
+    Возвращает сводку ``{customer_id, kontragent_id, name, phone}`` или ``None``,
+    если ни покупатель, ни контрагент с таким номером не найдены. Используется
+    AI-агентом для привязки заказа к существующему аккаунту по номеру телефона.
+    """
+    normalized = _normalize_phone(phone or "")
+    if not normalized:
+        return None
+    digits = normalized.lstrip("+")
+    variants = {normalized, digits, "+" + digits}
+
+    customer: Customer | None = None
+    for v in variants:
+        customer = (
+            await session.execute(select(Customer).where(Customer.phone == v))
+        ).scalar_one_or_none()
+        if customer is not None:
+            break
+
+    kontragent: Kontragent | None = None
+    for v in variants:
+        kontragent = (
+            await session.execute(select(Kontragent).where(Kontragent.phones == v))
+        ).scalar_one_or_none()
+        if kontragent is not None:
+            break
+
+    if customer is None and kontragent is None:
+        return None
+
+    name = customer.name if customer and customer.name else (kontragent.name if kontragent else None)
+    return {
+        "customer_id": customer.id if customer else None,
+        "kontragent_id": kontragent.id if kontragent else None,
+        "name": name,
+        "phone": digits,
+    }
+
+
+async def create_order_by_phone(
+    session: AsyncSession,
+    *,
+    phone: str,
+    customer_name: str | None = None,
+    customer_id: int | None = None,
+    items: list[dict],
+    source: str = "agent",
+) -> Document:
+    """Создаёт черновик заявки (ZAKAZ) по телефону и списку разрешённых позиций.
+
+    Позиции — ``[{nomenklatura_id, quantity}]``. Контрагент подбирается по
+    телефону; цена и ставка НДС берутся из номенклатуры. Документ создаётся в
+    статусе ``DRAFT`` (проведение — за оператором).
+    """
+    kontragent = await match_kontragent_by_phone(session, phone)
+    nomen_ids = [i["nomenklatura_id"] for i in items]
+    nomen_map = {
+        n.id: n
+        for n in (
+            await session.execute(select(Nomenklatura).where(Nomenklatura.id.in_(nomen_ids)))
+        ).scalars()
+    }
+
+    doc_items: list[dict] = []
+    for it in items:
+        nomen = nomen_map.get(it["nomenklatura_id"])
+        if nomen is None:
+            raise CustomerError(f"Товар #{it['nomenklatura_id']} не найден")
+        doc_items.append(
+            {
+                "nomenklatura_id": nomen.id,
+                "quantity": it["quantity"],
+                "price": nomen.retail_price or Decimal("0"),
+                "nds_rate_id": nomen.nds_rate_id,
+            }
+        )
+
+    doc = await document_service.create_document(
+        session,
+        doc_type=DocType.ZAKAZ,
+        doc_date=date.today(),
+        kontragent_id=kontragent.id if kontragent else None,
+        extra={
+            "state": "draft",
+            "source": source,
+            "customer_id": customer_id,
+            "customer_phone": phone,
+            "customer_name": customer_name,
+        },
+        items=doc_items,
+        created_by_id=None,
+    )
+    return doc
+
+
 async def get_customer_order(
     session: AsyncSession, customer_id: int, document_id: int
 ) -> Document | None:

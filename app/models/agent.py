@@ -1,12 +1,13 @@
 """Модели управления AI-агентом (консультант покупателей).
 
 Хранят управляемую из админки конфигурацию агента: глобальные настройки,
-версионируемые промпты, реестр инструментов (действий), API-ключи, а также
-журнал запусков (``AgentRun``) и очередь одобрений (``AgentApproval``) для
-human-in-the-loop.
+версионируемые промпты, реестр инструментов (действий), API-ключи и журнал
+запусков (``AgentRun``) для аудита.
 
-Сам агент выполняется в отдельном репозитории/контейнере и обращается к ядру
-через REST API; эти таблицы — «плоскость управления» (control plane) агента.
+Агент собирает заказы и консультирует **без участия человека** — одобрение
+(human-in-the-loop) полностью убрано, поэтому таблицы/очереди одобрений здесь
+отсутствуют. Документ создаётся в статусе ``DRAFT``, проведение остаётся за
+оператором учётной системы.
 
 См. также: :mod:`app.services.agent_service`, :mod:`app.web.agent_admin`,
 :mod:`app.models.base`.
@@ -14,23 +15,16 @@ human-in-the-loop.
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.models.base import IdMixin, TimestampMixin
 
-# Политики одобрения инструмента (human-in-the-loop по порогу).
-APPROVAL_POLICIES = ("auto", "threshold", "always")
-
 # Статусы запуска агента.
-RUN_STATUSES = ("ok", "error", "approval_pending", "rejected")
-
-# Статусы одобрения.
-APPROVAL_STATUSES = ("pending", "approved", "rejected")
+RUN_STATUSES = ("ok", "error")
 
 # Права агента (минимальный набор, расширяется по необходимости).
 AGENT_PERMISSIONS = (
@@ -44,10 +38,9 @@ AGENT_PERMISSIONS = (
 #
 # Модель и параметры сэмплирования LLM (model/temperature/max_tokens) НЕ хранятся
 # здесь — они задаются переменными окружения отдельного сервиса ``uwu-ai-agent``
-# (см. docs/ai-agent.md). В админке управляются только бизнес-политики: порог
-# одобрения и сообщение-заглушка при ошибке.
+# (см. docs/ai-agent.md). В админке управляется только бизнес-политика:
+# сообщение-заглушка при ошибке.
 DEFAULT_AGENT_CONFIG: dict[str, str] = {
-    "approval_threshold_amount": "5000",  # порог суммы для политики threshold (₽)
     "fallback_message": "Извините, я сейчас не могу ответить. Оператор свяжется с вами.",
 }
 
@@ -109,9 +102,6 @@ class AgentTool(Base, IdMixin, TimestampMixin):
     method: Mapped[str] = mapped_column(String(10), default="GET", nullable=False)
     params_schema: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     permission: Mapped[str | None] = mapped_column(String(80), nullable=True)
-    # auto | threshold | always (см. APPROVAL_POLICIES).
-    approval_policy: Mapped[str] = mapped_column(String(20), default="auto", nullable=False)
-    approval_threshold_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     rate_limit: Mapped[int] = mapped_column(Integer, default=60, nullable=False)
 
@@ -149,19 +139,3 @@ class AgentRun(Base, IdMixin):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-
-
-class AgentApproval(Base, IdMixin, TimestampMixin):
-    """Запрос одобрения действия агента (human-in-the-loop)."""
-
-    __tablename__ = "agent_approvals"
-
-    run_id: Mapped[int | None] = mapped_column(ForeignKey("agent_runs.id"), nullable=True)
-    chat_id: Mapped[int | None] = mapped_column(ForeignKey("chats.id"), nullable=True)
-    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), nullable=True)
-    tool_key: Mapped[str] = mapped_column(String(80), nullable=False)
-    payload: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
-    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
-    decided_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    resume_value: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)

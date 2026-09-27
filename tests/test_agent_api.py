@@ -1,8 +1,8 @@
 """Тесты API, потребляемого AI-агентом (``/api/agent/*``).
 
 Покрывают API-key аутентификацию, чтение конфигурации (промпты/инструменты),
-обмен сообщениями, контекст покупателя, одобрения (HITL), журнал запусков и
-tool-friendly чтение (поиск/остатки/корзина/заявка).
+обмен сообщениями, контекст покупателя, привязку по телефону, создание заказа
+(система слотов), журнал запусков и tool-friendly чтение.
 """
 from __future__ import annotations
 
@@ -126,23 +126,75 @@ async def test_context_missing_chat(client, agent_headers):
     assert resp.status_code == 404
 
 
-# --- Одобрения (HITL) ----------------------------------------------------------
+# --- Привязка покупателя по телефону и создание заказа --------------------------
 
 
-async def test_approval_lifecycle(client, agent_headers):
-    resp = await client.post(
-        "/api/agent/approvals",
-        headers=agent_headers,
-        json={"tool_key": "create_order", "payload": {"customer_id": 1}},
+async def test_match_customer_not_found(client, agent_headers):
+    resp = await client.get(
+        "/api/agent/match_customer", headers=agent_headers, params={"phone": "+79990000000"}
     )
-    assert resp.status_code == 201
-    approval_id = resp.json()["id"]
-    assert resp.json()["status"] == "pending"
-
-    resp = await client.get(f"/api/agent/approvals/{approval_id}", headers=agent_headers)
     assert resp.status_code == 200
-    assert resp.json()["status"] == "pending"
-    assert resp.json()["tool_key"] == "create_order"
+    assert resp.json()["found"] is False
+
+
+async def test_match_customer_found_by_kontragent(client, agent_headers, seeded_session):
+    from app.models.catalog import Kontragent
+
+    seeded_session.add(Kontragent(code="K001", name="Иван", phones="+79991112233"))
+    await seeded_session.commit()
+
+    resp = await client.get(
+        "/api/agent/match_customer", headers=agent_headers, params={"phone": "79991112233"}
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["found"] is True
+    assert data["name"] == "Иван"
+    assert data["kontragent_id"] is not None
+
+
+async def test_create_order_requires_phone(client, agent_headers):
+    resp = await client.post(
+        "/api/agent/create_order",
+        headers=agent_headers,
+        json={"customer_phone": "", "items": [{"name": "хлеб", "quantity": 2}]},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["created"] is False
+    assert "телефон" in resp.json()["error"].lower()
+
+
+async def test_create_order_unknown_phone(client, agent_headers):
+    resp = await client.post(
+        "/api/agent/create_order",
+        headers=agent_headers,
+        json={"customer_phone": "+79990000000", "items": [{"name": "хлеб", "quantity": 2}]},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["created"] is False
+    assert "не найден" in resp.json()["error"].lower()
+
+
+async def test_create_order_by_name(client, agent_headers, seeded_session):
+    from app.models.catalog import Kontragent, Nomenklatura
+
+    seeded_session.add(Kontragent(code="K002", name="Пётр", phones="+79992223344"))
+    seeded_session.add(Nomenklatura(code="900", name="Хлеб пшеничный", retail_price=Decimal("45.00")))
+    await seeded_session.commit()
+
+    resp = await client.post(
+        "/api/agent/create_order",
+        headers=agent_headers,
+        json={
+            "customer_phone": "+79992223344",
+            "items": [{"name": "хлеб пшеничный", "quantity": 2}],
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["created"] is True
+    assert data["order"]["items"][0]["name"] == "Хлеб пшеничный"
+    assert Decimal(str(data["order"]["items"][0]["quantity"])) == 2
 
 
 # --- Журнал запусков -----------------------------------------------------------

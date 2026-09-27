@@ -1,8 +1,8 @@
 """Тесты управления AI-агентом (админка).
 
 Покрывают: сид дефолтных промптов/инструментов, конфигурацию, версионирование
-промптов, инструменты, API-ключи (хеширование/верификация), одобрения
-(human-in-the-loop) и рендер страниц админки.
+промптов, инструменты, API-ключи (хеширование/верификация) и рендер страниц
+админки. Одобрение (human-in-the-loop) полностью убрано.
 
 См. также: :mod:`app.services.agent_service`, :mod:`app.web.agent_admin`,
 :mod:`app.models.agent`.
@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from app.models.agent import AgentApproval, AgentPrompt, AgentTool
+from app.models.agent import AgentPrompt, AgentTool
 from app.services import agent_service
 
 
@@ -43,15 +43,13 @@ async def test_seed_agent_is_idempotent(seeded_session):
 # ---------------------------------------------------------------------------
 async def test_config_get_set(seeded_session):
     config = await agent_service.get_configs(seeded_session)
-    assert config["approval_threshold_amount"] == "5000"  # дефолт
     assert config["fallback_message"]
-    # Параметры модели в админке не управляются — они задаются env сервиса uwu-ai-agent.
+    # Модель/параметры LLM в админке не управляются — они задаются env сервиса uwu-ai-agent.
     assert "model" not in config
     assert "temperature" not in config
-    assert "max_tokens" not in config
-    await agent_service.set_config(seeded_session, "approval_threshold_amount", "7000")
+    await agent_service.set_config(seeded_session, "fallback_message", "Оператор на связи.")
     config = await agent_service.get_configs(seeded_session)
-    assert config["approval_threshold_amount"] == "7000"
+    assert config["fallback_message"] == "Оператор на связи."
 
 
 # ---------------------------------------------------------------------------
@@ -97,22 +95,21 @@ async def test_create_prompt(seeded_session):
 # ---------------------------------------------------------------------------
 async def test_update_tool(seeded_session):
     tool = next(t for t in await agent_service.list_tools(seeded_session) if t.key == "create_order")
-    assert tool.approval_policy == "auto"  # сбор заказов без одобрения
 
     await agent_service.update_tool(
-        seeded_session, tool, approval_policy="threshold", enabled=False, rate_limit=5
+        seeded_session, tool, enabled=False, rate_limit=5
     )
     tool = await agent_service.get_tool(seeded_session, tool.id)
-    assert tool.approval_policy == "threshold"
     assert tool.enabled is False
     assert tool.rate_limit == 5
 
 
-async def test_default_tools_are_auto(seeded_session):
-    """Запись в корзину и создание заказа по умолчанию без одобрения (auto)."""
+async def test_default_tools_include_order_flow(seeded_session):
+    """Сид создаёт инструменты сбора заказа и привязки по телефону."""
     tools = {t.key: t for t in await agent_service.list_tools(seeded_session)}
-    assert tools["add_to_cart"].approval_policy == "auto"
-    assert tools["create_order"].approval_policy == "auto"
+    assert "create_order" in tools
+    assert "match_customer" in tools
+    assert "search_catalog" in tools
 
 
 # ---------------------------------------------------------------------------
@@ -139,23 +136,6 @@ async def test_api_key_wrong_raw_rejects(seeded_session):
 
 
 # ---------------------------------------------------------------------------
-# Одобрения (human-in-the-loop)
-# ---------------------------------------------------------------------------
-async def test_approval_decide(seeded_session):
-    seeded_session.add(AgentApproval(tool_key="create_order", payload={"a": 1}, status="pending"))
-    await seeded_session.commit()
-
-    pending = await agent_service.list_approvals(seeded_session, status="pending")
-    assert len(pending) == 1
-
-    await agent_service.decide_approval(seeded_session, pending[0], approve=True, decided_by="admin")
-    approval = await agent_service.get_approval(seeded_session, pending[0].id)
-    assert approval.status == "approved"
-    assert approval.decided_by == "admin"
-    assert approval.resume_value == {"approved": True}
-
-
-# ---------------------------------------------------------------------------
 # Маршруты админки
 # ---------------------------------------------------------------------------
 _AGENT_ROUTES = [
@@ -164,7 +144,6 @@ _AGENT_ROUTES = [
     "/admin/agent/tools",
     "/admin/agent/keys",
     "/admin/agent/runs",
-    "/admin/agent/approvals",
 ]
 
 

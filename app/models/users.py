@@ -33,7 +33,6 @@ PERMISSIONS: dict[str, str] = {
     "agent.manage": "Управление AI-агентом (обзор и конфигурация)",
     "agent.prompts.manage": "Управление промптами агента",
     "agent.tools.manage": "Управление инструментами агента",
-    "agent.approvals.manage": "Управление одобрениями агента (HITL)",
 }
 
 # Права по умолчанию для встроенных ролей.

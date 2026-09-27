@@ -20,8 +20,6 @@
           <td class="num muted">{{ r.latency_ms }} мс</td>
           <td>
             {% if r.status == 'ok' %}{{ badge('posted', 'ok') }}
-            {% elif r.status == 'approval_pending' %}{{ badge('draft', 'одобрение') }}
-            {% elif r.status == 'rejected' %}{{ badge('deleted', 'отклонено') }}
             {% else %}{{ badge('deleted', 'ошибка') }}{% endif %}
           </td>
           <td class="muted">{{ r.created_at.strftime('%d.%m %H:%M') if r.created_at else '—' }}</td>

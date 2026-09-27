@@ -17,10 +17,6 @@
     <div class="kpi-top"><span class="kpi-label">API-ключи</span><span class="kpi-icon">{{ icon('shield') }}</span></div>
     <div class="kpi-value">{{ keys|length }}</div>
   </div>
-  <div class="kpi-card {% if pending %}accent-orange{% endif %}">
-    <div class="kpi-top"><span class="kpi-label">Ожидают одобрения</span><span class="kpi-icon">{{ icon('alert') }}</span></div>
-    <div class="kpi-value">{{ pending|length }}</div>
-  </div>
 </div>
 
 <!-- Навигация -->
@@ -30,7 +26,6 @@
     <a class="qa" href="/admin/agent/tools"><span class="qa-icon">{{ icon('settings') }}</span><span>Инструменты</span></a>
     <a class="qa" href="/admin/agent/keys"><span class="qa-icon">{{ icon('shield') }}</span><span>API-ключи</span></a>
     <a class="qa" href="/admin/agent/runs"><span class="qa-icon">{{ icon('clock') }}</span><span>Журнал запусков</span></a>
-    <a class="qa" href="/admin/agent/approvals"><span class="qa-icon">{{ icon('alert') }}</span><span>Одобрения</span></a>
   </div>
 </div>
 
@@ -38,18 +33,15 @@
 <div class="card">
   <div class="card-header">
     <h2>Конфигурация агента</h2>
-    <span class="muted small">Бизнес-политики. Модель и параметры LLM задаются переменными окружения сервиса <code>uwu-ai-agent</code></span>
+    <span class="muted small">Модель и параметры LLM задаются переменными окружения сервиса <code>uwu-ai-agent</code></span>
   </div>
   <div class="notice">
-    Модель, токен и параметры сэмплирования (temperature / max_tokens) задаются переменными
-    окружения отдельного сервиса <code>uwu-ai-agent</code> (<code>LLM_MODEL</code>, <code>LLM_API_KEY</code>,
-    <code>LLM_TEMPERATURE</code>, <code>LLM_MAX_TOKENS</code>). Здесь управляются только промпты и
-    права/разрешения агента, а автоответ включается/выключается переключателем на чате.
+    Модель, токен и параметры сэмплирования задаются переменными окружения отдельного
+    сервиса <code>uwu-ai-agent</code> (<code>LLM_MODEL</code>, <code>LLM_API_KEY</code> и т.д.).
+    Здесь управляются только промпты и права/разрешения агента. Одобрение оператора
+    убрано — агент собирает заказы и отвечает полностью самостоятельно.
   </div>
   <form method="post" action="/admin/agent/config">
-    <div class="form-row">
-      <div class="field"><label>Порог одобрения суммы, ₽</label><input type="number" name="approval_threshold_amount" value="{{ config.get('approval_threshold_amount', '5000') }}"></div>
-    </div>
     <div class="field"><label>Сообщение-заглушка при ошибке</label><textarea name="fallback_message" rows="2">{{ config.get('fallback_message', '') }}</textarea></div>
     <div class="form-actions"><button type="submit" class="btn primary">{{ t('common.save', lang) }}</button></div>
   </form>
@@ -89,8 +81,6 @@
           <td class="num muted">{{ r.latency_ms }} мс</td>
           <td>
             {% if r.status == 'ok' %}{{ badge('posted', 'ok') }}
-            {% elif r.status == 'approval_pending' %}{{ badge('draft', 'одобрение') }}
-            {% elif r.status == 'rejected' %}{{ badge('deleted', 'отклонено') }}
             {% else %}{{ badge('deleted', 'ошибка') }}{% endif %}
           </td>
           <td class="muted">{{ r.created_at.strftime('%d.%m %H:%M') if r.created_at else '—' }}</td>
@@ -100,27 +90,5 @@
     </table>
   </div>
   {% else %}{{ empty_state('inbox', 'Запусков пока нет') }}{% endif %}
-</div>
-
-<!-- Ожидают одобрения -->
-<div class="card">
-  <div class="card-header"><h2>Ожидают одобрения</h2><a class="btn text small" href="/admin/agent/approvals">Все →</a></div>
-  {% if pending %}
-  <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th>Действие</th><th>Детали</th><th>{{ t('report.date', lang) }}</th><th></th></tr></thead>
-      <tbody>
-        {% for a in pending %}
-        <tr>
-          <td><strong>{{ a.tool_key }}</strong></td>
-          <td class="muted"><code style="font-size:11px">{{ a.payload }}</code></td>
-          <td class="muted">{{ a.created_at.strftime('%d.%m %H:%M') if a.created_at else '—' }}</td>
-          <td><a class="btn small secondary" href="/admin/agent/approvals">Решить</a></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}{{ empty_state('check', 'Нет ожидающих одобрения') }}{% endif %}
 </div>
 {% endblock %}

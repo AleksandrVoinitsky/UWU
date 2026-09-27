@@ -1,13 +1,12 @@
 """Веб-интерфейс управления AI-агентом (админка).
 
-Страницы: обзор/конфигурация, промпты (версионирование), инструменты, API-ключи,
-журнал запусков и очередь одобрений (human-in-the-loop).
+Страницы: обзор/конфигурация, промпты (версионирование), инструменты, API-ключи
+и журнал запусков. Одобрение (human-in-the-loop) убрано — агент собирает заказы
+самостоятельно, участие человека не требуется.
 
 См. также: :mod:`app.services.agent_service`, :mod:`app.models.agent`.
 """
 from __future__ import annotations
-
-from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -16,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.core.deps import get_current_user_from_cookie
 from app.core.i18n import translate
-from app.models.agent import APPROVAL_POLICIES, APPROVAL_STATUSES, AgentApiKey
+from app.models.agent import AgentApiKey
 from app.models.users import User
 from app.services import agent_service, search_service
 from app.templates import render
@@ -45,15 +44,6 @@ def _require_admin(user: User):
     return not user.is_admin
 
 
-def _as_decimal(raw: str | None) -> Decimal | None:
-    if not raw:
-        return None
-    try:
-        return Decimal(raw.strip())
-    except InvalidOperation:
-        return None
-
-
 def _as_int(raw: str | None) -> int | None:
     if not raw:
         return None
@@ -78,7 +68,6 @@ async def agent_overview(
     prompts = await agent_service.list_prompts(session)
     tools = await agent_service.list_tools(session)
     keys = await agent_service.list_keys(session)
-    pending = await agent_service.list_approvals(session, status="pending", limit=20)
     runs = await agent_service.list_runs(session, limit=10)
     embeddings = await search_service.embeddings_status(session)
     embedding_status = request.query_params.get("embedding_status")
@@ -90,7 +79,6 @@ async def agent_overview(
         prompts=prompts,
         tools=tools,
         keys=keys,
-        pending=pending,
         runs=runs,
         embeddings=embeddings,
         embedding_status=embedding_status,
@@ -227,7 +215,6 @@ async def agent_tools(
         user,
         "admin/agent_tools.html",
         tools=tools,
-        policies=APPROVAL_POLICIES,
     )
 
 
@@ -240,8 +227,6 @@ async def agent_update_tool(
     endpoint: str = Form(...),
     method: str = Form(...),
     permission: str = Form(""),
-    approval_policy: str = Form("auto"),
-    approval_threshold_amount: str = Form(""),
     rate_limit: str = Form("60"),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
@@ -259,8 +244,6 @@ async def agent_update_tool(
             endpoint=endpoint,
             method=method.upper() or "GET",
             permission=permission or None,
-            approval_policy=approval_policy,
-            approval_threshold_amount=_as_decimal(approval_threshold_amount),
             enabled=form.get("enabled") == "on",
             rate_limit=_as_int(rate_limit) or 60,
         )
@@ -331,7 +314,7 @@ async def agent_delete_key(
     return RedirectResponse("/admin/agent/keys", status_code=303)
 
 
-# --- Журнал запусков и одобрения ----------------------------------------------
+# --- Журнал запусков -----------------------------------------------------------
 
 
 @router.get("/admin/agent/runs", response_class=HTMLResponse)
@@ -344,38 +327,3 @@ async def agent_runs(
         return RedirectResponse("/", status_code=303)
     runs = await agent_service.list_runs(session)
     return _page(request, user, "admin/agent_runs.html", runs=runs)
-
-
-@router.get("/admin/agent/approvals", response_class=HTMLResponse)
-async def agent_approvals(
-    request: Request,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user_from_cookie),
-):
-    if _require_admin(user):
-        return RedirectResponse("/", status_code=303)
-    approvals = await agent_service.list_approvals(session)
-    return _page(
-        request,
-        user,
-        "admin/agent_approvals.html",
-        approvals=approvals,
-        statuses=APPROVAL_STATUSES,
-    )
-
-
-@router.post("/admin/agent/approvals/{approval_id}/decide", response_class=HTMLResponse)
-async def agent_decide_approval(
-    approval_id: int,
-    approve: str = Form(...),
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user_from_cookie),
-):
-    if _require_admin(user):
-        return RedirectResponse("/", status_code=303)
-    approval = await agent_service.get_approval(session, approval_id)
-    if approval and approval.status == "pending":
-        await agent_service.decide_approval(
-            session, approval, approve=approve == "approve", decided_by=user.login
-        )
-    return RedirectResponse("/admin/agent/approvals", status_code=303)

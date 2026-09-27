@@ -8,7 +8,6 @@
     <h2>Инструменты (действия)</h2>
     <span class="muted small">Каждое действие — обёртка над REST-эндпоинтом ядра</span>
   </div>
-  <div class="muted small mb">Политика одобрения: <code>auto</code> — без одобрения, <code>threshold</code> — при сумме выше порога, <code>always</code> — всегда.</div>
 
   {% for tool in tools %}
   <form method="post" action="/admin/agent/tools/{{ tool.id }}" class="bot-card">
@@ -32,14 +31,6 @@
         </select>
       </div>
       <div class="field" style="margin:0"><label>Право</label><input type="text" name="permission" value="{{ tool.permission or '' }}" placeholder="catalog.read"></div>
-      <div class="field" style="margin:0"><label>Одобрение</label>
-        <select name="approval_policy">
-          {% for p in policies %}
-          <option value="{{ p }}" {% if tool.approval_policy == p %}selected{% endif %}>{{ p }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="field" style="margin:0"><label>Порог суммы, ₽</label><input type="number" step="0.01" name="approval_threshold_amount" value="{{ tool.approval_threshold_amount or '' }}"></div>
       <div class="field" style="margin:0"><label>Rate limit/мин</label><input type="number" name="rate_limit" value="{{ tool.rate_limit }}"></div>
     </div>
     <div class="field" style="margin-top:10px"><label>Описание (для LLM)</label><textarea name="description" rows="2" required>{{ tool.description }}</textarea></div>

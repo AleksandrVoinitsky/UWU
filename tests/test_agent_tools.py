@@ -108,40 +108,42 @@ async def test_add_to_cart_missing_customer(client, agent_headers):
 
 
 async def test_create_order_draft(client, agent_headers, seeded_session):
-    customer = await _make_customer(seeded_session)
-    nomen = await _make_nomen(seeded_session, "003", "Ручка", price="50.00")
+    customer = await _make_customer(seeded_session)  # phone=79990000001
+    await _make_nomen(seeded_session, "003", "Ручка", price="50.00")
     await seeded_session.commit()
 
     resp = await client.post(
         "/api/agent/create_order",
         headers=agent_headers,
         json={
-            "customer_id": customer.id,
-            "items": [{"nomenklatura_id": nomen.id, "quantity": 3}],
+            "customer_phone": customer.phone,
+            "items": [{"name": "Ручка", "quantity": 3}],
         },
     )
-    assert resp.status_code == 201
+    assert resp.status_code == 200
     data = resp.json()
-    assert data["status"] == "draft"
-    assert data["items"][0]["name"] == "Ручка"
-    assert data["items"][0]["quantity"] == 3
-    assert Decimal(str(data["total"])) == Decimal("150.00")
+    assert data["created"] is True
+    order = data["order"]
+    assert order["status"] == "draft"
+    assert order["items"][0]["name"] == "Ручка"
+    assert Decimal(str(order["items"][0]["quantity"])) == 3
+    assert Decimal(str(order["total"])) == Decimal("150.00")
 
     # Документ создан как ZAKAZ в статусе DRAFT.
-    doc = (await seeded_session.execute(select(Document).where(Document.id == data["id"]))).scalar_one()
+    doc = (await seeded_session.execute(select(Document).where(Document.id == order["id"]))).scalar_one()
     assert doc.doc_type == DocType.ZAKAZ.value
     assert doc.status == "draft"
 
 
 async def test_create_order_requires_write_permission(client, read_only_headers, seeded_session):
     customer = await _make_customer(seeded_session)
-    nomen = await _make_nomen(seeded_session, "004", "Карандаш")
+    await _make_nomen(seeded_session, "004", "Карандаш")
     await seeded_session.commit()
 
     resp = await client.post(
         "/api/agent/create_order",
         headers=read_only_headers,
-        json={"customer_id": customer.id, "items": [{"nomenklatura_id": nomen.id, "quantity": 1}]},
+        json={"customer_phone": customer.phone, "items": [{"name": "Карандаш", "quantity": 1}]},
     )
     assert resp.status_code == 403
 
@@ -153,21 +155,27 @@ async def test_create_order_empty_items(client, agent_headers, seeded_session):
     resp = await client.post(
         "/api/agent/create_order",
         headers=agent_headers,
-        json={"customer_id": customer.id, "items": []},
+        json={"customer_phone": customer.phone, "items": []},
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["created"] is False
+    assert "список" in data["error"].lower()
 
 
-async def test_create_order_missing_nomen(client, agent_headers, seeded_session):
+async def test_create_order_unknown_name(client, agent_headers, seeded_session):
     customer = await _make_customer(seeded_session)
     await seeded_session.commit()
 
     resp = await client.post(
         "/api/agent/create_order",
         headers=agent_headers,
-        json={"customer_id": customer.id, "items": [{"nomenklatura_id": 9999, "quantity": 1}]},
+        json={"customer_phone": customer.phone, "items": [{"name": "Несуществующий", "quantity": 1}]},
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["created"] is False
+    assert "не найден" in data["error"].lower()
 
 
 # --- Персонализация -------------------------------------------------------------
