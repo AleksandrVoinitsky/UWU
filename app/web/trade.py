@@ -67,29 +67,23 @@ async def _require_web_read(
 
 router = APIRouter(tags=["web-trade"], dependencies=[Depends(_require_web_read)])
 
-# Названия документов для отображения.
-DOC_LABELS = {
-    "prihod": "Приходная накладная",
-    "rashod": "Накладная",
-    "peremeshenie": "Перемещение",
-    "spisanie": "Списание",
-    "oprihodovanie": "Оприходование",
-    "vvod_ostatkov": "Ввод остатков ТМЦ",
-    "pko": "Приходный кассовый ордер",
-    "rko": "Расходный кассовый ордер",
-    "platezhnoe_poruchenie": "Платёжное поручение",
-    "vvod_ostatkov_deneg": "Ввод остатков денег",
-    "zakaz": "Заявка покупателя",
-    "vozvrat": "Возврат товара",
-    "pereocenka": "Переоценка товаров",
-}
+# Ключи видов документов и состояний заявок (идентификаторы для перевода).
+_DOC_TYPE_KEYS = (
+    "prihod", "rashod", "peremeshenie", "spisanie", "oprihodovanie",
+    "vvod_ostatkov", "pko", "rko", "platezhnoe_poruchenie",
+    "vvod_ostatkov_deneg", "zakaz", "vozvrat", "pereocenka",
+)
+_ZAKAZ_STATE_KEYS = ("new", "in_work", "done", "cancelled")
 
-ZAKAZ_STATES = {
-    "new": "Новая",
-    "in_work": "В работе",
-    "done": "Выполнена",
-    "cancelled": "Отменена",
-}
+
+def _doc_labels(lang: str) -> dict[str, str]:
+    """Подписи видов документов на выбранном языке (ключ — значение ``DocType``)."""
+    return {key: translate(f"doc.{key}", lang) for key in _DOC_TYPE_KEYS}
+
+
+def _zakaz_states(lang: str) -> dict[str, str]:
+    """Подписи состояний заявки покупателя на выбранном языке."""
+    return {key: translate(f"zakaz.state.{key}", lang) for key in _ZAKAZ_STATE_KEYS}
 
 # Виды документов, у которых есть табличная часть.
 _ITEM_DOCS = {"prihod", "rashod", "peremeshenie", "spisanie", "oprihodovanie", "vvod_ostatkov", "vozvrat", "pereocenka"}
@@ -105,15 +99,17 @@ def _lang(request: Request) -> str:
 
 
 def _page(request: Request, user: User, template: str, **ctx) -> HTMLResponse:
+    lang = _lang(request)
     return HTMLResponse(
         render(
             template,
-            lang=_lang(request),
+            lang=lang,
             t=translate,
             user=user,
             section="trade",
             DocType=DocType,
-            DOC_LABELS=DOC_LABELS,
+            DOC_LABELS=_doc_labels(lang),
+            ZAKAZ_STATES=_zakaz_states(lang),
             **ctx,
         )
     )
@@ -1201,8 +1197,7 @@ async def zakazy_list(
     return _page(
         request, user, "trade/zakazy.html",
         zakazy=zakazy, kontragenty=kontragenty, nomen=nomen, kg_map=kg_map,
-        zakaz_items=zakaz_items,
-        ZAKAZ_STATES=ZAKAZ_STATES, today=date.today().isoformat(),
+        zakaz_items=zakaz_items, today=date.today().isoformat(),
     )
 
 
@@ -1250,7 +1245,7 @@ async def zakaz_state(
     doc = await document_service.get_document(session, zakaz_id)
     if doc:
         extra = dict(doc.extra or {})
-        extra["state"] = state if state in ZAKAZ_STATES else "new"
+        extra["state"] = state if state in _ZAKAZ_STATE_KEYS else "new"
         doc.extra = extra
         await session.commit()
         # При выполнении/отмене — снимаем резерв.
@@ -1518,7 +1513,7 @@ async def document_new_form(
         today=date.today().isoformat(),
         is_item_doc=doc_type in _ITEM_DOCS,
         is_money_doc=doc_type in _MONEY_DOCS,
-        label=DOC_LABELS.get(doc_type, doc_type),
+        label=translate(f"doc.{doc_type}", _lang(request)),
         open_invoices=open_invoices,
     )
 

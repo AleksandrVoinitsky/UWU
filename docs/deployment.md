@@ -26,6 +26,7 @@
 | `ADMIN_EMAIL` | `admin@uwu.local` | Email администратора |
 | `SECRET_KEY` | `change-me-...` | Ключ подписи JWT |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `480` | Срок жизни токена |
+| `ENVIRONMENT` | `development` | `development` \| `production`. В `production` небезопасные `SECRET_KEY`/`ADMIN_PASSWORD` блокируют запуск (fail-fast) |
 | `DEFAULT_CURRENCY` | `RUB` | Валюта по умолчанию |
 | `DEFAULT_LANGUAGE` | `ru` | Язык интерфейса по умолчанию |
 | `EMBEDDING_BASE_URL` | *(пусто)* | OpenAI-совместимый эндпоинт эмбеддингов (семантический поиск) |
@@ -41,6 +42,11 @@ docker compose up --build
 ```
 
 Открыть http://localhost:8000.
+
+> Для разработки `ENVIRONMENT=development` (по умолчанию) — слабые секреты
+> допустимы (в лог пишется предупреждение). Для продакшена задайте
+> `ENVIRONMENT=production` и надёжные `SECRET_KEY`/`ADMIN_PASSWORD` — иначе
+> сервис откажется стартовать (fail-fast).
 
 ## Миграции
 

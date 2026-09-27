@@ -36,8 +36,10 @@ services:
       # AI-агент (отдельный сервис uwu-ai-agent): webhook для уведомления о
       # новых входящих сообщениях (пусто — уведомление выключено).
       AGENT_WEBHOOK_URL: ${AGENT_WEBHOOK_URL:-http://host.docker.internal:8100/webhook}
-      # production — небезопасные SECRET_KEY/пароль блокируют запуск (fail-fast).
-      ENVIRONMENT: ${ENVIRONMENT:-production}
+      # development — работает «из коробки» (слабые секреты допустимы с
+      # предупреждением). production — небезопасные SECRET_KEY/пароль блокируют
+      # запуск (fail-fast); задайте ENVIRONMENT=production и надёжные секреты.
+      ENVIRONMENT: ${ENVIRONMENT:-development}
     ports:
       - "8000:8000"
     volumes:

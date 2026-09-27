@@ -20,7 +20,7 @@ from app.models.catalog import Category, Kontragent, Nomenklatura, Sklad
 from app.models.customer import Customer
 from app.models.document.base_document import Document
 from app.models.enums import DocType
-from app.services import catalog_service, customer_service, document_service
+from app.services import catalog_service, customer_service, document_service, site_service
 
 
 # --- Разделение токенов сотрудников и покупателей ---
@@ -172,6 +172,46 @@ async def test_checkout_empty_cart(client, seeded_session):
     h = {"Authorization": f"Bearer {r.json()['access_token']}"}
     r = await client.post("/shop/api/checkout", headers=h)
     assert r.status_code == 400  # пустая корзина
+
+
+async def test_checkout_applies_promo_discount(client, seeded_session):
+    """Скидка из каталога должна применяться и в корзине/чекауте (регрессия CUS-1)."""
+    item = await _seed_in_stock_item(seeded_session, name="Телефон", price="1000", qty="10")
+    await site_service.create_promotion(
+        seeded_session,
+        name="Скидка 20%",
+        discount_type="percent",
+        value=Decimal("20"),
+        nomenklatura_id=item.id,
+    )
+    r = await client.post("/shop/api/register", json={"phone": "+79990003344", "password": "secret123"})
+    h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+    # Каталог показывает цену со скидкой.
+    r = await client.get("/shop/api/products")
+    products = {p["id"]: p for p in r.json()}
+    assert float(products[item.id]["price"]) == 800.00
+
+    # Корзина применяет ту же скидку.
+    r = await client.post("/shop/api/cart", json={"nomenklatura_id": item.id, "quantity": 2}, headers=h)
+    assert r.status_code == 201
+    assert float(r.json()["total"]) == 1600.00
+
+    # Чекаут — та же цена со скидкой.
+    r = await client.post("/shop/api/checkout", headers=h)
+    assert r.status_code == 201
+    assert float(r.json()["total"]) == 1600.00
+
+
+async def test_checkout_no_promo_uses_full_price(client, seeded_session):
+    """Без активной акции цена остаётся розничной (без скидки)."""
+    item = await _seed_in_stock_item(seeded_session, name="Товар", price="500", qty="5")
+    r = await client.post("/shop/api/register", json={"phone": "+79990005566", "password": "secret123"})
+    h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    await client.post("/shop/api/cart", json={"nomenklatura_id": item.id, "quantity": 1}, headers=h)
+    r = await client.post("/shop/api/checkout", headers=h)
+    assert r.status_code == 201
+    assert float(r.json()["total"]) == 500.00
 
 
 # --- PDF (HTML всегда; PDF — если доступен WeasyPrint) ---

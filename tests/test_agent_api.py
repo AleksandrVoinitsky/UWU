@@ -102,6 +102,43 @@ async def test_post_message_missing_chat(client, agent_headers):
     assert resp.status_code == 404
 
 
+async def test_post_message_rejects_spoofed_author(client, agent_headers, seeded_session):
+    """Агент не может выдавать себя за оператора/покупателя (author спуфинг)."""
+    chat = Chat(name="Покупатель", channel="site")
+    seeded_session.add(chat)
+    await seeded_session.commit()
+    resp = await client.post(
+        "/api/agent/messages",
+        headers=agent_headers,
+        json={"chat_id": chat.id, "text": "Привет", "author": "operator"},
+    )
+    assert resp.status_code == 422
+
+
+async def test_post_message_rejects_empty_text(client, agent_headers, seeded_session):
+    chat = Chat(name="Покупатель", channel="site")
+    seeded_session.add(chat)
+    await seeded_session.commit()
+    resp = await client.post(
+        "/api/agent/messages",
+        headers=agent_headers,
+        json={"chat_id": chat.id, "text": ""},
+    )
+    assert resp.status_code == 422
+
+
+async def test_post_message_rejects_long_text(client, agent_headers, seeded_session):
+    chat = Chat(name="Покупатель", channel="site")
+    seeded_session.add(chat)
+    await seeded_session.commit()
+    resp = await client.post(
+        "/api/agent/messages",
+        headers=agent_headers,
+        json={"chat_id": chat.id, "text": "x" * 4001},
+    )
+    assert resp.status_code == 422
+
+
 # --- Контекст ------------------------------------------------------------------
 
 
