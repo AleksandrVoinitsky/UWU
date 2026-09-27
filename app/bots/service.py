@@ -13,6 +13,7 @@ import asyncio
 from datetime import datetime, timezone
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.bots.base import (
@@ -182,7 +183,11 @@ async def apply_bot_config(
 async def find_or_create_chat(
     session: AsyncSession, channel: str, external_id: str, name: str
 ) -> Chat:
-    """Находит чат по каналу и внешнему id или создаёт новый."""
+    """Находит чат по каналу и внешнему id или создаёт новый.
+
+    Защищён от гонки уникальным ограничением ``(channel, external_id)``: при
+    конкурентном создании второго чата перечитываем уже созданный.
+    """
     stmt = select(Chat).where(
         Chat.channel == channel, Chat.external_id == external_id
     )
@@ -190,7 +195,13 @@ async def find_or_create_chat(
     if chat is None:
         chat = Chat(name=name or "Чат", channel=channel, external_id=external_id)
         session.add(chat)
-        await session.flush()
+        try:
+            await session.flush()
+        except IntegrityError:
+            await session.rollback()
+            chat = (await session.execute(stmt)).scalar_one_or_none()
+            if chat is None:
+                raise
     return chat
 
 

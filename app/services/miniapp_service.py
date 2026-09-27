@@ -17,6 +17,7 @@ import time
 import urllib.parse
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
@@ -151,7 +152,18 @@ async def find_or_create_customer(
         session.add(customer)
         await session.flush()
     session.add(CustomerBinding(channel=channel, external_id=external_id, customer_id=customer.id))
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Гонка: параллельный первый вход уже создал покупателя/привязку.
+        # Перечитываем существующую запись вместо падения с 500.
+        await session.rollback()
+        binding = await get_binding(session, channel, external_id)
+        if binding is None:
+            raise
+        customer = await session.get(Customer, binding.customer_id)
+        if customer is None:
+            raise
     await session.refresh(customer)
     logger.info("MiniApp: привязан %s/%s к покупателю #%s", channel, external_id, customer.id)
     return customer

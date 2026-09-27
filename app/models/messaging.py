@@ -1,7 +1,8 @@
-"""Мессенджер: чаты и сообщения (основа для интеграции с ботами).
+"""Мессенджер: чаты и сообщения (интеграция с ботами Telegram/MAX и сайтом).
 
-Чаты привязаны к клиентам (контрагентам) и к каналам (Макс, Telegram и т.д.).
-Сама интеграция с ботами пока не реализована — заложена модель и API.
+Чаты привязаны к клиентам (контрагентам/покупателям) и к каналам. Входящие
+сообщения ботов и сайта попадают в общий инбокс оператора; ответы оператора
+доставляются обратно через адаптеры ботов.
 
 См. также: :mod:`app.models.base`.
 """
@@ -9,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -20,6 +21,12 @@ class Chat(Base, IdMixin, TimestampMixin):
     """Чат с клиентом или ботом."""
 
     __tablename__ = "chats"
+    # Один внешний чат на (канал, external_id) — защита от дублей при гонке
+    # параллельного первого сообщения. NULL external_id (чаты сайта) не
+    # конфликтуют: в PostgreSQL несколько NULL допустимы.
+    __table_args__ = (
+        UniqueConstraint("channel", "external_id", name="uq_chats_channel_external"),
+    )
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     channel: Mapped[str] = mapped_column(String(30), default="internal", server_default="internal", nullable=False)  # internal | telegram | maks | site

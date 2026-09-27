@@ -90,6 +90,19 @@ async def test_find_or_create_chat(seeded_session):
     assert chat1.id == chat2.id  # повторный вызов не создаёт дубль
 
 
+async def test_chat_unique_channel_external(seeded_session):
+    """Уникальное ограничение (channel, external_id) не даёт создать дубль чата."""
+    from sqlalchemy.exc import IntegrityError
+    import pytest
+
+    await find_or_create_chat(seeded_session, "telegram", "456", "Иван")
+    dup = Chat(name="Дубль", channel="telegram", external_id="456")
+    seeded_session.add(dup)
+    with pytest.raises(IntegrityError):
+        await seeded_session.flush()
+    await seeded_session.rollback()
+
+
 async def test_store_incoming(seeded_session):
     from app.core.database import async_session_factory
 
