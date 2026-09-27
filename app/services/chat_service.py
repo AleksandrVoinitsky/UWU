@@ -19,8 +19,11 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.models.customer import Customer
 from app.models.messaging import Chat, Message
+
+logger = get_logger("app.services.chat")
 
 # Канал чата покупателя (отличается от internal/telegram/maks).
 CHANNEL_SITE = "site"
@@ -103,12 +106,14 @@ async def send_customer_message(
         )
         session.add(chat)
         await session.flush()
+        logger.info("Chat created for customer id=%s (chat=%s)", customer.id, chat.id)
 
     message = Message(chat_id=chat.id, direction="in", text=text, author="customer")
     session.add(message)
     chat.last_message_at = datetime.now(timezone.utc)
     await session.commit()
     await session.refresh(message)
+    logger.info("Customer message saved (chat=%s, message=%s)", chat.id, message.id)
 
     # Если чат включён для AI-агента — уведомляем его (best-effort, не блокирует).
     if chat.agent_enabled:

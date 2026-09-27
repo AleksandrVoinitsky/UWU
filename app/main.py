@@ -113,13 +113,9 @@ def create_app() -> FastAPI:
         path = request.url.path
         skip = any(path.startswith(p) for p in _SKIP_REQUEST_LOG_PREFIXES)
         start = time.perf_counter()
-        try:
-            response = await call_next(request)
-        except Exception:
-            logger.exception(
-                "Unhandled exception on %s %s", request.method, path
-            )
-            raise
+        # Исключения не логируем здесь — их ловит и логирует единый
+        # exception-handler ниже (иначе каждый 500 писался бы дважды).
+        response = await call_next(request)
         if not skip:
             elapsed_ms = (time.perf_counter() - start) * 1000
             logger.info(

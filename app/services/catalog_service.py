@@ -16,8 +16,11 @@ from sqlalchemy import Integer, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import Base
+from app.core.logging import get_logger
 from app.models.catalog import CurrencyRate, Kontragent, Nomenklatura
 from app.models.constants import DEFAULT_CONSTANTS, Constant
+
+logger = get_logger("app.services.catalog")
 
 ModelT = TypeVar("ModelT", bound=Base)
 
@@ -40,6 +43,7 @@ async def create_one(session: AsyncSession, model: type[ModelT], **fields: Any) 
     session.add(obj)
     await session.commit()
     await session.refresh(obj)
+    logger.info("Created %s id=%s", model.__tablename__, obj.id)  # type: ignore[attr-defined]
     return obj
 
 
@@ -51,12 +55,16 @@ async def update_one(
             setattr(obj, key, value)
     await session.commit()
     await session.refresh(obj)
+    logger.info("Updated %s id=%s", type(obj).__tablename__, obj.id)  # type: ignore[attr-defined]
     return obj
 
 
 async def delete_one(session: AsyncSession, obj: ModelT) -> None:
+    obj_id = obj.id  # type: ignore[attr-defined]
+    model_name = type(obj).__tablename__  # type: ignore[attr-defined]
     await session.delete(obj)
     await session.commit()
+    logger.info("Deleted %s id=%s", model_name, obj_id)
 
 
 async def next_code(session: AsyncSession, model: type[Any], prefix: str = "") -> str:
@@ -153,3 +161,4 @@ async def set_rate(
         row.rate = rate
         row.multiplicity = multiplicity
     await session.commit()
+    logger.info("Set rate currency=%s on=%s rate=%s", currency_id, on_date, rate)

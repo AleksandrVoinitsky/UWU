@@ -7,9 +7,12 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.core.security import hash_password
 from app.models.enums import RoleKey
 from app.models.users import DEFAULT_ROLE_PERMISSIONS, Role, User
+
+logger = get_logger("app.services.user")
 
 
 async def list_users(session: AsyncSession) -> list[User]:
@@ -46,6 +49,7 @@ async def create_user(
     session.add(user)
     await session.commit()
     await session.refresh(user)
+    logger.info("User created (id=%s, login=%s, is_admin=%s)", user.id, login, is_admin)
     return user
 
 
@@ -83,6 +87,7 @@ async def update_user(
 async def delete_user(session: AsyncSession, user: User) -> None:
     await session.delete(user)
     await session.commit()
+    logger.info("User deleted (id=%s)", user.id)
 
 
 async def list_roles(session: AsyncSession) -> list[Role]:

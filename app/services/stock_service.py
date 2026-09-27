@@ -15,8 +15,11 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.models.enums import CostMethod
 from app.models.registry import Reservation, StockBatch, StockMovement
+
+logger = get_logger("app.services.stock")
 
 
 @dataclass
@@ -161,6 +164,10 @@ async def consume_batches(
     # отрицательной партией, чтобы остаток корректно ушёл в минус.
     if remaining > 0:
         unit_cost = avg_cost if method == CostMethod.AVERAGE else Decimal("0")
+        logger.warning(
+            "Negative stock allowed: item=%s sklad=%s shortfall=%s (document=%s)",
+            nomenklatura_id, sklad_id, remaining, source_document_id,
+        )
         negative_batch = StockBatch(
             nomenklatura_id=nomenklatura_id,
             sklad_id=sklad_id,
@@ -290,10 +297,15 @@ async def reserve(
             quantity=quantity, zakaz_id=zakaz_id,
         )
     )
+    logger.info(
+        "Reserved item=%s sklad=%s quantity=%s zakaz=%s",
+        nomenklatura_id, sklad_id, quantity, zakaz_id,
+    )
 
 
 async def release_for_zakaz(session: AsyncSession, zakaz_id: int) -> None:
     """Снимает резерв по заявке."""
     from sqlalchemy import delete
 
-    await session.execute(delete(Reservation).where(Reservation.zakaz_id == zakaz_id))
+    result = await session.execute(delete(Reservation).where(Reservation.zakaz_id == zakaz_id))
+    logger.info("Released reservation for zakaz=%s (rows=%s)", zakaz_id, result.rowcount)

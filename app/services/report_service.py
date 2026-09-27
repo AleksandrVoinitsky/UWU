@@ -1147,5 +1147,7 @@ async def replenishment_recommendations(
             }
         )
 
-    rows.sort(key=lambda r: (-float(r["to_order"]), r["nomenklatura"]))
+    # Сортировка по убыванию «к заказу» с сохранением точности Decimal
+    # (без потери точности через float).
+    rows.sort(key=lambda r: (-r["to_order"], r["nomenklatura"]))
     return rows

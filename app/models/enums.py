@@ -52,13 +52,6 @@ class DocumentStatus(StrEnum):
     MARKED_DELETED = "deleted"      # Помечен на удаление
 
 
-class DocumentDirection(StrEnum):
-    """Направление движения товара по документу."""
-
-    IN = "in"
-    OUT = "out"
-
-
 class CostMethod(StrEnum):
     """Метод списания себестоимости партий."""
 
@@ -73,22 +66,6 @@ class RestockControl(StrEnum):
     BY_FIRM = "by_firm"
     BY_WAREHOUSE = "by_warehouse"
     NONE = "none"
-
-
-class PaymentKind(StrEnum):
-    """Вид денежной операции."""
-
-    IN = "in"
-    OUT = "out"
-
-
-class ZakazState(StrEnum):
-    """Состояние заявки покупателя."""
-
-    NEW = "new"
-    IN_WORK = "in_work"
-    DONE = "done"
-    CANCELLED = "cancelled"
 
 
 class RoleKey(StrEnum):

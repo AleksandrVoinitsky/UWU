@@ -16,6 +16,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.logging import get_logger
 from app.models.constants import Constant
 from app.models.document.base_document import Document, DocumentItem
 from app.models.enums import CostMethod, DocSubtype, DocType, DocumentStatus, RestockControl
@@ -29,6 +30,8 @@ from app.models.registry import (
 )
 from app.services import stock_service
 from app.services.stock_service import InsufficientStockError
+
+logger = get_logger("app.services.document")
 
 # Виды документов, порождающие движение товара.
 _STOCK_DOC_TYPES = {
@@ -231,6 +234,10 @@ async def create_document(
     else:
         _recalc_totals(document, item_objs)
     await session.commit()
+    logger.info(
+        "Document %s created (id=%s, type=%s, items=%d)",
+        document.number, document.id, doc_type.value, len(item_objs),
+    )
     return await get_document(session, document.id)
 
 
@@ -355,7 +362,14 @@ async def post_document(
         document.posted_at = datetime.now(timezone.utc)
         _log(session, document, "post", user_id=user_id)
         await session.commit()
+        logger.info(
+            "Document %s posted (id=%s, type=%s, user_id=%s)",
+            document.number, document.id, doc_type.value, user_id,
+        )
     except Exception:
+        logger.exception(
+            "Failed to post document id=%s (type=%s)", document.id, document.doc_type
+        )
         # Явный откат: не оставляем сессию в «грязном» состоянии и снимаем
         # advisory-lock до завершения обработки ошибки.
         await session.rollback()
@@ -817,7 +831,12 @@ async def unpost_document(
         document.posted_at = None
         _log(session, document, "unpost", user_id=user_id)
         await session.commit()
+        logger.info(
+            "Document %s unposted (id=%s, type=%s, user_id=%s)",
+            document.number, document.id, doc_type.value, user_id,
+        )
     except Exception:
+        logger.exception("Failed to unpost document id=%s", document.id)
         await session.rollback()
         raise
     return await get_document(session, document.id)
@@ -886,4 +905,8 @@ async def mark_for_deletion(
     document.status = DocumentStatus.MARKED_DELETED
     _log(session, document, "delete", user_id=user_id)
     await session.commit()
+    logger.info(
+        "Document %s marked for deletion (id=%s, user_id=%s)",
+        document.number, document.id, user_id,
+    )
     return await get_document(session, document.id)

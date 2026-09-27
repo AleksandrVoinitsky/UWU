@@ -18,7 +18,10 @@ from decimal import Decimal
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.models.catalog.nomenklatura import Nomenklatura, TipTsen, TsenaNomenklatury
+
+logger = get_logger("app.services.price")
 
 
 def auto_price(purchase_price: Decimal | None, markup_percent: Decimal | None) -> Decimal | None:
@@ -96,6 +99,7 @@ async def set_explicit_price(
     # Делаем запись видимой для последующих запросов в этой же транзакции
     # (при autoflush=False без flush resolve_prices не увидит новую цену).
     await session.flush()
+    logger.info("Set explicit price nomenklatura=%s tip_tsen=%s price=%s", nomenklatura_id, tip_tsen_id, price)
 
 
 async def clear_explicit_price(

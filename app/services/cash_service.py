@@ -10,7 +10,10 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.models.registry import CashShift, MoneyMovement
+
+logger = get_logger("app.services.cash")
 
 
 async def get_open_shift(session: AsyncSession, kassa_id: int | None = None) -> CashShift | None:
@@ -38,6 +41,10 @@ async def open_shift(
     session.add(shift)
     await session.commit()
     await session.refresh(shift)
+    logger.info(
+        "Cash shift opened (id=%s, kassa=%s, opening_amount=%s, user_id=%s)",
+        shift.id, kassa_id, opening_amount, user_id,
+    )
     return shift
 
 
@@ -47,6 +54,10 @@ async def close_shift(session: AsyncSession, shift: CashShift, closing_amount: D
     shift.closing_amount = closing_amount
     await session.commit()
     await session.refresh(shift)
+    logger.info(
+        "Cash shift closed (id=%s, kassa=%s, closing_amount=%s)",
+        shift.id, shift.kassa_id, closing_amount,
+    )
     return shift
 
 

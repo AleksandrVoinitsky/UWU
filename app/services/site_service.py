@@ -160,17 +160,6 @@ def find_promotion(
     return global_[0] if global_ else None
 
 
-async def promotion_for(
-    session: AsyncSession,
-    nomenklatura_id: int,
-    category_id: int | None,
-    on: date | None = None,
-) -> Promotion | None:
-    """Активная акция для товара (обёртка над :func:`find_promotion`)."""
-    promos = await list_promotions(session)
-    return find_promotion(promos, nomenklatura_id, category_id, on)
-
-
 def apply_discount(base_price: Decimal, promo: Promotion) -> Decimal:
     """Цена после скидки (не ниже нуля)."""
     base = base_price or Decimal("0")
@@ -181,3 +170,15 @@ def apply_discount(base_price: Decimal, promo: Promotion) -> Decimal:
     if result < 0:
         result = Decimal("0")
     return result.quantize(Decimal("0.01"))
+
+
+def effective_price(base_price: Decimal, promo: Promotion | None) -> Decimal:
+    """Итоговая цена с учётом активной акции (никогда не выше базовой).
+
+    Единая точка расчёта цены для каталога и корзины/чекаута — гарантирует,
+    что покупатель платит ту же цену, которую видел в каталоге.
+    """
+    if promo is None:
+        return base_price or Decimal("0")
+    discounted = apply_discount(base_price, promo)
+    return discounted if discounted < (base_price or Decimal("0")) else (base_price or Decimal("0"))

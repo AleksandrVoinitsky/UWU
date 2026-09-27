@@ -9,8 +9,11 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.core.security import create_access_token, verify_password
 from app.models.users import User
+
+logger = get_logger("app.services.auth")
 
 
 class AuthError(Exception):
@@ -24,11 +27,14 @@ async def authenticate(session: AsyncSession, login: str, password: str) -> str:
     """
     user = await get_user_by_login(session, login)
     if user is None or not verify_password(password, user.password_hash):
+        logger.warning("Failed login attempt for login=%r", login)
         raise AuthError("Invalid login or password")
     if not user.is_active:
+        logger.warning("Login attempt for disabled account id=%s", user.id)
         raise AuthError("Account is disabled")
     user.last_login_at = datetime.now(timezone.utc)
     await session.commit()
+    logger.info("User logged in (id=%s)", user.id)
     return create_access_token(str(user.id))
 
 

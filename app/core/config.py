@@ -42,7 +42,6 @@ class Settings(BaseSettings):
 
     # --- Сервис ---
     app_name: str = "UWU"
-    debug: bool = False
     uploads_dir: str = "./uploads"  # каталог для загружаемых изображений
     log_level: str = "INFO"  # DEBUG | INFO | WARNING | ERROR | CRITICAL
     # Окружение развёртывания: "development" | "production". В production

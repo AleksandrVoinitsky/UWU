@@ -13,9 +13,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -121,8 +122,9 @@ async def inbox(
 
 class AgentMessageRequest(BaseModel):
     chat_id: int
-    text: str
-    author: str = "agent"
+    text: str = Field(..., min_length=1, max_length=4000)
+    # Агент публикует только как «agent» — запрещаем спуфинг operator/customer.
+    author: Literal["agent"] = "agent"
     agent_run_id: int | None = None
 
 

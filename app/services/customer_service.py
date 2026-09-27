@@ -171,15 +171,9 @@ async def available_products(
             continue
         base_price = p.retail_price or Decimal("0")
         promo = site_service.find_promotion(promos, p.id, p.category_id)
-        price = base_price
-        price_old = None
-        promo_name = None
-        if promo is not None:
-            discounted = site_service.apply_discount(base_price, promo)
-            if discounted < base_price:
-                price = discounted
-                price_old = base_price
-                promo_name = promo.name
+        price = site_service.effective_price(base_price, promo)
+        price_old = base_price if price < base_price else None
+        promo_name = promo.name if promo is not None and price < base_price else None
         products.append(
             {
                 "id": p.id,
@@ -212,7 +206,7 @@ async def get_cart(session: AsyncSession, customer_id: int) -> Cart:
 
 
 async def get_cart_items(session: AsyncSession, customer_id: int) -> list[dict]:
-    """Позиции корзины с данными товара и суммой."""
+    """Позиции корзины с данными товара и суммой (с учётом активных акций)."""
     cart = await get_cart(session, customer_id)
     result = await session.execute(
         select(CartItem, Nomenklatura)
@@ -220,9 +214,13 @@ async def get_cart_items(session: AsyncSession, customer_id: int) -> list[dict]:
         .where(CartItem.cart_id == cart.id)
         .order_by(CartItem.id)
     )
+    # Акции загружаем один раз — цена корзины должна совпадать с ценой каталога.
+    promos = await site_service.list_promotions(session)
     items: list[dict] = []
     for ci, n in result.all():
-        price = n.retail_price or Decimal("0")
+        base_price = n.retail_price or Decimal("0")
+        promo = site_service.find_promotion(promos, n.id, n.category_id)
+        price = site_service.effective_price(base_price, promo)
         items.append(
             {
                 "id": ci.id,
@@ -279,16 +277,6 @@ async def set_cart_quantity(
         await session.delete(item)
     else:
         item.quantity = quantity
-    await session.commit()
-
-
-async def clear_cart(session: AsyncSession, customer_id: int) -> None:
-    cart = await get_cart(session, customer_id)
-    cart_items = (
-        await session.execute(select(CartItem).where(CartItem.cart_id == cart.id))
-    ).scalars().all()
-    for item in cart_items:
-        await session.delete(item)
     await session.commit()
 
 

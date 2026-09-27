@@ -1,7 +1,8 @@
 """API мессенджера (чаты и сообщения).
 
-Основа для интеграции с ботами (Макс, Telegram). Пока сообщения хранятся в БД,
-внешняя доставка не реализована. Аутентификация — по cookie (как веб-интерфейс).
+Чаты покупателей/ботов (Telegram/MAX) и сообщения операторов. Доставка ответов
+на внешние каналы выполняется через адаптеры ботов; канал «site» (покупатель
+интернет-магазина) забирает сообщения опросом. Аутентификация — по cookie.
 
 См. также: :mod:`app.models.messaging`.
 """
@@ -10,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +24,7 @@ router = APIRouter(prefix="/api/chats", tags=["messaging"])
 
 
 class SendMessageRequest(BaseModel):
-    text: str
+    text: str = Field(..., min_length=1, max_length=4000)
 
 
 async def _current_user(
