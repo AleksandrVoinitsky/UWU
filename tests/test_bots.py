@@ -59,6 +59,31 @@ def test_create_adapter_unknown_channel():
         create_adapter("unknown", "fake", None)
 
 
+async def test_telegram_adapter_retries_on_polling_error(monkeypatch):
+    """При сетевом сбое long polling перезапускается, а не «умирает» молча."""
+    from app.bots.telegram import TelegramAdapter
+    import app.bots.telegram as tg_mod
+
+    token = "1234567890:AAbbCCddEEffGGhhIIjjKKll"
+    calls = 0
+
+    adapter = TelegramAdapter(token, on_message=None)
+
+    async def fake_start_polling(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise RuntimeError("network down")
+        adapter._stopped = True  # третий вызов — штатная остановка
+
+    monkeypatch.setattr(adapter._dp, "start_polling", fake_start_polling)
+    monkeypatch.setattr(tg_mod, "_RETRY_DELAY", 0)
+
+    await adapter.run()
+
+    assert calls == 3  # два сбоя + успешный третий запуск (затем остановка)
+
+
 async def test_find_or_create_chat(seeded_session):
     chat1 = await find_or_create_chat(seeded_session, "telegram", "123", "Иван")
     chat2 = await find_or_create_chat(seeded_session, "telegram", "123", "Иван")

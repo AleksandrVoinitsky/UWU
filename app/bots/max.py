@@ -8,6 +8,8 @@
 """
 from __future__ import annotations
 
+import asyncio
+
 from maxapi import Bot as MaxBot
 from maxapi import Dispatcher as MaxDispatcher
 
@@ -15,6 +17,9 @@ from app.bots.base import CHANNEL_MAKS, BotAdapter, IncomingMessage
 from app.core.logging import get_logger
 
 logger = get_logger("app.bots.max")
+
+# Пауза перед перезапуском long polling после неожиданной остановки (сбой сети).
+_RETRY_DELAY = 5.0
 
 
 class MaxAdapter(BotAdapter):
@@ -26,6 +31,7 @@ class MaxAdapter(BotAdapter):
         super().__init__(on_message)
         self._bot = MaxBot(token=token)
         self._dp = MaxDispatcher()
+        self._stopped = False
 
         @self._dp.message_created
         async def _handle(event) -> None:
@@ -48,9 +54,22 @@ class MaxAdapter(BotAdapter):
 
     async def run(self) -> None:
         logger.info("MAX bot polling started")
-        await self._dp.start_polling(self._bot)
+        while not self._stopped:
+            try:
+                await self._dp.start_polling(self._bot)
+            except Exception as exc:  # noqa: BLE001 — сетевые сбои не фатальны
+                logger.warning("MAX polling error: %s", exc)
+            if self._stopped:
+                break
+            logger.warning(
+                "MAX polling stopped unexpectedly — restart in %.0fs",
+                _RETRY_DELAY,
+            )
+            await asyncio.sleep(_RETRY_DELAY)
+        logger.info("MAX bot stopped")
 
     async def shutdown(self) -> None:
+        self._stopped = True
         await self._dp.stop_polling()
 
     async def send_message(self, external_chat_id: str, text: str) -> None:
