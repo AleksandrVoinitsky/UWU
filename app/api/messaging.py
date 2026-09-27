@@ -125,7 +125,7 @@ async def send_message(
     if chat is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
 
-    message = Message(chat_id=chat_id, direction="out", text=payload.text)
+    message = Message(chat_id=chat_id, direction="out", text=payload.text, author="operator")
     session.add(message)
     chat.last_message_at = datetime.now(timezone.utc)
     await session.commit()

@@ -201,7 +201,7 @@ async def store_incoming(
         chat = await find_or_create_chat(
             session, message.channel, message.external_chat_id, message.sender_name
         )
-        session.add(Message(chat_id=chat.id, direction="in", text=message.text))
+        session.add(Message(chat_id=chat.id, direction="in", text=message.text, author="customer"))
         chat.last_message_at = datetime.now(timezone.utc)
         await session.commit()
     logger.info(

@@ -86,6 +86,7 @@ async def test_store_incoming(seeded_session):
     assert len(messages) == 1
     assert messages[0].direction == "in"
     assert messages[0].text == "Привет"
+    assert messages[0].author == "customer"  # входящее — от покупателя
 
 
 async def test_deliver_outgoing_routes_to_adapter(seeded_session):

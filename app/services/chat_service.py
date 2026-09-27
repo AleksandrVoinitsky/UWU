@@ -104,7 +104,7 @@ async def send_customer_message(
         session.add(chat)
         await session.flush()
 
-    message = Message(chat_id=chat.id, direction="in", text=text)
+    message = Message(chat_id=chat.id, direction="in", text=text, author="customer")
     session.add(message)
     chat.last_message_at = datetime.now(timezone.utc)
     await session.commit()

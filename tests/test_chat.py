@@ -83,6 +83,21 @@ async def test_seller_sees_and_replies(client, seeded_session):
     assert [m["direction"] for m in messages] == ["in", "out"]
 
 
+async def test_message_authors(client, seeded_session):
+    """Автор сообщения: покупатель — 'customer', продавец — 'operator'."""
+    headers = await _register_customer(client)
+    await client.post("/shop/api/chat", json={"text": "Вопрос"}, headers=headers)
+
+    await _seller_headers(seeded_session, client)
+    chat_id = (await client.get("/api/chats")).json()[0]["id"]
+    await client.post(f"/api/chats/{chat_id}/messages", json={"text": "Ответ"})
+
+    msgs = (
+        await seeded_session.execute(select(Message).order_by(Message.id))
+    ).scalars().all()
+    assert [m.author for m in msgs] == ["customer", "operator"]
+
+
 async def test_empty_message_rejected(client, seeded_session):
     headers = await _register_customer(client)
     r = await client.post("/shop/api/chat", json={"text": "   "}, headers=headers)
