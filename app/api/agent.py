@@ -378,22 +378,17 @@ async def agent_create_order(
 ):
     """Создаёт заявку (ZAKAZ) по телефону и списку позиций — система слотов.
 
-    Право — ``documents.write``. Позиции задаются по ``nomenklatura_id`` или по
-    ``name`` (ядро резолвит название в товар). Возвращает ``created=true`` с
-    заказом, либо ``created=false`` с текстом, чего не хватает (телефон, список,
-    количество или товар) — модель заполняет слоты и повторяет вызов.
+    Право — ``documents.write``. Новый номер телефона автоматически регистрирует
+    покупателя (аккаунт + контрагента, см. ``resolve_customer_by_phone``). Позиции
+    задаются по ``nomenklatura_id`` или по ``name`` (ядро резолвит название в
+    товар). Возвращает ``created=true`` с заказом, либо ``created=false`` с текстом,
+    чего не хватает (телефон, список, количество или товар).
     """
     _require_perm(key, "documents.write")
 
     phone = (payload.customer_phone or "").strip()
     if not phone:
         return {"created": False, "error": "Нужен номер телефона покупателя."}
-    match = await customer_service.match_customer_by_phone(session, phone)
-    if match is None:
-        return {
-            "created": False,
-            "error": f"Покупатель с номером {phone} не найден. Уточните номер телефона.",
-        }
     if not payload.items:
         return {"created": False, "error": "Укажите список товаров для заказа."}
 
@@ -415,8 +410,7 @@ async def agent_create_order(
         doc = await customer_service.create_order_by_phone(
             session,
             phone=phone,
-            customer_name=payload.customer_name or match.get("name"),
-            customer_id=match.get("customer_id"),
+            customer_name=payload.customer_name,
             items=resolved,
             source="agent",
         )

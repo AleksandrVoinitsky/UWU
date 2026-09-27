@@ -95,3 +95,59 @@ async def test_zakaz_reject_via_state(client, seeded_session):
     resp = await client.post(f"/zakazy/{zakaz.id}/state", data={"state": "cancelled"})
     assert resp.status_code == 303
     assert (await _zakaz_extra(seeded_session, zakaz.id)).get("state") == "cancelled"
+
+
+async def test_rmk_sell_defaults_to_retail_kontragent(client, seeded_session):
+    """Продажа без конкретного клиента оформляется на «Розничного покупателя»."""
+    from app.models.catalog import Kontragent
+
+    sklad = await catalog_service.create_one(seeded_session, Sklad, code="003", name="Склад3", tip="optovy")
+    item = await catalog_service.create_one(seeded_session, Nomenklatura, code="003", name="Товар3", vid="tovar")
+    prihod = await document_service.create_document(
+        seeded_session, doc_type=DocType.PRIHOD, doc_date=date.today(), sklad_id=sklad.id,
+        items=[{"nomenklatura_id": item.id, "quantity": Decimal("10"), "price": Decimal("100")}],
+    )
+    await document_service.post_document(seeded_session, prihod)
+
+    user = await user_service.create_user(seeded_session, login="kassir5", password="secret123", is_admin=True)
+    client.cookies.set("access_token", create_access_token(str(user.id)))
+
+    resp = await client.post(
+        "/rmk/sell",
+        json={"sklad_id": sklad.id, "items": [{"nomenklatura_id": item.id, "quantity": 1, "price": 100}], "received": 100},
+    )
+    assert resp.status_code == 200
+    sale = await document_service.get_document(seeded_session, resp.json()["id"])
+    retail = (await seeded_session.execute(select(Kontragent).where(Kontragent.code == "ROZN"))).scalar_one()
+    assert sale.kontragent_id == retail.id
+
+
+async def test_rmk_sell_uses_zakaz_kontragent(client, seeded_session):
+    """Продажа заявки автоматически подставляет контрагента заявки."""
+    from app.models.catalog import Kontragent
+
+    sklad = await catalog_service.create_one(seeded_session, Sklad, code="004", name="Склад4", tip="optovy")
+    item = await catalog_service.create_one(seeded_session, Nomenklatura, code="004", name="Товар4", vid="tovar")
+    kg = await catalog_service.create_one(seeded_session, Kontragent, code="004", name="Клиент")
+    prihod = await document_service.create_document(
+        seeded_session, doc_type=DocType.PRIHOD, doc_date=date.today(), sklad_id=sklad.id,
+        items=[{"nomenklatura_id": item.id, "quantity": Decimal("10"), "price": Decimal("100")}],
+    )
+    await document_service.post_document(seeded_session, prihod)
+    zakaz = await document_service.create_document(
+        seeded_session, doc_type=DocType.ZAKAZ, doc_date=date.today(),
+        kontragent_id=kg.id,
+        items=[{"nomenklatura_id": item.id, "quantity": Decimal("2"), "price": Decimal("150")}],
+        extra={"state": "new"},
+    )
+
+    user = await user_service.create_user(seeded_session, login="kassir6", password="secret123", is_admin=True)
+    client.cookies.set("access_token", create_access_token(str(user.id)))
+
+    resp = await client.post(
+        "/rmk/sell",
+        json={"sklad_id": sklad.id, "items": [{"nomenklatura_id": item.id, "quantity": 2, "price": 150}], "received": 300, "zakaz_id": zakaz.id},
+    )
+    assert resp.status_code == 200
+    sale = await document_service.get_document(seeded_session, resp.json()["id"])
+    assert sale.kontragent_id == kg.id

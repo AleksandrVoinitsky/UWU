@@ -47,7 +47,17 @@ async def seed_all(session: AsyncSession) -> None:
     await seed_units(session)
     await seed_admin(session)
     await seed_agent_defaults(session)
+    await seed_retail_kontragent(session)
     await session.commit()
+
+
+async def seed_retail_kontragent(session: AsyncSession) -> None:
+    """Дефолтный контрагент «Розничный покупатель» (продажа без конкретного клиента)."""
+    from app.models.catalog import Kontragent
+
+    exists = await session.execute(select(Kontragent).where(Kontragent.code == "ROZN"))
+    if exists.scalar_one_or_none() is None:
+        session.add(Kontragent(code="ROZN", name="Розничный покупатель"))
 
 
 async def seed_agent_defaults(session: AsyncSession) -> None:

@@ -99,6 +99,14 @@
         <span class="label">{{ t('rmk.total', lang) }}</span>
         <span class="value" id="rmk-total">0.00 ₽</span>
       </div>
+      <div class="field" style="margin:0 0 12px">
+        <label>Покупатель (контрагент)</label>
+        <select id="rmk-kontragent">
+          {% for k in kontragenty %}
+          <option value="{{ k.id }}" {% if k.id == zakaz_kontragent_id or (not zakaz_kontragent_id and k.id == retail_kontragent_id) %}selected{% endif %}>{{ k.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
       <div class="form-row" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
         <div class="field" style="margin:0">
           <label>Получено</label>

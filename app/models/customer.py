@@ -17,7 +17,12 @@ from app.models.base import IdMixin, TimestampMixin
 
 
 class Customer(Base, IdMixin, TimestampMixin):
-    """Учётная запись покупателя (логин — номер телефона)."""
+    """Учётная запись покупателя (логин — номер телефона).
+
+    Связана с контрагентом (:class:`Kontragent`) по ``kontragent_id`` — один и тот
+    же покупатель ведётся и как аккаунт, и как контрагент учёта (заказы/продажи
+    оформляются на контрагента). Связь дополняет совпадение по номеру телефона.
+    """
 
     __tablename__ = "customers"
 
@@ -25,10 +30,15 @@ class Customer(Base, IdMixin, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true(), nullable=False)
+    # Связь с контрагентом учёта (контрагент = аккаунт по номеру телефона).
+    kontragent_id: Mapped[int | None] = mapped_column(
+        ForeignKey("kontragenty.id"), nullable=True, index=True
+    )
 
     cart: Mapped["Cart | None"] = relationship(
         back_populates="customer", cascade="all, delete-orphan", uselist=False
     )
+    kontragent: Mapped["Kontragent | None"] = relationship()  # noqa: F821
 
 
 class Cart(Base, IdMixin, TimestampMixin):

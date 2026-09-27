@@ -25,7 +25,7 @@ from app.models import catalog as cat
 from app.models.document.base_document import Document
 from app.models.enums import DocSubtype, DocType
 from app.models.users import User
-from app.services import cash_service, catalog_service, document_service, image_service, price_service, report_service, stock_service
+from app.services import cash_service, catalog_service, customer_service, document_service, image_service, price_service, report_service, stock_service
 from app.services.stock_service import InsufficientStockError
 from app.templates import render
 from app.web.helpers import _csv_response, _json_safe, _sanitize_csv_cell
@@ -970,6 +970,8 @@ async def rmk_page(
     ]
     sklady = await catalog_service.list_all(session, cat.Sklad)
     kassy = await catalog_service.list_all(session, cat.Kassa)
+    kontragenty = await catalog_service.list_all(session, cat.Kontragent)
+    retail = await customer_service.get_retail_kontragent(session)
 
     # Текущая кассовая смена.
     shift = await cash_service.get_open_shift(session)
@@ -979,11 +981,13 @@ async def rmk_page(
     # Предзагрузка корзины из заявки (продажа заказа через РМК).
     zakaz_id = _to_int(request.query_params.get("zakaz_id"))
     zakaz_number = None
+    zakaz_kontragent_id = None
     preload: list[dict] = []
     if zakaz_id:
         zakaz = await document_service.get_document(session, zakaz_id)
         if zakaz is not None and zakaz.doc_type == DocType.ZAKAZ.value:
             zakaz_number = zakaz.number
+            zakaz_kontragent_id = zakaz.kontragent_id
             nomen_map = {n.id: n for n in nomen}
             for it in zakaz.items:
                 nm = nomen_map.get(it.nomenklatura_id)
@@ -999,7 +1003,9 @@ async def rmk_page(
     return _page(
         request, user, "trade/rmk.html",
         items_json=_json_safe(items),
-        sklady=sklady, kassy=kassy,
+        sklady=sklady, kassy=kassy, kontragenty=kontragenty,
+        retail_kontragent_id=retail.id if retail else None,
+        zakaz_kontragent_id=zakaz_kontragent_id,
         shift=shift, revenue=revenue, expenses=expenses,
         preload_json=_json_safe(preload),
         zakaz_id=zakaz_id,
@@ -1062,6 +1068,17 @@ async def rmk_sell(
     received = data.get("received")
     zakaz_id = _to_int(data.get("zakaz_id"))
 
+    # Контрагент продажи: явно выбранный → из заявки → «Розничный покупатель».
+    # Любая продажа/заказ оформляется на контрагента (без «дыр»).
+    kontragent_id = _to_int(data.get("kontragent_id"))
+    if kontragent_id is None and zakaz_id:
+        zakaz = await document_service.get_document(session, zakaz_id)
+        if zakaz is not None:
+            kontragent_id = zakaz.kontragent_id
+    if kontragent_id is None:
+        retail = await customer_service.get_retail_kontragent(session)
+        kontragent_id = retail.id if retail else None
+
     # Валидируем строки заранее — невалидный JSON иначе даёт 500 (KeyError/ValueError).
     parsed_items = []
     for i in items:
@@ -1097,6 +1114,7 @@ async def rmk_sell(
             subtype=DocSubtype.CASH if doc_type == DocType.RASHOD else None,
             doc_date=date.today(),
             sklad_id=sklad_id,
+            kontragent_id=kontragent_id,
             extra=extra or None,
             items=parsed_items,
             created_by_id=user.id,

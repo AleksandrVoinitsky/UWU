@@ -164,15 +164,37 @@ async def test_create_order_requires_phone(client, agent_headers):
     assert "телефон" in resp.json()["error"].lower()
 
 
-async def test_create_order_unknown_phone(client, agent_headers):
+async def test_create_order_auto_registers_new_phone(client, agent_headers, seeded_session):
+    """Новый номер автоматически создаёт контрагента + аккаунт, связанные по номеру."""
+    from sqlalchemy import select
+
+    from app.models.catalog import Kontragent, Nomenklatura
+
+    seeded_session.add(Nomenklatura(code="901", name="Хлеб пшеничный", retail_price=Decimal("45.00")))
+    await seeded_session.commit()
+
     resp = await client.post(
         "/api/agent/create_order",
         headers=agent_headers,
-        json={"customer_phone": "+79990000000", "items": [{"name": "хлеб", "quantity": 2}]},
+        json={
+            "customer_phone": "+79995556677",
+            "customer_name": "Иван",
+            "items": [{"name": "хлеб пшеничный", "quantity": 2}],
+        },
     )
     assert resp.status_code == 200
-    assert resp.json()["created"] is False
-    assert "не найден" in resp.json()["error"].lower()
+    data = resp.json()
+    assert data["created"] is True
+
+    # Авто-регистрация: контрагент и аккаунт созданы и связаны (Customer.kontragent_id).
+    kg = (
+        await seeded_session.execute(select(Kontragent).where(Kontragent.phones == "79995556677"))
+    ).scalar_one()
+    customer = (
+        await seeded_session.execute(select(Customer).where(Customer.phone == "79995556677"))
+    ).scalar_one()
+    assert customer.kontragent_id == kg.id
+    assert kg.name == "Иван"
 
 
 async def test_create_order_by_name(client, agent_headers, seeded_session):

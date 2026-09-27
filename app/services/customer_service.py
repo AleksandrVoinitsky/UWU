@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import secrets
 from datetime import date
 from decimal import Decimal
 
@@ -420,24 +421,119 @@ async def match_customer_by_phone(session: AsyncSession, phone: str) -> dict | N
     }
 
 
+# Код дефолтного контрагента «Розничный покупатель» (продажа без конкретного клиента).
+RETAIL_KONTRAGENT_CODE = "ROZN"
+
+
+async def get_retail_kontragent(session: AsyncSession) -> Kontragent | None:
+    """Дефолтный контрагент «Розничный покупатель» (или ``None``, если не создан)."""
+    return (
+        await session.execute(select(Kontragent).where(Kontragent.code == RETAIL_KONTRAGENT_CODE))
+    ).scalar_one_or_none()
+
+
+async def resolve_customer_by_phone(
+    session: AsyncSession,
+    phone: str,
+    name: str | None = None,
+) -> dict | None:
+    """Находит или создаёт покупателя (аккаунт + контрагента) по номеру телефона.
+
+    Контрагент = аккаунт: если ни покупателя (``Customer``), ни контрагента
+    (``Kontragent``) с таким номером нет — создаёт **обоих** и связывает их
+    (``Customer.kontragent_id``). Имя берётся из аргумента, иначе подставляется
+    ``Покупатель {телефон}`` (агент затем уточняет имя у клиента).
+
+    Идемпотентно: повторный вызов с именем обновляет имя у заглушечной записи.
+    Возвращает ``{customer_id, kontragent_id, name, phone, is_new}``.
+    """
+    normalized = _normalize_phone(phone or "")
+    if not normalized:
+        return None
+    digits = normalized.lstrip("+")
+    variants = {normalized, digits, "+" + digits}
+
+    customer: Customer | None = None
+    for v in variants:
+        customer = (
+            await session.execute(select(Customer).where(Customer.phone == v))
+        ).scalar_one_or_none()
+        if customer is not None:
+            break
+
+    kontragent: Kontragent | None = None
+    for v in variants:
+        kontragent = (
+            await session.execute(select(Kontragent).where(Kontragent.phones == v))
+        ).scalar_one_or_none()
+        if kontragent is not None:
+            break
+
+    is_new = kontragent is None
+
+    if kontragent is None:
+        from app.services.catalog_service import next_kontragent_code
+
+        code = await next_kontragent_code(session)
+        kontragent = Kontragent(
+            code=code,
+            name=(name or "").strip() or f"Покупатель {digits}",
+            phones=digits,
+        )
+        session.add(kontragent)
+        await session.flush()
+
+    if customer is None:
+        customer = Customer(
+            phone=digits,
+            password_hash=hash_password(secrets.token_urlsafe(16)),
+            name=(name or "").strip() or None,
+            kontragent_id=kontragent.id,
+        )
+        session.add(customer)
+        await session.flush()
+    elif customer.kontragent_id != kontragent.id:
+        customer.kontragent_id = kontragent.id
+
+    # Если имя передано, а текущее — заглушка/пустое — обновляем.
+    clean_name = (name or "").strip()
+    if clean_name:
+        if not kontragent.name or kontragent.name.startswith("Покупатель "):
+            kontragent.name = clean_name[:40]
+        if not customer.name:
+            customer.name = clean_name
+
+    await session.commit()
+
+    return {
+        "customer_id": customer.id,
+        "kontragent_id": kontragent.id,
+        "name": customer.name or kontragent.name,
+        "phone": digits,
+        "is_new": is_new,
+    }
+
+
 async def create_order_by_phone(
     session: AsyncSession,
     *,
     phone: str,
     customer_name: str | None = None,
-    customer_id: int | None = None,
     items: list[dict],
     source: str = "agent",
 ) -> Document:
     """Создаёт новую заявку покупателя (ZAKAZ) по телефону и списку позиций.
 
-    Позиции — ``[{nomenklatura_id, quantity}]``. Контрагент подбирается по
-    телефону; цена и ставка НДС берутся из номенклатуры. Документ создаётся
-    как **новая заявка** (``state="new"``) — её получает и обрабатывает оператор
-    (резерв → отгрузка, либо продажа через РМК). Сам документ не проведён
-    (``Document.status="draft"``), проведение остаётся за оператором.
+    Покупатель (аккаунт + контрагент) находится или создаётся по номеру телефона
+    через :func:`resolve_customer_by_phone`; заказ всегда оформляется на
+    контрагента. Цена и ставка НДС берутся из номенклатуры. Документ — новая
+    заявка (``state="new"``), не проведён (``Document.status="draft"``).
     """
-    kontragent = await match_kontragent_by_phone(session, phone)
+    resolved = await resolve_customer_by_phone(session, phone, name=customer_name)
+    if resolved is None:
+        raise CustomerError("Нужен номер телефона покупателя.")
+    kontragent_id = resolved["kontragent_id"]
+
     nomen_ids = [i["nomenklatura_id"] for i in items]
     nomen_map = {
         n.id: n
@@ -464,13 +560,13 @@ async def create_order_by_phone(
         session,
         doc_type=DocType.ZAKAZ,
         doc_date=date.today(),
-        kontragent_id=kontragent.id if kontragent else None,
+        kontragent_id=kontragent_id,
         extra={
             "state": "new",
             "source": source,
-            "customer_id": customer_id,
-            "customer_phone": phone,
-            "customer_name": customer_name,
+            "customer_id": resolved["customer_id"],
+            "customer_phone": resolved["phone"],
+            "customer_name": resolved["name"],
         },
         items=doc_items,
         created_by_id=None,

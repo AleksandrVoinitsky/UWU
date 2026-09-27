@@ -627,6 +627,7 @@
     var skladSelect = document.getElementById("rmk-sklad");
     var receivedInput = document.getElementById("rmk-received");
     var changeEl = document.getElementById("rmk-change");
+    var kontragentSelect = document.getElementById("rmk-kontragent");
 
     // Корзина: id -> {name, qty, price}
     var cart = {};
@@ -767,7 +768,7 @@
       fetch("/rmk/sell", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sklad_id: skladId ? parseInt(skladId, 10) : null, items: lines, return: !!isReturn, received: received, zakaz_id: zakazId }),
+        body: JSON.stringify({ sklad_id: skladId ? parseInt(skladId, 10) : null, kontragent_id: kontragentSelect && kontragentSelect.value ? parseInt(kontragentSelect.value, 10) : null, items: lines, return: !!isReturn, received: received, zakaz_id: zakazId }),
       })
         .then(function (r) {
           if (!r.ok) return r.json().then(function (e) { throw new Error(e.detail || "Ошибка"); });
