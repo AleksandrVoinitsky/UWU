@@ -21,7 +21,7 @@
           <td>{{ z.number }}</td>
           <td>{{ z.date }}</td>
           <td>
-            {% if extra.get('source') == 'customer' %}
+            {% if extra.get('customer_name') or extra.get('customer_phone') %}
               <div>{{ extra.get('customer_name') or 'Покупатель' }}</div>
               <div class="muted small">{{ extra.get('customer_phone') or '' }}</div>
             {% else %}
@@ -51,7 +51,7 @@
       <div class="form-row">
         <div class="field">
           <label>Покупатель</label>
-          {% if extra.get('source') == 'customer' %}
+          {% if extra.get('customer_name') or extra.get('customer_phone') %}
             <div>{{ extra.get('customer_name') or 'Покупатель' }}</div>
             <div class="muted small">{{ extra.get('customer_phone') or '' }}</div>
           {% else %}
