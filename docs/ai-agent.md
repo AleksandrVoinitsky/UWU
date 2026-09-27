@@ -88,8 +88,7 @@ API, поэтому дрейф бизнес-логики между агенто
 
 Режим ответа (решение №4): по умолчанию отвечает **агент**; оператор в любой
 момент «перехватывает» диалог (ручной режим) — переключатель на чате
-(`Chat.agent_enabled`) и глобальная настройка `default_responder`
-(`agent` / `operator`).
+(`Chat.agent_enabled`, по умолчанию включён).
 
 Требуется два новых эндпоинта в ядре (см. §9): приём/отправка сообщений агентом
 и управление одобрениями.
@@ -178,10 +177,13 @@ START → classify_intent
 | `version` | номер версии (автоинкремент) |
 | `template` | текст промпта с плейсхолдерами `{customer}`, `{context}`, `{history}`, `{intent}`, `{tools}` |
 | `variables` | список разрешённых переменных (JSON) |
-| `model` | имя модели (переопределение глобального) |
-| `temperature`, `max_tokens` | параметры сэмплирования |
 | `active` | активная версия |
 | `updated_by`, `updated_at` | аудит |
+
+> Модель и параметры сэмплирования (`model`, `temperature`, `max_tokens`) **не
+> хранятся в промптах** — они задаются переменными окружения отдельного сервиса
+> `uwu-ai-agent` (`LLM_MODEL`, `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`). Админка ядра
+> управляет только текстом промптов и их переменными.
 
 Возможности админки:
 
@@ -290,11 +292,15 @@ START → classify_intent
 | `expires_at` | datetime \| null | |
 
 ### `agent_configs`
-Глобальные настройки агента.
+Глобальные настройки агента (только бизнес-политики).
 
 | Поле | Описание |
 | --- | --- |
-| `key` / `value` | key-value (`model`, `temperature`, `max_history`, `approval_threshold`, `default_responder`, `fallback_message`) |
+| `key` / `value` | key-value (`approval_threshold_amount`, `fallback_message`) |
+
+> Модель и параметры LLM (`model`, `temperature`, `max_tokens`, `max_history`)
+> в `agent_configs` **не хранятся** — они задаются переменными окружения сервиса
+> `uwu-ai-agent` (см. §2, §10).
 
 ### `agent_prompts` и `agent_prompt_versions`
 Версионируемые промпты (§5).
@@ -305,7 +311,7 @@ START → classify_intent
 | `created_at`, `updated_at` | |
 
 `agent_prompt_versions`: `prompt_id`, `version`, `template`, `variables`,
-`model`, `temperature`, `max_tokens`, `updated_by`, `updated_at`.
+`updated_by`, `updated_at`.
 
 ### `agent_tools`
 Реестр инструментов (§6): `key`, `name`, `description`, `endpoint`, `method`,
@@ -359,8 +365,9 @@ START → classify_intent
 - **`Message`** — ✅ добавлены `author` (`operator | agent | customer`; по
   умолчанию `operator`) и `agent_run_id` (nullable, ссылка на запуск). Позволяет
   различать ответы агента в чате и аудит. Миграция `a1b2c3d4e5f9`.
-- **`Chat`** — ✅ добавлен `agent_enabled` (bool, default false) — включать
-  агента по чату/каналу. Миграция `a1b2c3d4e5f9`.
+- **`Chat`** — ✅ добавлен `agent_enabled` (bool, default `true`) — автоответ
+  агента включён по умолчанию; оператор выключает тумблер для ручного режима.
+  Миграция `a1b2c3d4e5f9` (default изменён на `true` в `c4d5e6f7a8b9`).
 - **`Role`/`permissions`** — новые права: `agent.manage`, `agent.prompts.manage`,
   `agent.tools.manage`, `agent.approvals.manage` (для разграничения в админке).
 - **`Role` агента** — специальный принципал с урезанными правами (только чтение
@@ -465,7 +472,7 @@ START → classify_intent
 - Документация в Markdown в `docs/`, **перекрёстные ссылки** на каждый модуль,
   функцию, промпт и инструмент.
 - Для каждого промпта и инструмента — отдельная секция: **назначение** (что делает
-  для бизнеса) и **техническое описание** (переменные, модель, права, эндпоинт).
+  для бизнеса) и **техническое описание** (переменные, права, эндпоинт).
 - Документация интегрируется в админку UWU (`/admin/docs`) тем же механизмом
   [`app/web/docs.py`](../app/web/docs.py), что и остальные разделы.
 - Карта графа LangGraph (узлы, рёбра, состояния) — в виде таблицы + ASCII-схемы.

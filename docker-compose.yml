@@ -33,6 +33,9 @@ services:
       EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      # AI-агент (отдельный сервис uwu-ai-agent): webhook для уведомления о
+      # новых входящих сообщениях (пусто — уведомление выключено).
+      AGENT_WEBHOOK_URL: ${AGENT_WEBHOOK_URL:-http://host.docker.internal:8100/webhook}
       # production — небезопасные SECRET_KEY/пароль блокируют запуск (fail-fast).
       ENVIRONMENT: ${ENVIRONMENT:-production}
     ports:

@@ -38,20 +38,16 @@
 <div class="card">
   <div class="card-header">
     <h2>Конфигурация агента</h2>
-    <span class="muted small">Глобальные настройки модели и надзора</span>
+    <span class="muted small">Бизнес-политики. Модель и параметры LLM задаются переменными окружения сервиса <code>uwu-ai-agent</code></span>
+  </div>
+  <div class="notice">
+    Модель, токен и параметры сэмплирования (temperature / max_tokens) задаются переменными
+    окружения отдельного сервиса <code>uwu-ai-agent</code> (<code>LLM_MODEL</code>, <code>LLM_API_KEY</code>,
+    <code>LLM_TEMPERATURE</code>, <code>LLM_MAX_TOKENS</code>). Здесь управляются только промпты и
+    права/разрешения агента, а автоответ включается/выключается переключателем на чате.
   </div>
   <form method="post" action="/admin/agent/config">
     <div class="form-row">
-      <div class="field"><label>Модель (пусто = провайдер по умолчанию)</label><input type="text" name="model" value="{{ config.get('model', '') }}" placeholder="например gpt-4o-mini"></div>
-      <div class="field"><label>Temperature</label><input type="number" step="0.1" name="temperature" value="{{ config.get('temperature', '0.3') }}"></div>
-      <div class="field"><label>История диалога (сообщений)</label><input type="number" name="max_history" value="{{ config.get('max_history', '20') }}"></div>
-      <div class="field"><label>Max tokens</label><input type="number" name="max_tokens" value="{{ config.get('max_tokens', '1024') }}"></div>
-      <div class="field"><label>Отвечает по умолчанию</label>
-        <select name="default_responder">
-          <option value="agent" {% if config.get('default_responder') == 'agent' %}selected{% endif %}>Агент (оператор перехватывает)</option>
-          <option value="operator" {% if config.get('default_responder') == 'operator' %}selected{% endif %}>Оператор (агент по требованию)</option>
-        </select>
-      </div>
       <div class="field"><label>Порог одобрения суммы, ₽</label><input type="number" name="approval_threshold_amount" value="{{ config.get('approval_threshold_amount', '5000') }}"></div>
     </div>
     <div class="field"><label>Сообщение-заглушка при ошибке</label><textarea name="fallback_message" rows="2">{{ config.get('fallback_message', '') }}</textarea></div>

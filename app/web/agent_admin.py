@@ -54,15 +54,6 @@ def _as_decimal(raw: str | None) -> Decimal | None:
         return None
 
 
-def _as_float(raw: str | None) -> float | None:
-    if not raw:
-        return None
-    try:
-        return float(raw.strip())
-    except ValueError:
-        return None
-
-
 def _as_int(raw: str | None) -> int | None:
     if not raw:
         return None
@@ -184,9 +175,6 @@ async def agent_add_prompt_version(
     request: Request,
     template: str = Form(...),
     variables: str = Form(""),
-    model: str = Form(""),
-    temperature: str = Form(""),
-    max_tokens: str = Form(""),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user_from_cookie),
 ):
@@ -199,9 +187,6 @@ async def agent_add_prompt_version(
             prompt,
             template=template,
             variables=[v.strip() for v in variables.split(",") if v.strip()],
-            model=model or None,
-            temperature=_as_float(temperature),
-            max_tokens=_as_int(max_tokens),
             updated_by=user.login,
         )
     return RedirectResponse("/admin/agent/prompts", status_code=303)

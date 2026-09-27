@@ -43,10 +43,15 @@ async def test_seed_agent_is_idempotent(seeded_session):
 # ---------------------------------------------------------------------------
 async def test_config_get_set(seeded_session):
     config = await agent_service.get_configs(seeded_session)
-    assert config["temperature"] == "0.3"  # дефолт
-    await agent_service.set_config(seeded_session, "temperature", "0.7")
+    assert config["approval_threshold_amount"] == "5000"  # дефолт
+    assert config["fallback_message"]
+    # Параметры модели в админке не управляются — они задаются env сервиса uwu-ai-agent.
+    assert "model" not in config
+    assert "temperature" not in config
+    assert "max_tokens" not in config
+    await agent_service.set_config(seeded_session, "approval_threshold_amount", "7000")
     config = await agent_service.get_configs(seeded_session)
-    assert config["temperature"] == "0.7"
+    assert config["approval_threshold_amount"] == "7000"
 
 
 # ---------------------------------------------------------------------------

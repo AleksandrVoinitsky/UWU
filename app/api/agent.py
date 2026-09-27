@@ -62,9 +62,6 @@ async def list_prompts(
                 "active_version": p.active_version,
                 "template": ver.template if ver else "",
                 "variables": ver.variables if ver else [],
-                "model": ver.model if ver else None,
-                "temperature": ver.temperature if ver else None,
-                "max_tokens": ver.max_tokens if ver else None,
             }
         )
     return out

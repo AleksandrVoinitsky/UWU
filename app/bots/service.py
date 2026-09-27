@@ -204,6 +204,13 @@ async def store_incoming(
         session.add(Message(chat_id=chat.id, direction="in", text=message.text, author="customer"))
         chat.last_message_at = datetime.now(timezone.utc)
         await session.commit()
+
+        # Если чат включён для AI-агента — уведомляем его (best-effort, fire-and-forget).
+        if chat.agent_enabled:
+            from app.services.agent_notify import notify_agent
+
+            notify_agent(chat.id, message.text, channel=chat.channel)
+
     logger.info(
         "Incoming %s from %s (%s)",
         message.channel,

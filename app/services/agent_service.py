@@ -46,9 +46,6 @@ DEFAULT_PROMPTS: list[dict] = [
             "- Отвечай на языке пользователя."
         ),
         "variables": [],
-        "model": None,
-        "temperature": None,
-        "max_tokens": None,
     },
     {
         "key": "classify_intent",
@@ -64,9 +61,6 @@ DEFAULT_PROMPTS: list[dict] = [
             "Сообщение: {messages}"
         ),
         "variables": ["messages"],
-        "model": None,
-        "temperature": 0.0,
-        "max_tokens": 16,
     },
     {
         "key": "generate",
@@ -81,9 +75,6 @@ DEFAULT_PROMPTS: list[dict] = [
             "Ответ должен быть дружелюбным, конкретным и без выдуманных данных."
         ),
         "variables": ["customer", "history", "context", "intent"],
-        "model": None,
-        "temperature": None,
-        "max_tokens": None,
     },
     {
         "key": "reorder_suggestion",
@@ -99,9 +90,6 @@ DEFAULT_PROMPTS: list[dict] = [
             "«у вас заканчивается …»). Не выдумывай цены и наличие."
         ),
         "variables": ["customer", "history", "reorder"],
-        "model": None,
-        "temperature": None,
-        "max_tokens": None,
     },
 ]
 
@@ -245,9 +233,6 @@ async def create_prompt(
     *,
     description: str | None = None,
     variables: list[str] | None = None,
-    model: str | None = None,
-    temperature: float | None = None,
-    max_tokens: int | None = None,
     updated_by: str | None = None,
 ) -> AgentPrompt:
     """Создаёт промпт с первой версией (v1) и делает её активной."""
@@ -260,9 +245,6 @@ async def create_prompt(
             version=1,
             template=template,
             variables=variables or [],
-            model=model,
-            temperature=temperature,
-            max_tokens=max_tokens,
             updated_by=updated_by,
         )
     )
@@ -277,9 +259,6 @@ async def add_prompt_version(
     template: str,
     *,
     variables: list[str] | None = None,
-    model: str | None = None,
-    temperature: float | None = None,
-    max_tokens: int | None = None,
     updated_by: str | None = None,
     activate: bool = True,
 ) -> AgentPrompt:
@@ -291,9 +270,6 @@ async def add_prompt_version(
             version=next_version,
             template=template,
             variables=variables or [],
-            model=model,
-            temperature=temperature,
-            max_tokens=max_tokens,
             updated_by=updated_by,
         )
     )
@@ -493,9 +469,6 @@ async def seed_agent(session: AsyncSession) -> None:
             template=spec["template"],
             description=spec.get("description"),
             variables=spec.get("variables") or [],
-            model=spec.get("model"),
-            temperature=spec.get("temperature"),
-            max_tokens=spec.get("max_tokens"),
         )
 
     existing_tools = {

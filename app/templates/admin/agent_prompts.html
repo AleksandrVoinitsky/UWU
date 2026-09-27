@@ -30,12 +30,7 @@
   {% set active = p.versions | selectattr('version', 'equalto', p.active_version) | list | first %}
   <form method="post" action="/admin/agent/prompts/{{ p.id }}/version">
     <div class="field"><label>Шаблон (правка создаст новую версию)</label><textarea name="template" rows="6" required>{{ active.template if active else '' }}</textarea></div>
-    <div class="form-row">
-      <div class="field"><label>Переменные (через запятую)</label><input type="text" name="variables" value="{{ (active.variables if active else []) | join(', ') }}"></div>
-      <div class="field"><label>Модель</label><input type="text" name="model" value="{{ active.model or '' }}"></div>
-      <div class="field"><label>Temperature</label><input type="number" step="0.1" name="temperature" value="{{ active.temperature if active and active.temperature is not none else '' }}"></div>
-      <div class="field"><label>Max tokens</label><input type="number" name="max_tokens" value="{{ active.max_tokens if active and active.max_tokens is not none else '' }}"></div>
-    </div>
+    <div class="field"><label>Переменные (через запятую)</label><input type="text" name="variables" value="{{ (active.variables if active else []) | join(', ') }}"></div>
     <div class="form-actions"><button type="submit" class="btn primary">Сохранить новую версию</button></div>
   </form>
 

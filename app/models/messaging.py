@@ -31,7 +31,9 @@ class Chat(Base, IdMixin, TimestampMixin):
     # записью покупателя и используется для отображения в чате продавца.
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     # Включать ли автоматический ответ AI-агента по этому чату.
-    agent_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    # По умолчанию включён (агент отвечает сразу); оператор выключает тумблер,
+    # чтобы отвечать вручную (см. docs/ai-agent.md).
+    agent_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     messages: Mapped[list["Message"]] = relationship(

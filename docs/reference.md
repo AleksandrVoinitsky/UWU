@@ -355,7 +355,7 @@ initData (для тестов и локальной проверки).
 
 | Модель | Таблица | Назначение |
 | --- | --- | --- |
-| `AgentConfig` | `agent_configs` | глобальные настройки (модель, temperature, пороги) |
+| `AgentConfig` | `agent_configs` | глобальные бизнес-политики (порог одобрения, сообщение-заглушка) |
 | `AgentPrompt` / `AgentPromptVersion` | `agent_prompts` / `agent_prompt_versions` | версионируемые промпты |
 | `AgentTool` | `agent_tools` | реестр инструментов (эндпоинт, права, политика одобрения) |
 | `AgentApiKey` | `agent_api_keys` | API-ключи (хранится только SHA-256 хеш) |

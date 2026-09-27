@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -41,14 +41,14 @@ AGENT_PERMISSIONS = (
 )
 
 # Значения глобальных настроек агента по умолчанию (ключ -> значение-строка).
+#
+# Модель и параметры сэмплирования LLM (model/temperature/max_tokens) НЕ хранятся
+# здесь — они задаются переменными окружения отдельного сервиса ``uwu-ai-agent``
+# (см. docs/ai-agent.md). В админке управляются только бизнес-политики: порог
+# одобрения и сообщение-заглушка при ошибке.
 DEFAULT_AGENT_CONFIG: dict[str, str] = {
-    "model": "",                       # имя модели (пусто = провайдер по умолчанию)
-    "temperature": "0.3",
-    "max_history": "20",               # последних сообщений диалога
-    "default_responder": "agent",      # agent | operator
     "approval_threshold_amount": "5000",  # порог суммы для политики threshold (₽)
     "fallback_message": "Извините, я сейчас не могу ответить. Оператор свяжется с вами.",
-    "max_tokens": "1024",
 }
 
 
@@ -89,9 +89,6 @@ class AgentPromptVersion(Base, IdMixin):
     template: Mapped[str] = mapped_column(Text, nullable=False)
     # Разрешённые переменные-плейсхолдеры (например {customer}, {context}).
     variables: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
-    model: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    temperature: Mapped[float | None] = mapped_column(Float, nullable=True)
-    max_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     updated_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

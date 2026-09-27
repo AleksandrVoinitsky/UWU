@@ -49,9 +49,30 @@ async def list_chats(
     )
     chats = list(result.scalars())
     return [
-        {"id": c.id, "name": c.name, "channel": c.channel, "kontragent_id": c.kontragent_id}
+        {
+            "id": c.id,
+            "name": c.name,
+            "channel": c.channel,
+            "kontragent_id": c.kontragent_id,
+            "agent_enabled": c.agent_enabled,
+        }
         for c in chats
     ]
+
+
+@router.post("/{chat_id}/agent-toggle")
+async def toggle_agent(
+    chat_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(_current_user),
+):
+    """Включает/выключает автоответ AI-агента для чата."""
+    chat = await session.get(Chat, chat_id)
+    if chat is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
+    chat.agent_enabled = not chat.agent_enabled
+    await session.commit()
+    return {"id": chat.id, "agent_enabled": chat.agent_enabled}
 
 
 @router.get("/unread")

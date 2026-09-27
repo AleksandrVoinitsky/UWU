@@ -156,3 +156,29 @@ async def test_customer_unread_count(client, seeded_session):
     await client.get("/shop/api/chat", headers=headers)
     r = await client.get("/shop/api/chat/unread", headers=headers)
     assert r.json()["unread"] == 0
+
+
+async def test_new_chat_agent_autoreply_enabled_by_default(client, seeded_session):
+    """Новый чат по умолчанию имеет автоответ агента включённым (ручной режим выкл.)."""
+    headers = await _register_customer(client)
+    await client.post("/shop/api/chat", json={"text": "Привет"}, headers=headers)
+    chat = (await seeded_session.execute(select(Chat))).scalars().one()
+    assert chat.agent_enabled is True
+
+
+async def test_agent_toggle_switches_to_manual(client, seeded_session):
+    """Оператор выключает автоответ тумблером чата → ручные ответы."""
+    headers = await _register_customer(client)
+    await client.post("/shop/api/chat", json={"text": "Привет"}, headers=headers)
+
+    await _seller_headers(seeded_session, client)
+    chat = (await client.get("/api/chats")).json()[0]
+    assert chat["agent_enabled"] is True
+
+    r = await client.post(f"/api/chats/{chat['id']}/agent-toggle")
+    assert r.status_code == 200
+    assert r.json()["agent_enabled"] is False
+
+    # Включаем обратно.
+    r = await client.post(f"/api/chats/{chat['id']}/agent-toggle")
+    assert r.json()["agent_enabled"] is True

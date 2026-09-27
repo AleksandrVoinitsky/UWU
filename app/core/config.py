@@ -63,6 +63,13 @@ class Settings(BaseSettings):
     # при смене модели — новая миграция).
     embedding_dim: int = 1536
 
+    # --- AI-агент (отдельный сервис uwu-ai-agent) ---
+    # URL webhook-эндпоинта агента (POST /webhook). Пустая строка — ядро не
+    # уведомляет агента о новых входящих сообщениях.
+    agent_webhook_url: str = ""
+    # Таймаут (сек) запроса-уведомления агенту (best-effort, не блокирует чат).
+    agent_webhook_timeout: float = 3.0
+
 
 @lru_cache
 def get_settings() -> Settings:

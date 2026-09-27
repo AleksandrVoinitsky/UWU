@@ -109,6 +109,18 @@ async def send_customer_message(
     chat.last_message_at = datetime.now(timezone.utc)
     await session.commit()
     await session.refresh(message)
+
+    # Если чат включён для AI-агента — уведомляем его (best-effort, не блокирует).
+    if chat.agent_enabled:
+        from app.services.agent_notify import notify_agent
+
+        notify_agent(
+            chat.id,
+            text,
+            channel=chat.channel,
+            customer_id=customer.id,
+        )
+
     return {
         "id": message.id,
         "direction": message.direction,
