@@ -249,9 +249,12 @@
   var chatList = document.getElementById("chat-list");
   var chatSearch = document.getElementById("chat-search");
   var chatCurrentName = document.getElementById("chat-current-name");
+  var chatAgentToggle = document.getElementById("chat-agent-toggle");
+  var chatAgentLabel = document.getElementById("chat-agent-label");
 
   var allChats = [];
   var currentChatId = null;
+  var currentChat = null;
   var lastMessageId = 0;
   var pollTimer = null;
 
@@ -292,7 +295,13 @@
       .then(function (r) { return r.json(); })
       .then(function (chats) {
         allChats = chats || [];
+        // Обновляем текущий чат (agent_enabled / unread) из свежих данных.
+        if (currentChatId) {
+          var cur = allChats.filter(function (c) { return c.id === currentChatId; })[0];
+          if (cur) currentChat = cur;
+        }
         renderChatList();
+        updateAgentToggle();
       })
       .catch(function () {});
   }
@@ -312,16 +321,49 @@
       el.querySelector(".chat-avatar").textContent = (c.name[0] || "?").toUpperCase();
       el.querySelector(".chat-name").textContent = c.name;
       el.querySelector(".chat-last").textContent = channelLabel(c.channel);
-      el.querySelector(".chat-badge").textContent = channelLabel(c.channel);
+      var badge = el.querySelector(".chat-badge");
+      var unread = c.unread || 0;
+      if (unread > 0) {
+        badge.textContent = unread > 99 ? "99+" : String(unread);
+        badge.classList.add("unread");
+      } else {
+        badge.textContent = "";
+        badge.classList.remove("unread");
+      }
       el.addEventListener("click", function () { openChat(c); });
       chatList.appendChild(el);
     });
   }
 
+  function updateAgentToggle() {
+    if (!chatAgentToggle || !chatAgentLabel) return;
+    if (!currentChat) { chatAgentToggle.hidden = true; return; }
+    chatAgentToggle.hidden = false;
+    var on = currentChat.agent_enabled !== false;
+    chatAgentToggle.classList.toggle("on", on);
+    chatAgentLabel.textContent = on ? "агент: вкл" : "агент: выкл";
+  }
+
+  function toggleAgent() {
+    if (!currentChatId) return;
+    fetch("/api/chats/" + currentChatId + "/agent-toggle", { method: "POST" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (currentChat) currentChat.agent_enabled = data.agent_enabled;
+        allChats = allChats.map(function (c) {
+          return c.id === currentChatId ? Object.assign({}, c, { agent_enabled: data.agent_enabled }) : c;
+        });
+        updateAgentToggle();
+      })
+      .catch(function () {});
+  }
+
   function openChat(c) {
     currentChatId = c.id;
+    currentChat = c;
     if (chatCurrentName) chatCurrentName.textContent = c.name;
     renderChatList();
+    updateAgentToggle();
     fetch("/api/chats/" + c.id + "/messages")
       .then(function (r) { return r.json(); })
       .then(function (msgs) { renderMessages(msgs || []); pollUnread(); })
@@ -394,6 +436,7 @@
   if (chatClose) chatClose.addEventListener("click", function () { toggleChat(false); });
   if (chatBackdrop) chatBackdrop.addEventListener("click", function () { toggleChat(false); });
   if (chatSend) chatSend.addEventListener("click", send);
+  if (chatAgentToggle) chatAgentToggle.addEventListener("click", toggleAgent);
   if (chatInput) {
     chatInput.addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
   }

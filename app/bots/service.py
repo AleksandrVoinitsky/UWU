@@ -21,6 +21,7 @@ from app.bots.base import (
     BotAdapter,
     IncomingMessage,
     MessageCallback,
+    strip_markdown,
 )
 from app.core.logging import get_logger
 from app.models.bot import BotConfig
@@ -230,7 +231,7 @@ async def deliver_outgoing(chat: Chat, text: str) -> None:
         )
         return
     try:
-        await adapter.send_message(chat.external_id, text)
+        await adapter.send_message(chat.external_id, strip_markdown(text))
     except Exception:  # noqa: BLE001
         logger.exception(
             "Не удалось отправить сообщение в %s (%s)",

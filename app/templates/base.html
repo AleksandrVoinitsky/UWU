@@ -155,7 +155,12 @@
         <div class="messenger-chat-list" id="chat-list"></div>
       </div>
       <div class="messenger-main">
-        <div class="messenger-main-header" id="chat-current-name">Выберите чат</div>
+        <div class="messenger-main-header">
+          <span id="chat-current-name">Выберите чат</span>
+          <button id="chat-agent-toggle" type="button" class="agent-toggle" hidden title="{{ t('chat.agent_toggle', lang) }}">
+            <span class="dot"></span><span id="chat-agent-label">агент: вкл</span>
+          </button>
+        </div>
         <div class="messenger-messages" id="chat-messages">
           <div class="messenger-empty">Выберите чат для просмотра сообщений</div>
         </div>

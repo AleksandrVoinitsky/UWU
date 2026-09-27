@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -16,6 +17,38 @@ from dataclasses import dataclass
 # Каналы мессенджеров (совпадают с Chat.channel).
 CHANNEL_TELEGRAM = "telegram"
 CHANNEL_MAKS = "maks"
+
+
+def strip_markdown(text: str) -> str:
+    """Преобразует простую Markdown-разметку в обычный текст.
+
+    Ответы AI-агента могут содержать ``**жирный**``, ``*курсив*``, списки и ссылки,
+    которые мессенджеры (Telegram/MAX) не отображают без ``parse_mode``. Эта функция
+    убирает распространённую разметку, оставляя читаемый текст.
+
+    См. также: :func:`app.bots.service.deliver_outgoing`.
+    """
+    if not text:
+        return text
+    # Ссылки [text](url) → text; картинки ![alt](url) → alt.
+    text = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+    # Жирный **text** / __text__.
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"__(.+?)__", r"\1", text)
+    # Курсив *text* / _text_.
+    text = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"\1", text)
+    text = re.sub(r"(?<!_)_([^_\n]+)_(?!_)", r"\1", text)
+    # Инлайн-код `text` и зачёркивание ~~text~~.
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    text = re.sub(r"~~(.+?)~~", r"\1", text)
+    # Заголовки (# ## ### …) и маркеры списков (- * +, 1. 2.).
+    text = re.sub(r"^\s{0,3}#{1,6}\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s{0,3}[-*+]\s+", "• ", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s{0,3}\d+[.)]\s+", "", text, flags=re.MULTILINE)
+    # Горизонтальные линии (--- / ***).
+    text = re.sub(r"^\s{0,3}([-*_])\s*\1\s*\1[ \t]*$", "", text, flags=re.MULTILINE)
+    return text.strip()
 
 
 @dataclass(frozen=True)

@@ -182,3 +182,20 @@ async def test_agent_toggle_switches_to_manual(client, seeded_session):
     # Включаем обратно.
     r = await client.post(f"/api/chats/{chat['id']}/agent-toggle")
     assert r.json()["agent_enabled"] is True
+
+
+async def test_list_chats_reports_per_chat_unread(client, seeded_session):
+    """Список чатов возвращает число непрочитанных входящих по каждому чату."""
+    headers = await _register_customer(client)
+    await client.post("/shop/api/chat", json={"text": "Вопрос"}, headers=headers)
+
+    await _seller_headers(seeded_session, client)
+    chats = (await client.get("/api/chats")).json()
+    site = [c for c in chats if c["channel"] == "site"][0]
+    assert site["unread"] == 1
+
+    # После просмотра чата оператором непрочитанное сбрасывается.
+    await client.get(f"/api/chats/{site['id']}/messages")
+    chats = (await client.get("/api/chats")).json()
+    site = [c for c in chats if c["channel"] == "site"][0]
+    assert site["unread"] == 0

@@ -66,6 +66,7 @@
   "chat.status": "в сети",
   "chat.greeting": "Здравствуйте! Чем можем помочь?",
   "chat.placeholder": "Введите сообщение…",
+  "chat.agent_toggle": "Автоответ AI-агента",
   "common.search": "Поиск",
   "common.create": "Создать",
   "menu.rmk": "РМК — касса",

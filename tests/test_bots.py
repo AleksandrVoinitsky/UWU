@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-from app.bots.base import BotAdapter, IncomingMessage
+from app.bots.base import BotAdapter, IncomingMessage, strip_markdown
 from app.bots.service import (
     bot_manager,
     create_adapter,
@@ -131,6 +131,30 @@ async def test_deliver_outgoing_no_adapter(seeded_session):
     bot_manager.clear()
     chat = Chat(name="Клиент", channel="telegram", external_id="123")
     await deliver_outgoing(chat, "Привет")  # не должно бросать исключение
+
+
+def test_strip_markdown():
+    """Разметка Markdown убирается в обычный текст (для мессенджеров)."""
+    assert strip_markdown("**Жирный** текст") == "Жирный текст"
+    assert strip_markdown("*курсив* и _ещё_") == "курсив и ещё"
+    assert strip_markdown("- пункт 1\n- пункт 2") == "• пункт 1\n• пункт 2"
+    assert strip_markdown("## Заголовок") == "Заголовок"
+    assert strip_markdown("Ссылка [тут](http://x) и `код`") == "Ссылка тут и код"
+    assert strip_markdown("1. Первый\n2. Второй") == "Первый\nВторой"
+    assert strip_markdown("") == ""
+
+
+async def test_deliver_outgoing_strips_markdown(seeded_session):
+    """Ответ агенту доставляется в мессенджер без Markdown-разметки."""
+    adapter = FakeAdapter()
+    bot_manager.register(adapter)
+    chat = Chat(name="Клиент", channel="telegram", external_id="123")
+    seeded_session.add(chat)
+    await seeded_session.commit()
+
+    await deliver_outgoing(chat, "**Жирный** и *курсив*")
+    assert adapter.sent == [("123", "Жирный и курсив")]
+    bot_manager.clear()
 
 
 async def test_upsert_config_keeps_token_when_empty(seeded_session):

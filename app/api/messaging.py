@@ -48,6 +48,13 @@ async def list_chats(
         select(Chat).order_by(Chat.last_message_at.desc().nullslast(), Chat.id)
     )
     chats = list(result.scalars())
+    # Непрочитанные входящие по каждому чату (для бейджа в списке чатов).
+    unread_rows = await session.execute(
+        select(Message.chat_id, func.count())
+        .where(Message.direction == "in", Message.is_read.is_(False))
+        .group_by(Message.chat_id)
+    )
+    unread = {chat_id: cnt for chat_id, cnt in unread_rows.all()}
     return [
         {
             "id": c.id,
@@ -55,6 +62,7 @@ async def list_chats(
             "channel": c.channel,
             "kontragent_id": c.kontragent_id,
             "agent_enabled": c.agent_enabled,
+            "unread": unread.get(c.id, 0),
         }
         for c in chats
     ]

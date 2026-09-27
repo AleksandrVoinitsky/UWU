@@ -97,7 +97,7 @@ async def test_create_prompt(seeded_session):
 # ---------------------------------------------------------------------------
 async def test_update_tool(seeded_session):
     tool = next(t for t in await agent_service.list_tools(seeded_session) if t.key == "create_order")
-    assert tool.approval_policy == "always"
+    assert tool.approval_policy == "auto"  # сбор заказов без одобрения
 
     await agent_service.update_tool(
         seeded_session, tool, approval_policy="threshold", enabled=False, rate_limit=5
@@ -106,6 +106,13 @@ async def test_update_tool(seeded_session):
     assert tool.approval_policy == "threshold"
     assert tool.enabled is False
     assert tool.rate_limit == 5
+
+
+async def test_default_tools_are_auto(seeded_session):
+    """Запись в корзину и создание заказа по умолчанию без одобрения (auto)."""
+    tools = {t.key: t for t in await agent_service.list_tools(seeded_session)}
+    assert tools["add_to_cart"].approval_policy == "auto"
+    assert tools["create_order"].approval_policy == "auto"
 
 
 # ---------------------------------------------------------------------------
