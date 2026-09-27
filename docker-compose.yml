@@ -20,7 +20,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://uwu:uwu@db:5432/uwu
+      DATABASE_URL: postgresql+asyncpg://uwu:uwu@db:5432/uwu?sslmode=disable
       SECRET_KEY: ${SECRET_KEY:-change-me-to-a-long-random-string}
       ADMIN_LOGIN: ${ADMIN_LOGIN:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}

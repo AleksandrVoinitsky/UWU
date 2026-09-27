@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     )
 
     # --- База данных ---
-    database_url: str = "postgresql+asyncpg://uwu:uwu@localhost:5432/uwu"
+    database_url: str = "postgresql+asyncpg://uwu:uwu@localhost:5432/uwu?sslmode=disable"
 
     # --- Администратор (создаётся при первом запуске) ---
     admin_login: str = "admin"

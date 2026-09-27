@@ -20,7 +20,7 @@
 
 | Переменная | По умолчанию | Назначение |
 | --- | --- | --- |
-| `DATABASE_URL` | `postgresql+asyncpg://uwu:uwu@db:5432/uwu` | Строка подключения |
+| `DATABASE_URL` | `postgresql+asyncpg://uwu:uwu@db:5432/uwu?sslmode=disable` | Строка подключения (SSL отключён — внутренняя сеть Docker) |
 | `ADMIN_LOGIN` | `admin` | Логин администратора |
 | `ADMIN_PASSWORD` | `admin` | Пароль администратора |
 | `ADMIN_EMAIL` | `admin@uwu.local` | Email администратора |
