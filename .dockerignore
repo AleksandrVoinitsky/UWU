@@ -28,4 +28,7 @@ pgdata/
 *.db
 *.sqlite3
 
+# Отдельный контейнер AI-агента (свой build-context и свой .dockerignore)
+uwu-ai-agent/
+
 # Docs sources stay (needed by admin UI), but exclude nothing else

@@ -39,6 +39,25 @@ docker compose up --build
 
 Открыть http://localhost:8000 и войти под `ADMIN_LOGIN` / `ADMIN_PASSWORD`.
 
+`docker compose up --build` поднимает три сервиса: `db` (PostgreSQL 16 +
+pgvector), `app` (ядро учёта) и `agent` (AI-консультант `uwu-ai-agent`,
+отдельный контейнер-клиент REST API ядра, порт 8100). Агент аутентифицируется
+API-ключом из `AGENT_API_KEY` (ядро создаёт его при старте); без `LLM_API_KEY`
+работает в детерминированном fallback-режиме. Подробнее — [`uwu-ai-agent`](uwu-ai-agent/README.md)
+и [docs/ai-agent.md](docs/ai-agent.md).
+
+## Демо-данные (тестовый каталог)
+
+```bash
+# 130+ товаров в 14 категориях с ценами, остатками и приходными накладными
+docker exec -w /app -e PYTHONPATH=/app uwu-app-1 python scripts/seed_catalog.py
+```
+
+Скрипт [`scripts/seed_catalog.py`](scripts/seed_catalog.py) идемпотентен и
+создаёт тестовый каталог товаров, распределённых по разным категориям, с
+закупочной и розничной ценой, плюс минимальную инфраструктуру (склад, фирма,
+контрагент, тип цен) и приходные документы для ненулевых остатков.
+
 ## Тесты
 
 ```bash

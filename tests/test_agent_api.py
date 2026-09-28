@@ -77,6 +77,36 @@ async def test_inbox_returns_unread(client, agent_headers, seeded_session):
     assert data[0]["chat_id"] == chat.id
 
 
+async def test_inbox_read_marks_messages(client, agent_headers, seeded_session):
+    """POST /api/agent/inbox/read помечает входящие прочитанными (идемпотентно)."""
+    chat = Chat(name="Покупатель", channel="site")
+    seeded_session.add(chat)
+    await seeded_session.flush()
+    msg = Message(chat_id=chat.id, direction="in", text="Привет", author="customer")
+    seeded_session.add(msg)
+    await seeded_session.commit()
+
+    resp = await client.post(
+        "/api/agent/inbox/read",
+        headers=agent_headers,
+        json={"message_ids": [msg.id]},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["marked"] == 1
+
+    # После пометки inbox больше не возвращает это сообщение.
+    inbox = await client.get("/api/agent/inbox", headers=agent_headers)
+    assert inbox.json() == []
+
+    # Повторная пометка безопасна.
+    again = await client.post(
+        "/api/agent/inbox/read",
+        headers=agent_headers,
+        json={"message_ids": [msg.id]},
+    )
+    assert again.status_code == 200
+
+
 async def test_post_message_as_agent(client, agent_headers, seeded_session):
     chat = Chat(name="Покупатель", channel="site")
     seeded_session.add(chat)

@@ -47,8 +47,37 @@ async def seed_all(session: AsyncSession) -> None:
     await seed_units(session)
     await seed_admin(session)
     await seed_agent_defaults(session)
+    await seed_agent_api_key(session)
     await seed_retail_kontragent(session)
     await session.commit()
+
+
+async def seed_agent_api_key(session: AsyncSession) -> None:
+    """Гарантирует наличие API-ключа агента из ``AGENT_API_KEY`` (идемпотентно).
+
+    Если переменная окружения ``AGENT_API_KEY`` задана, а записи ключа с таким
+    значением ещё нет — создаёт её с минимальным набором прав агента. Это
+    позволяет сервису ``uwu-ai-agent`` аутентифицироваться без ручного создания
+    ключа в админке.
+    """
+    raw = settings.agent_api_key
+    if not raw:
+        return
+    from app.models.agent import AGENT_PERMISSIONS, AgentApiKey
+    from app.services.agent_service import _hash_key
+
+    key_hash = _hash_key(raw)
+    exists = await session.execute(
+        select(AgentApiKey).where(AgentApiKey.key_hash == key_hash)
+    )
+    if exists.scalar_one_or_none() is None:
+        session.add(
+            AgentApiKey(
+                name="uwu-ai-agent (auto)",
+                key_hash=key_hash,
+                permissions=list(AGENT_PERMISSIONS),
+            )
+        )
 
 
 async def seed_retail_kontragent(session: AsyncSession) -> None:

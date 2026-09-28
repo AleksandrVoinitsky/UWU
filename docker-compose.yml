@@ -35,7 +35,10 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       # AI-агент (отдельный сервис uwu-ai-agent): webhook для уведомления о
       # новых входящих сообщениях (пусто — уведомление выключено).
-      AGENT_WEBHOOK_URL: ${AGENT_WEBHOOK_URL:-http://host.docker.internal:8100/webhook}
+      AGENT_WEBHOOK_URL: ${AGENT_WEBHOOK_URL:-http://agent:8100/webhook}
+      # API-ключ агента: ядро при старте гарантирует существование ключа с этим
+      # значением; тот же ключ передаётся сервису uwu-ai-agent.
+      AGENT_API_KEY: ${AGENT_API_KEY:-uwu-dev-agent-key-change-me}
       # development — работает «из коробки» (слабые секреты допустимы с
       # предупреждением). production — небезопасные SECRET_KEY/пароль блокируют
       # запуск (fail-fast); задайте ENVIRONMENT=production и надёжные секреты.
@@ -44,6 +47,27 @@ services:
       - "8000:8000"
     volumes:
       - uploads:/app/uploads
+    restart: unless-stopped
+
+  # AI-агент — отдельный контейнер (клиент REST API ядра, не пишет в БД напрямую).
+  agent:
+    build: ./uwu-ai-agent
+    depends_on:
+      app:
+        condition: service_started
+    environment:
+      CORE_BASE_URL: http://app:8000
+      AGENT_API_KEY: ${AGENT_API_KEY:-uwu-dev-agent-key-change-me}
+      # LLM (OpenAI-совместимый API). Пустой LLM_API_KEY — fallback-режим.
+      LLM_BASE_URL: ${AGENT_LLM_BASE_URL:-}
+      LLM_API_KEY: ${AGENT_LLM_API_KEY:-}
+      LLM_MODEL: ${AGENT_LLM_MODEL:-gpt-4o-mini}
+      LLM_TEMPERATURE: ${AGENT_LLM_TEMPERATURE:-0.3}
+      LLM_MAX_TOKENS: ${AGENT_LLM_MAX_TOKENS:-512}
+      POLL_INTERVAL: ${AGENT_POLL_INTERVAL:-2.0}
+      ENABLE_POLLING: ${AGENT_ENABLE_POLLING:-true}
+    ports:
+      - "8100:8100"
     restart: unless-stopped
 
 volumes:

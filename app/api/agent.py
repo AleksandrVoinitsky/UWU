@@ -17,7 +17,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -118,6 +118,32 @@ async def inbox(
         }
         for m, c in result.all()
     ]
+
+
+class MarkReadRequest(BaseModel):
+    message_ids: list[int] = Field(default_factory=list)
+
+
+@router.post("/inbox/read")
+async def mark_inbox_read(
+    payload: MarkReadRequest,
+    session: AsyncSession = Depends(get_session),
+    key: AgentApiKey = AGENT,
+):
+    """Помечает входящие сообщения прочитанными (после обработки агентом).
+
+    Без этого polling ``/api/agent/inbox`` вернёт одни и те же сообщения на
+    каждом цикле. Идемпотентно: повторная пометка безопасна.
+    """
+    if not payload.message_ids:
+        return {"marked": 0}
+    await session.execute(
+        update(Message)
+        .where(Message.id.in_(payload.message_ids), Message.direction == "in")
+        .values(is_read=True)
+    )
+    await session.commit()
+    return {"marked": len(payload.message_ids)}
 
 
 class AgentMessageRequest(BaseModel):
