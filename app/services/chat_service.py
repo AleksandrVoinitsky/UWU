@@ -124,6 +124,7 @@ async def send_customer_message(
             text,
             channel=chat.channel,
             customer_id=customer.id,
+            message_id=message.id,
         )
 
     return {

@@ -29,12 +29,22 @@ def is_enabled() -> bool:
     return bool(settings.agent_webhook_url)
 
 
-async def _post_webhook(chat_id: int, text: str, *, channel: str, customer_id: int | None) -> None:
+async def _post_webhook(
+    chat_id: int,
+    text: str,
+    *,
+    channel: str,
+    customer_id: int | None,
+    message_id: int | None,
+) -> None:
     payload = {
         "chat_id": chat_id,
         "text": text,
         "channel": channel,
         "customer_id": customer_id,
+        # message_id позволяет агенту дедуплицировать webhook против polling
+        # (иначе одно входящее обрабатывается дважды).
+        "message_id": message_id,
     }
     try:
         async with httpx.AsyncClient(timeout=settings.agent_webhook_timeout) as client:
@@ -44,7 +54,14 @@ async def _post_webhook(chat_id: int, text: str, *, channel: str, customer_id: i
         logger.warning("Не удалось уведомить AI-агента о сообщении (chat %s): %s", chat_id, exc)
 
 
-def notify_agent(chat_id: int, text: str, *, channel: str, customer_id: int | None = None) -> None:
+def notify_agent(
+    chat_id: int,
+    text: str,
+    *,
+    channel: str,
+    customer_id: int | None = None,
+    message_id: int | None = None,
+) -> None:
     """Запускает best-effort уведомление агента (fire-and-forget).
 
     Не требует ``await`` от вызывающего: создаёт фоновую задачу, чтобы не
@@ -52,4 +69,6 @@ def notify_agent(chat_id: int, text: str, *, channel: str, customer_id: int | No
     """
     if not is_enabled():
         return
-    asyncio.create_task(_post_webhook(chat_id, text, channel=channel, customer_id=customer_id))
+    asyncio.create_task(
+        _post_webhook(chat_id, text, channel=channel, customer_id=customer_id, message_id=message_id)
+    )

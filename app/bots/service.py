@@ -213,7 +213,8 @@ async def store_incoming(
         chat = await find_or_create_chat(
             session, message.channel, message.external_chat_id, message.sender_name
         )
-        session.add(Message(chat_id=chat.id, direction="in", text=message.text, author="customer"))
+        msg = Message(chat_id=chat.id, direction="in", text=message.text, author="customer")
+        session.add(msg)
         chat.last_message_at = datetime.now(timezone.utc)
         await session.commit()
 
@@ -221,7 +222,7 @@ async def store_incoming(
         if chat.agent_enabled:
             from app.services.agent_notify import notify_agent
 
-            notify_agent(chat.id, message.text, channel=chat.channel)
+            notify_agent(chat.id, message.text, channel=chat.channel, message_id=msg.id)
 
     logger.info(
         "Incoming %s from %s (%s)",
