@@ -9,7 +9,6 @@
 """
 from __future__ import annotations
 
-import secrets
 from datetime import date
 from decimal import Decimal
 
@@ -18,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.security import hash_password, verify_password
 from app.models.catalog import Category, Kontragent, Nomenklatura
@@ -472,9 +472,12 @@ async def resolve_customer_by_phone(
         await session.flush()
 
     if customer is None:
+        # Пароль по умолчанию (задаётся CUSTOMER_DEFAULT_PASSWORD) — покупатель
+        # сможет войти в личный кабинет и сменить его. Раньше здесь генерировался
+        # случайный пароль, и войти было невозможно без сброса.
         customer = Customer(
             phone=digits,
-            password_hash=hash_password(secrets.token_urlsafe(16)),
+            password_hash=hash_password(settings.customer_default_password),
             name=(name or "").strip() or None,
             kontragent_id=kontragent.id,
         )

@@ -15,6 +15,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.config import settings
 from app.core_client import CoreClient
 from app.llm import LLM
 from app.responder import classify_intent as fallback_classify
@@ -70,7 +71,16 @@ async def classify_intent(state: AgentState, llm: LLM) -> AgentState:
     return state
 
 
-async def retrieve_context(state: AgentState, client: CoreClient) -> AgentState:
+async def _search_query(text: str, llm: LLM) -> str:
+    """Извлекает поисковый запрос из сообщения: через LLM, иначе стоп-словами."""
+    if llm.available:
+        query = await llm.extract_search_query(text)
+        if query:
+            return query
+    return extract_query(text)
+
+
+async def retrieve_context(state: AgentState, client: CoreClient, llm: LLM) -> AgentState:
     """Собирает контекст и (по намерению) вызывает read-инструменты ядра."""
     if state.context is None:
         state.context = await client.get_context(state.chat_id)
@@ -80,21 +90,28 @@ async def retrieve_context(state: AgentState, client: CoreClient) -> AgentState:
     if state.customer_id is None and ctx.get("customer"):
         state.customer_id = ctx["customer"].get("id")
 
-    if state.intent in ("stock", "price"):
-        state.products = await client.search_catalog(extract_query(state.text))
-        state.tool_calls.append("search_catalog")
-
-    elif state.intent == "order_status":
+    if state.intent == "order_status":
         order_id = _extract_order_id(state.text)
         if order_id is not None:
             state.order = await client.get_order_status(order_id)
             state.tool_calls.append("get_zakaz")
+        return state
 
-    elif state.intent == "reorder_suggestion" and state.customer_id is not None:
+    # Персонализированный список покупок: история покупателя, если он известен.
+    if state.intent == "reorder_suggestion" and state.customer_id is not None:
         insights = await client.customer_insights(state.customer_id)
-        if insights:
-            state.products = insights.get("reorder") or []
+        if insights and insights.get("reorder"):
+            state.products = insights["reorder"]
             state.tool_calls.append("customer_insights")
+            return state
+
+    # Товарные намерения (в т.ч. «посоветуй …»): ищем каталог по извлечённому
+    # запросу, чтобы у модели был реальный список товаров с ценами и остатками.
+    if state.intent in ("stock", "price", "consultation", "reorder_suggestion", "fallback"):
+        query = await _search_query(state.text, llm)
+        if query:
+            state.products = await client.search_catalog(query)
+            state.tool_calls.append("search_catalog")
 
     return state
 
@@ -141,8 +158,17 @@ def _build_messages(state: AgentState) -> list[dict]:
         f"{m.get('author', '?')}: {m.get('text', '')}" for m in history[-10:]
     )
 
+    business = (
+        "Правила оформления заказа:\n"
+        "- Новый покупатель регистрируется автоматически по номеру телефона.\n"
+        f"- Временный пароль для входа в личный кабинет — «{settings.customer_default_password}». "
+        "Сообщи его покупателю, когда создаёшь аккаунт/заказ по новому номеру.\n"
+        "- Цены и остатки бери только из раздела «Товары» контекста, не выдумывай."
+    )
+
     return [
         {"role": "system", "content": _SYSTEM_FRAME},
+        {"role": "system", "content": business},
         {"role": "system", "content": "Контекст:\n" + "\n".join(parts)},
         {"role": "system", "content": "История диалога:\n" + (history_text or "—")},
         {"role": "user", "content": state.text},
@@ -166,6 +192,6 @@ async def run_turn(client: CoreClient, llm: LLM, message: dict[str, Any]) -> Age
         return state
 
     await classify_intent(state, llm)
-    await retrieve_context(state, client)
+    await retrieve_context(state, client, llm)
     await generate(state, llm)
     return state

@@ -328,3 +328,34 @@ async def test_keyword_search_service(seeded_session):
     assert rows[0]["name"] == "Ручка"
     assert rows[0]["price"] == "10.00"
     assert rows[0]["stock"] == "0"
+
+
+async def test_keyword_search_tokenizes_query(seeded_session):
+    """Многословный запрос ищет по любому токену (OR), а не по точной подстроке."""
+    await _make_nomen(seeded_session, "021", "Хлеб пшеничный нарезной", price="45.00")
+    await _make_nomen(seeded_session, "022", "Молоко пастеризованное 3,2% 1 л", price="78.00")
+    await seeded_session.commit()
+
+    rows = await search_service.keyword_search(seeded_session, "хлеб пшеничный")
+    names = {r["name"] for r in rows}
+    assert "Хлеб пшеничный нарезной" in names
+
+    rows = await search_service.keyword_search(seeded_session, "свежее молоко")
+    names = {r["name"] for r in rows}
+    assert "Молоко пастеризованное 3,2% 1 л" in names
+
+    # Пустой/бессмысленный запрос — без ошибок, пустой результат.
+    assert await search_service.keyword_search(seeded_session, "? !") == []
+
+
+async def test_resolve_customer_uses_default_password(seeded_session):
+    """Агент создаёт аккаунт с паролем по умолчанию (CUSTOMER_DEFAULT_PASSWORD)."""
+    from app.core.config import settings
+    from app.services.customer_service import authenticate, resolve_customer_by_phone
+
+    resolved = await resolve_customer_by_phone(seeded_session, "+79997776655", name="Иван")
+    assert resolved["is_new"] is True
+
+    customer = await authenticate(seeded_session, "79997776655", settings.customer_default_password)
+    assert customer.name == "Иван"
+    assert customer.kontragent_id == resolved["kontragent_id"]

@@ -45,9 +45,10 @@ _KEYWORDS: dict[str, tuple[str, ...]] = {
 _STOPWORDS: frozenset[str] = frozenset(
     "привет здравствуйте здравствуй добрый день добрый есть ли сколько стоит цена "
     "наличие остаток в наличии хочу нужен нужна нужно пожалуйста подскажите скажите "
+    "посоветуй порекомендуй предложи покажи что что-нибудь что-то какой-нибудь "
     "можете можно какой какая какое какие и на в по с за у к от из для не а "
     "hello hi hey do you have how much price of the a an is there any in stock "
-    "please i want need tell me can you".split()
+    "please i want need tell me can you show recommend".split()
 )
 
 
@@ -61,13 +62,14 @@ def extract_query(text: str) -> str:
 
     Используется fallback-поиском каталога: ядро ищет ``ILIKE %query%`` по
     полному названию, поэтому передавать всё сообщение целиком (с приветствием
-    и вопросительными словами) неэффективно.
+    и вопросительными словами) неэффективно. Пустая строка — если значимых
+    слов нет (чистое приветствие), тогда поиск не выполняется.
     """
     import re
 
     words = re.findall(r"[a-zа-яё0-9]+", text.lower())
     meaningful = [w for w in words if w not in _STOPWORDS]
-    return " ".join(meaningful) if meaningful else " ".join(words)
+    return " ".join(meaningful)
 
 
 def classify_intent(text: str) -> str:

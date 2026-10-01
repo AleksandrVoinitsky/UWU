@@ -10,6 +10,8 @@ OpenAI-совместимый провайдер эмбеддингов. Есл�
 """
 from __future__ import annotations
 
+import re
+
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,16 +52,33 @@ async def _product(nomen: Nomenklatura, session: AsyncSession, *, similarity: fl
     return out
 
 
+def _search_terms(query: str) -> list[str]:
+    """Разбивает запрос на значимые токены (буквы/цифры, ≥2 символа, без регистра)."""
+    return [
+        t for t in re.findall(r"[a-zа-яё0-9]+", (query or "").lower()) if len(t) >= 2
+    ]
+
+
 async def keyword_search(session: AsyncSession, query: str, limit: int = 50) -> list[dict]:
-    """Поиск товаров по ключевым словам (ILIKE по названию/артикулу)."""
+    """Поиск товаров по ключевым словам (ILIKE по названию/артикулу).
+
+    Запрос токенизируется, и каждая позиция ищется по любому из токенов (OR) —
+    так фразы вида «хлеб пшеничный» находят «Хлеб пшеничный нарезной», а не
+    только точные подстроки. Токены короче двух символов игнорируются.
+    """
+    terms = _search_terms(query)
+    if not terms:
+        return []
+    conditions = [
+        or_(
+            Nomenklatura.name.ilike(f"%{t}%"),
+            Nomenklatura.artikul.ilike(f"%{t}%"),
+        )
+        for t in terms
+    ]
     result = await session.execute(
         select(Nomenklatura)
-        .where(
-            or_(
-                Nomenklatura.name.ilike(f"%{query}%"),
-                Nomenklatura.artikul.ilike(f"%{query}%"),
-            )
-        )
+        .where(or_(*conditions))
         .order_by(Nomenklatura.name)
         .limit(limit)
     )

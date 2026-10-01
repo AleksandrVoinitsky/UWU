@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # API-ключ агента (тот же, что передаётся ядру через AGENT_API_KEY).
     # Обязателен для обращения к /api/agent/*.
     agent_api_key: str = ""
+    # Временный пароль по умолчанию, который агент сообщает покупателю при
+    # регистрации нового аккаунта (совпадает с CUSTOMER_DEFAULT_PASSWORD в ядре).
+    customer_default_password: str = "1242"
 
     # --- LLM (OpenAI-совместимый API; пустой ключ — fallback-режим) ---
     llm_base_url: str = ""
