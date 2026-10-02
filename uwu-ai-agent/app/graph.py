@@ -43,8 +43,6 @@ def _business_rules() -> str:
     """Деловые инструкции (содержат параметры из конфигурации агента)."""
     return (
         "Правила работы:\n"
-        "- Поздоровайся только в первом сообщении диалога; дальше не повторяй "
-        "приветствие (диалог уже идёт).\n"
         "- Для вопроса о товаре/цене/наличии вызывай search_catalog или get_stock.\n"
         "- Чтобы оформить заказ, собери: номер телефона и список товаров с количеством. "
         "Когда данные собраны — вызови create_order(customer_phone, items=[{name, quantity}]). "
@@ -56,6 +54,36 @@ def _business_rules() -> str:
         "- Если данных для действия не хватает — сначала задай уточняющий вопрос, "
         "не выполняй действие вслепую."
     )
+
+
+# Приветствия, по которым определяем, здоровался ли агент ранее (и которые
+# убираем из повторных ответов). Порядок важен: более длинные раньше коротких.
+_GREETINGS: tuple[str, ...] = (
+    "здравствуйте", "добрый день", "добрый вечер", "доброе утро", "привет",
+    "hello", "hi", "hey",
+)
+
+
+def _already_greeted(history: list[dict]) -> bool:
+    """Был ли в истории ответ агента, начинающийся с приветствия."""
+    for m in history:
+        if m.get("author") != "agent":
+            continue
+        text = (m.get("text") or "").strip().lower()
+        if any(text.startswith(g) for g in _GREETINGS):
+            return True
+    return False
+
+
+def _strip_greeting(text: str) -> str:
+    """Убирает ведущее приветствие из ответа (если оно есть)."""
+    stripped = text.strip()
+    lower = stripped.lower()
+    for g in _GREETINGS:
+        if lower.startswith(g):
+            rest = stripped[len(g):].lstrip("!,.:; ")
+            return rest.strip() or stripped
+    return stripped
 
 
 @dataclass
@@ -90,13 +118,25 @@ def _build_messages(state: AgentState) -> list[dict]:
         f"{m.get('author', '?')}: {m.get('text', '')}" for m in history[-12:]
     )
 
-    return [
+    messages: list[dict] = [
         {"role": "system", "content": _SYSTEM_FRAME},
         {"role": "system", "content": _business_rules()},
-        {"role": "system", "content": "Контекст:\n" + "\n".join(parts)},
-        {"role": "system", "content": "История диалога:\n" + (history_text or "—")},
-        {"role": "user", "content": state.text},
     ]
+    if _already_greeted(history):
+        messages.append(
+            {
+                "role": "system",
+                "content": (
+                    "ВАЖНО: ты уже поздоровался ранее в этом диалоге. НЕ начинай "
+                    "ответ с приветствия («Здравствуйте», «Привет» и т.п.) — сразу "
+                    "отвечай по сути вопроса."
+                ),
+            }
+        )
+    messages.append({"role": "system", "content": "Контекст:\n" + "\n".join(parts)})
+    messages.append({"role": "system", "content": "История диалога:\n" + (history_text or "—")})
+    messages.append({"role": "user", "content": state.text})
+    return messages
 
 
 def _tool_calls_payload(message: Any) -> list[dict]:
@@ -211,5 +251,11 @@ async def run_turn(client: CoreClient, llm: LLM, message: dict[str, Any]) -> Age
         await _llm_turn(state, client, llm)
     else:
         await _fallback_turn(state, client, llm)
+
+    # Страховка от повторного приветствия: если агент уже здоровался, убираем
+    # ведущее приветствие из нового ответа (LLM не всегда следует инструкции).
+    history = ctx.get("history") or []
+    if state.final_answer and _already_greeted(history):
+        state.final_answer = _strip_greeting(state.final_answer)
 
     return state

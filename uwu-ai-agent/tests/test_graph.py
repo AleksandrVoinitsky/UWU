@@ -5,8 +5,23 @@ tool-calls. LLM-путь с реальными вызовами инструме
 """
 import pytest
 
-from app.graph import AgentState, run_turn
+from app.graph import AgentState, _already_greeted, _strip_greeting, run_turn
 from app.llm import LLM
+
+
+def test_already_greeted():
+    assert _already_greeted([{"author": "agent", "text": "Здравствуйте! Чем помочь?"}]) is True
+    assert _already_greeted([{"author": "customer", "text": "Привет"}]) is False
+    assert _already_greeted([{"author": "agent", "text": "Вот товары:"}]) is False
+    assert _already_greeted([]) is False
+
+
+def test_strip_greeting():
+    assert _strip_greeting("Здравствуйте! Вот товары") == "Вот товары"
+    assert _strip_greeting("Привет, как дела") == "как дела"
+    assert _strip_greeting("Вот товары") == "Вот товары"
+    # Только приветствие без полезной части — не режем (не оставляем пусто).
+    assert _strip_greeting("Здравствуйте!") == "Здравствуйте!"
 
 
 class FakeClient:
