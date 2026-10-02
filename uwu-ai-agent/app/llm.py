@@ -68,6 +68,30 @@ class LLM:
         content = resp.choices[0].message.content or ""
         return content.strip()
 
+    async def chat_with_tools(
+        self,
+        messages: list[dict],
+        tools: list[dict],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ):
+        """Вызывает LLM с инструментами (function calling) и возвращает message.
+
+        Возвращает объект ``message`` с полями ``content`` (текст) и/или
+        ``tool_calls`` (вызовы инструментов), чтобы вызывающий код решил:
+        выполнить инструмент или использовать текст как финальный ответ.
+        """
+        client = self._ensure_client()
+        resp = await client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            tools=tools,
+            temperature=temperature if temperature is not None else settings.llm_temperature,
+            max_tokens=max_tokens if max_tokens is not None else settings.llm_max_tokens,
+        )
+        return resp.choices[0].message
+
     async def classify(self, text: str) -> str:
         """Классифицирует намерение сообщения в одну из категорий графа."""
         try:

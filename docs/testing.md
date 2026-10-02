@@ -9,11 +9,12 @@ TDD: тесты пишутся как часть системы и исполь�
 
 ## Запуск
 
-Тестовая БД — сервис `db_test` в `docker-compose.yml` (изолирована от рабочей
-`uwu`, хост-порт 5433):
+Тесты используют одноразовую БД `uwu_test` (поднимается только на время прогона
+и удаляется после):
 
 ```bash
-docker compose up -d db_test     # тестовая БД (uwu_test, pgvector)
+docker run -d --name uwu-test-pg -e POSTGRES_USER=uwu -e POSTGRES_PASSWORD=uwu \
+  -e POSTGRES_DB=uwu_test -p 5433:5432 pgvector/pgvector:pg16
 pip install -r requirements.txt
 pytest tests/ -v
 ```
