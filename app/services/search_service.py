@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
@@ -76,10 +76,16 @@ async def keyword_search(session: AsyncSession, query: str, limit: int = 50) -> 
         )
         for t in terms
     ]
+    # Релевантность: совпадение по началу названия (префикс) важнее, чем по
+    # подстроке в середине. Иначе короткий запрос «сок» находит «Сахар-песок»
+    # (в слове «песок» есть «сок») раньше, чем «Сок апельсиновый» — и create_order
+    # с limit=1 подставляет не тот товар.
+    prefix = or_(*[Nomenklatura.name.ilike(f"{t}%") for t in terms])
+    relevance = case((prefix, 0), else_=1)
     result = await session.execute(
         select(Nomenklatura)
         .where(or_(*conditions))
-        .order_by(Nomenklatura.name)
+        .order_by(relevance, Nomenklatura.name)
         .limit(limit)
     )
     return [await _product(n, session) for n in result.scalars()]

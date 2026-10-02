@@ -348,6 +348,17 @@ async def test_keyword_search_tokenizes_query(seeded_session):
     assert await search_service.keyword_search(seeded_session, "? !") == []
 
 
+async def test_keyword_search_prefers_prefix_over_substring(seeded_session):
+    """Короткий запрос «сок» не должен подставлять «Сахар-песок» (в «песок» есть «сок»)."""
+    await _make_nomen(seeded_session, "030", "Сок апельсиновый 1 л", price="145.00")
+    await _make_nomen(seeded_session, "031", "Сахар-песок 1 кг", price="84.00")
+    await seeded_session.commit()
+
+    rows = await search_service.keyword_search(seeded_session, "сок")
+    # Префикс-совпадение («Сок …») идёт раньше подстроки («…песок»).
+    assert rows[0]["name"] == "Сок апельсиновый 1 л"
+
+
 async def test_resolve_customer_uses_default_password(seeded_session):
     """Агент создаёт аккаунт с паролем по умолчанию (CUSTOMER_DEFAULT_PASSWORD)."""
     from app.core.config import settings
