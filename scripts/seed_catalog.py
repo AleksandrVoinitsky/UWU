@@ -5,9 +5,8 @@
 а также минимальную инфраструктуру (склад, фирма, контрагент) и приходные
 накладные — чтобы у товаров был ненулевой остаток для отчётов и продаж.
 
-Запуск (внутри Docker-сети имя хоста ``db``, либо проброс порта):
-  $env:DATABASE_URL="postgresql+asyncpg://uwu:uwu@localhost:5433/uwu"
-  python scripts/seed_catalog.py
+Запуск (внутри контейнера приложения; там DATABASE_URL уже указывает на рабочую БД):
+  docker exec -w /app -e PYTHONPATH=/app uwu-app-1 python scripts/seed_catalog.py
 
 Идемпотентно: существующие категории/товары не дублируются.
 """
@@ -19,7 +18,8 @@ import random
 from datetime import date, timedelta
 from decimal import Decimal
 
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://uwu:uwu@localhost:5433/uwu")
+# Fallback для запуска вне контейнера (рабочая БД, а не тестовая uwu_test).
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://uwu:uwu@localhost:5432/uwu")
 
 from app.core.database import async_session_factory  # noqa: E402
 from app.models import catalog as cat  # noqa: E402

@@ -14,6 +14,27 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Тестовая БД для автотестов (pytest). Изолирована от рабочей ``uwu``, потому
+  # что тесты делают TRUNCATE/drop_all по всем таблицам — если бы они указывали
+  # на боевую БД, то затирали бы реальные данные. Управляется тем же compose:
+  # `docker compose up -d db_test`. Хост-порт 5433 использует conftest.py.
+  db_test:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: uwu
+      POSTGRES_PASSWORD: uwu
+      POSTGRES_DB: uwu_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgtestdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uwu -d uwu_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   app:
     build: .
     depends_on:
@@ -72,4 +93,5 @@ services:
 
 volumes:
   pgdata:
+  pgtestdata:
   uploads:

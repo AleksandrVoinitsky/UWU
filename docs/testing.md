@@ -9,19 +9,23 @@ TDD: тесты пишутся как часть системы и исполь�
 
 ## Запуск
 
-```bash
-# Тестовая БД (Docker) — с pgvector (для семантического поиска)
-docker run -d --name uwu-test-pg -e POSTGRES_USER=uwu -e POSTGRES_PASSWORD=uwu \
-  -e POSTGRES_DB=uwu_test -p 5433:5432 pgvector/pgvector:pg16
+Тестовая БД — сервис `db_test` в `docker-compose.yml` (изолирована от рабочей
+`uwu`, хост-порт 5433):
 
-# Создать схему и прогнать тесты
-export DATABASE_URL=postgresql+asyncpg://uwu:uwu@localhost:5433/uwu_test
+```bash
+docker compose up -d db_test     # тестовая БД (uwu_test, pgvector)
+pip install -r requirements.txt
 pytest tests/ -v
 ```
 
-Подключение к тестовой БД задаётся переменной `DATABASE_URL` (см.
-`tests/conftest.py`). Тестовый движок пересоздаётся с `NullPool` — это решает
-проблему привязки соединений asyncpg к event loop на Windows.
+Подключение к тестовой БД задаётся в `tests/conftest.py` (по умолчанию
+`postgresql+asyncpg://uwu:uwu@localhost:5433/uwu_test`). Тестовый движок
+пересоздаётся с `NullPool` — это решает проблему привязки соединений asyncpg к
+event loop на Windows.
+
+> Почему тестовая БД отделена от рабочей: фикстуры делают `drop_all`/`TRUNCATE`
+> по всем таблицам. Если бы они указывали на боевую `uwu`, каждый запуск тестов
+> стирал бы реальные данные (товары, пользователей, документы).
 
 ## Структура
 

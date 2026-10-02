@@ -1,8 +1,7 @@
 """Наполнение БД реалистичными демо-данными (товары, контрагенты, документы).
 
-Запуск:
-  $env:DATABASE_URL="postgresql+asyncpg://uwu:uwu@localhost:5433/uwu"
-  python scripts/seed_demo.py
+Запуск (внутри контейнера приложения; там DATABASE_URL уже указывает на рабочую БД):
+  docker exec -w /app -e PYTHONPATH=/app uwu-app-1 python scripts/seed_demo.py
 
 Создаёт: номенклатуру с ценами, контрагентов, склады, кассу, фирму, приходные и
 расходные накладные, денежные документы — для проверки отчётов, пагинации, ABC.
@@ -15,7 +14,8 @@ import random
 from datetime import date, timedelta
 from decimal import Decimal
 
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://uwu:uwu@localhost:5433/uwu")
+# Fallback для запуска вне контейнера (рабочая БД, а не тестовая uwu_test).
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://uwu:uwu@localhost:5432/uwu")
 
 from app.core.database import async_session_factory  # noqa: E402
 from app.models import catalog as cat  # noqa: E402

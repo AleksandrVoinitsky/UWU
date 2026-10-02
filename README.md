@@ -60,13 +60,17 @@ docker exec -w /app -e PYTHONPATH=/app uwu-app-1 python scripts/seed_catalog.py
 
 ## Тесты
 
+Тесты работают с **изолированной тестовой БД `uwu_test`** (сервис `db_test` в
+`docker-compose.yml`), а не с рабочей `uwu` — чтобы `TRUNCATE`/`drop_all` в
+тестах не затирали реальные данные. Поднять тестовую БД и прогнать тесты:
+
 ```bash
-docker run -d --name uwu-test-pg -e POSTGRES_USER=uwu -e POSTGRES_PASSWORD=uwu \
-  -e POSTGRES_DB=uwu_test -p 5433:5432 postgres:16-alpine
-export DATABASE_URL=postgresql+asyncpg://uwu:uwu@localhost:5433/uwu_test
+docker compose up -d db_test         # тестовая БД (хост-порт 5433)
 pip install -r requirements.txt
 pytest tests/ -v
 ```
+
+`tests/conftest.py` сам указывает на `localhost:5433/uwu_test`.
 
 ## Документация
 
